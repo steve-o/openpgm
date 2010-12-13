@@ -473,7 +473,6 @@ pgm_socket (
  */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
 		const int v = 1;
-#ifndef SO_REUSEPORT
 		if (SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    SOCKET_ERROR == setsockopt (new_sock->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
@@ -487,21 +486,6 @@ pgm_socket (
 				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			goto err_destroy;
 		}
-#else
-		if (SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&v, sizeof(v)) ||
-		    SOCKET_ERROR == setsockopt (new_sock->send_sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&v, sizeof(v)) ||
-		    SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&v, sizeof(v)))
-		{
-			const int save_errno = pgm_get_last_sock_error();
-			char errbuf[1024];
-			pgm_set_error (error,
-				       PGM_ERROR_DOMAIN_SOCKET,
-				       pgm_error_from_sock_errno (save_errno),
-				       _("Enabling reuse of duplicate socket address and port bindings: %s"),
-				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
-			goto err_destroy;
-		}
-#endif
 
 /* request extra packet information to determine destination address on each packet */
 #ifndef CONFIG_TARGET_WINE
@@ -745,7 +729,7 @@ pgm_getsockopt (
 			break;
 		{
 			struct timeval* tv = optval;
-			const long usecs = (long)pgm_rate_remaining2 (&sock->rate_control, &sock->odata_rate_control, sock->blocklen);
+			const long usecs = (long)pgm_rate_remaining (&sock->rate_control, sock->blocklen);
 			tv->tv_sec  = usecs / 1000000L;
 			tv->tv_usec = usecs % 1000000L;
 		}
@@ -816,34 +800,6 @@ pgm_getsockopt (
 		if (PGM_UNLIKELY(*optlen != sizeof (int)))
 			break;
 		*(int*restrict)optval = (int)sock->txw_max_rte;
-		status = TRUE;
-		break;
-
-	case PGM_ODATA_MAX_RTE:
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
-			break;
-		*(int*restrict)optval = (int)sock->odata_max_rte;
-		status = TRUE;
-		break;
-
-	case PGM_RDATA_MAX_RTE:
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
-			break;
-		*(int*restrict)optval = (int)sock->rdata_max_rte;
-		status = TRUE;
-		break;
-
-	case PGM_UNCONTROLLED_ODATA:
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
-			break;
-		*(int*restrict)optval = sock->is_controlled_odata ? 0 : 1;
-		status = TRUE;
-		break;
-
-	case PGM_UNCONTROLLED_RDATA:
-		if (PGM_UNLIKELY(*optlen != sizeof (int)))
-			break;
-		*(int*restrict)optval = sock->is_controlled_rdata ? 0 : 1;
 		status = TRUE;
 		break;
 
@@ -1143,7 +1099,7 @@ pgm_setsockopt (
 			break;
 		{
 			const bool v = (0 != *(const int*)optval);
-#if !defined(_WIN32) && !defined(__CYGWIN__)	/* loop on send */
+#ifndef _WIN32	/* loop on send */
 			if (SOCKET_ERROR == pgm_sockaddr_multicast_loop (sock->send_sock, sock->family, v) ||
 			    SOCKET_ERROR == pgm_sockaddr_multicast_loop (sock->send_with_router_alert_sock, sock->family, v))
 				break;
@@ -1253,55 +1209,6 @@ pgm_setsockopt (
 		if (PGM_UNLIKELY(*(const int*)optval <= 0))
 			break;
 		sock->txw_max_rte = *(const int*)optval;
-/* default to controlling SPM, ODATA, and RDATA packets. */
-		sock->is_controlled_odata = TRUE;
-		sock->is_controlled_rdata = TRUE;
-		status = TRUE;
-		break;
-
-/* maximum original data rate.
- * 0 < odata_max_rte < txw_max_rte
- */
-	case PGM_ODATA_MAX_RTE:
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
-			break;
-		if (PGM_UNLIKELY(*(const int*)optval <= 0))
-			break;
-		sock->odata_max_rte = *(const int*)optval;
-		status = TRUE;
-		break;
-
-/* maximum repair data rate.
- * 0 < rdata_max_rte < txw_max_rte
- */
-	case PGM_RDATA_MAX_RTE:
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
-			break;
-		if (PGM_UNLIKELY(*(const int*)optval <= 0))
-			break;
-		sock->rdata_max_rte = *(const int*)optval;
-		status = TRUE;
-		break;
-
-/* ignore rate limit for original data packets, i.e. only apply to repairs.
- */
-	case PGM_UNCONTROLLED_ODATA:
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
-			break;
-		if (PGM_UNLIKELY(*(const int*)optval <= 0))
-			break;
-		sock->is_controlled_odata = (0 == *(const int*)optval);
-		status = TRUE;
-		break;
-
-/* ignore rate limit for repair data packets, i.e. only apply to original data.
- */
-	case PGM_UNCONTROLLED_RDATA:
-		if (PGM_UNLIKELY(optlen != sizeof (int)))
-			break;
-		if (PGM_UNLIKELY(*(const int*)optval <= 0))
-			break;
-		sock->is_controlled_rdata = (0 == *(const int*)optval);
 		status = TRUE;
 		break;
 
@@ -2312,25 +2219,20 @@ pgm_bind3 (
 	if (sock->can_send_data)
 	{
 /* setup rate control */
-		if (sock->txw_max_rte > 0) {
+		if (sock->txw_max_rte > 0)
+		{
 			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %" PRIzd " bytes per second."),
 					sock->txw_max_rte);
 			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
 			sock->is_controlled_spm   = TRUE;	/* must always be set */
-		} else
-			sock->is_controlled_spm   = FALSE;
-
-		if (sock->odata_max_rte > 0) {
-			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting ODATA rate regulation to %" PRIzd " bytes per second."),
-					sock->odata_max_rte);
-			pgm_rate_create (&sock->odata_rate_control, sock->odata_max_rte, sock->iphdr_len, sock->max_tpdu);
 			sock->is_controlled_odata = TRUE;
-		}
-		if (sock->rdata_max_rte > 0) {
-			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting RDATA rate regulation to %" PRIzd " bytes per second."),
-					sock->rdata_max_rte);
-			pgm_rate_create (&sock->rdata_rate_control, sock->rdata_max_rte, sock->iphdr_len, sock->max_tpdu);
 			sock->is_controlled_rdata = TRUE;
+		}
+		else
+		{
+			sock->is_controlled_spm   = FALSE;
+			sock->is_controlled_odata = FALSE;
+			sock->is_controlled_rdata = FALSE;
 		}
 	}
 
@@ -2524,38 +2426,21 @@ pgm_select_info (
 #endif
 }
 
-#if defined(CONFIG_HAVE_POLL) || defined(CONFIG_HAVE_WSAPOLL)
+#ifdef CONFIG_HAVE_POLL
 /* add poll parameters for the receive socket(s)
  *
  * returns number of pollfd structures filled.
  */
 
-#ifndef _WIN32
-#	define PGM_POLLIN		POLLIN
-#	define PGM_POLLOUT		POLLOUT
-#else
-#	define PGM_POLLIN		POLLRDNORM
-#	define PGM_POLLOUT		POLLWRNORM
-#endif
-
 int
 pgm_poll_info (
 	pgm_sock_t*	 const restrict	sock,
-#ifndef _WIN32
 	struct pollfd*   const restrict	fds,
-	int*		 const restrict	n_fds,		/* in: #fds, out: used #fds */
-#else
-	WSAPOLLFD*	 const restrict	fds,
-	ULONG*		 const restrict	n_fds,
-#endif
-	const short			events		/* POLLIN, POLLOUT */
+	SOCKET*		 const restrict	n_fds,		/* in: #fds, out: used #fds */
+	const int			events		/* POLLIN, POLLOUT */
 	)
 {
-#ifndef _WIN32
 	int nfds = 0;
-#else
-	ULONG nfds = 0;
-#endif
 
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != fds);
@@ -2568,36 +2453,36 @@ pgm_poll_info (
 	}
 
 /* we currently only support one incoming socket */
-	if (events & PGM_POLLIN)
+	if (events & POLLIN)
 	{
 		pgm_assert ( (1 + nfds) <= *n_fds );
 		fds[nfds].fd = sock->recv_sock;
-		fds[nfds].events = PGM_POLLIN;
+		fds[nfds].events = POLLIN;
 		nfds++;
 		if (sock->can_send_data) {
 			pgm_assert ( (1 + nfds) <= *n_fds );
 			fds[nfds].fd = pgm_notify_get_socket (&sock->rdata_notify);
-			fds[nfds].events = PGM_POLLIN;
+			fds[nfds].events = POLLIN;
 			nfds++;
 		}
 		pgm_assert ( (1 + nfds) <= *n_fds );
 		fds[nfds].fd = pgm_notify_get_socket (&sock->pending_notify);
-		fds[nfds].events = PGM_POLLIN;
+		fds[nfds].events = POLLIN;
 		nfds++;
 	}
 
 /* ODATA only published on regular socket, no need to poll router-alert sock */
-	if (sock->can_send_data && events & PGM_POLLOUT)
+	if (sock->can_send_data && events & POLLOUT)
 	{
 		pgm_assert ( (1 + nfds) <= *n_fds );
 		if (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) {
 /* rx thread poll for ACK */
 			fds[nfds].fd = pgm_notify_get_socket (&sock->ack_notify);
-			fds[nfds].events = PGM_POLLIN;
+			fds[nfds].events = POLLIN;
 		} else {
 /* kernel resource poll */
 			fds[nfds].fd = sock->send_sock;
-			fds[nfds].events = PGM_POLLOUT;
+			fds[nfds].events = POLLOUT;
 		}
 		nfds++;
 	}

@@ -2,7 +2,7 @@
  * 
  * PGM packet formats, RFC 3208.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_PACKET_TEST_H__
 #define __PGM_IMPL_PACKET_TEST_H__
 

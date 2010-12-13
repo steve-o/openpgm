@@ -122,7 +122,7 @@ public:
 			errno = EINVAL;
 			return false;
 		}
-		return pgm_setsockopt (this->native_type_, IPPROTO_PGM, optname, &v, sizeof(v));
+		return pgm_setsockopt (this->native_type_, optname, v, sizeof(v));
 	}
 
 	/// Send some data on a connected socket.

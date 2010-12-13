@@ -168,13 +168,11 @@ pgm_spinlock_init (
 {
 	pgm_assert (NULL != spinlock);
 
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifndef _WIN32
 	posix_check_cmd (pthread_spin_init (&spinlock->pthread_spinlock, PTHREAD_PROCESS_PRIVATE));
-#elif defined(_WIN32)
+#else
 	InitializeCriticalSection (&spinlock->win32_spinlock);
-#else	/* GCC atomics */
-	spinlock->taken = 0;
-#endif
+#endif /* !_WIN32 */
 }
 
 bool
@@ -184,19 +182,15 @@ pgm_spinlock_trylock (
 {
 	pgm_assert (NULL != spinlock);
 
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifndef _WIN32
 	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
 	if (EBUSY == result)
 		return FALSE;
 	posix_check_err (result, "pthread_spinlock_trylock");
 	return TRUE;
-#elif defined(_WIN32)
+#else
 	return TryEnterCriticalSection (&spinlock->win32_spinlock);
-#else	/* GCC atomics */
-	uint32_t prev;
-	prev = __sync_lock_test_and_set (&spinlock->taken, 1);
-	return (0 == prev);
-#endif
+#endif /* !_WIN32 */
 }
 
 void
@@ -206,14 +200,12 @@ pgm_spinlock_free (
 {
 	pgm_assert (NULL != spinlock);
 
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifndef _WIN32
 /* ignore return value */
 	pthread_spin_destroy (&spinlock->pthread_spinlock);
-#elif defined(_WIN32)
+#else
 	DeleteCriticalSection (&spinlock->win32_spinlock);
-#else	/* GCC atomics */
-	/* NOP */
-#endif
+#endif /* !_WIN32 */
 }
 
 void

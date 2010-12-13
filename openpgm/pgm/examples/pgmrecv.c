@@ -482,6 +482,7 @@ receiver_thread (
 
 #ifdef CONFIG_HAVE_EPOLL
 	struct epoll_event events[ev_len];	/* wait for maximum 1 event */
+	int timeout;
 	const int efd = epoll_create (IP_MAX_MEMBERSHIPS);
 	if (efd < 0) {
 		g_error ("epoll_create failed errno %i: \"%s\"", errno, strerror(errno));
@@ -505,33 +506,37 @@ receiver_thread (
 		return NULL;
 	}
 #elif defined(CONFIG_HAVE_POLL)
+	int timeout;
 	int n_fds = 2;
 	struct pollfd fds[ 1 + n_fds ];
 #elif defined(G_OS_UNIX) /* HAVE_SELECT */
 	int n_fds;
 	fd_set readfds;
 #else /* G_OS_WIN32 */
-	SOCKET recv_sock, pending_sock;
-	DWORD cEvents = PGM_RECV_SOCKET_READ_COUNT + 1;
-	WSAEVENT waitEvents[ PGM_RECV_SOCKET_READ_COUNT + 1 ];
-	socklen_t socklen = sizeof (SOCKET);
+	int n_handles = 3, recv_sock, pending_sock;
+#  if (__STDC_VERSION__ >= 199901L)
+	HANDLE waitHandles[n_handles];
+#  else
+	HANDLE* waitHandles = (HANDLE*)g_malloc (n_handles * sizeof(HANDLE));;
+#  endif
+	DWORD timeout, dwEvents;
+	WSAEVENT recvEvent, pendingEvent;
+	socklen_t socklen = sizeof(int);
 
-	waitEvents[0] = g_quit_event;
-	waitEvents[1] = WSACreateEvent ();
+	recvEvent = WSACreateEvent ();
 	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_RECV_SOCK, &recv_sock, &socklen);
-	WSAEventSelect (recv_sock, waitEvents[1], FD_READ);
-	waitEvents[2] = WSACreateEvent ();
+	WSAEventSelect (recv_sock, recvEvent, FD_READ);
+	pendingEvent = WSACreateEvent ();
 	pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_PENDING_SOCK, &pending_sock, &socklen);
-	WSAEventSelect (pending_sock, waitEvents[2], FD_READ);
+	WSAEventSelect (pending_sock, pendingEvent, FD_READ);
+
+	waitHandles[0] = g_quit_event;
+	waitHandles[1] = recvEvent;
+	waitHandles[2] = pendingEvent;
 #endif /* !CONFIG_HAVE_EPOLL */
 
 	do {
 		struct timeval tv;
-#ifndef _WIN32
-		int timeout;
-#else
-		DWORD dwTimeout, dwEvents;
-#endif
 		size_t len;
 		pgm_error_t* pgm_err = NULL;
 		const int status = pgm_recvmsgv (rx_sock,
@@ -575,11 +580,11 @@ block:
 			pgm_select_info (rx_sock, &readfds, NULL, &n_fds);
 			select (n_fds, &readfds, NULL, NULL, PGM_IO_STATUS_RATE_LIMITED == status ? &tv : NULL);
 #else /* G_OS_WIN32 */
-			dwTimeout = PGM_IO_STATUS_WOULD_BLOCK == status ? WSA_INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
-			dwEvents = WSAWaitForMultipleEvents (cEvents, waitEvents, FALSE, dwTimeout, FALSE);
+			timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? INFINITE : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
+			dwEvents = WaitForMultipleObjects (n_handles, waitHandles, FALSE, timeout);
 			switch (dwEvents) {
-			case WSA_WAIT_EVENT_0+1: WSAResetEvent (waitEvents[1]); break;
-			case WSA_WAIT_EVENT_0+2: WSAResetEvent (waitEvents[2]); break;
+			case WAIT_OBJECT_0+1: WSAResetEvent (recvEvent); break;
+			case WAIT_OBJECT_0+2: WSAResetEvent (pendingEvent); break;
 			default: break;
 			}
 #endif /* !CONFIG_HAVE_EPOLL */
@@ -599,8 +604,8 @@ block:
 #ifdef CONFIG_HAVE_EPOLL
 	close (efd);
 #elif defined(G_OS_WIN32)
-	WSACloseEvent (waitEvents[1]);
-	WSACloseEvent (waitEvents[2]);
+	WSACloseEvent (recvEvent);
+	WSACloseEvent (pendingEvent);
 #  if (__STDC_VERSION__ < 199901L)
 	g_free (waitHandles);
 #  endif

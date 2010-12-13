@@ -17,13 +17,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_ATOMIC_H__
 #define __PGM_ATOMIC_H__
 
-#if defined( __sun )
+#ifdef sun
 #	include <atomic.h>
 #endif
 #include <pgm/types.h>
@@ -37,20 +35,19 @@ pgm_atomic_exchange_and_add32 (
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint32_t result;
-	__asm volatile (  "lock\n\t"
-		   	  "xaddl %0, %1"
-		        : "=r" (result), "=m" (*atomic)
-		        : "0" (val), "m" (*atomic)
-		        : "memory", "cc"  );
+	asm volatile (	"lock\n\t"
+			"xaddl %0, %1"
+		      : "=r" (result), "=m" (*atomic)
+		      : "0" (val), "m" (*atomic)
+		      : "memory", "cc"  );
 	return result;
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
-/* Sun C++ compiler wants __asm__ not __asm */
 	uint32_t result = val;
-	__asm__ volatile ("lock\n\t"
-			  "xaddl %0, %1"
-		       :: "r" (result), "m" (*atomic)  );
+	asm volatile (	"lock\n\t"
+			"xaddl %0, %1"
+		      :: "r" (result), "m" (*atomic)  );
 	return result;
-#elif defined( __sun )
+#elif defined( sun )
 	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
 	return nv - val;
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
@@ -70,17 +67,16 @@ pgm_atomic_add32 (
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	__asm volatile (  "lock\n\t"
-			  "addl %1, %0"
-		        : "=m" (*atomic)
-		        : "ir" (val), "m" (*atomic)
-		        : "memory", "cc"  );
+	asm volatile (	"lock\n\t"
+			"addl %1, %0"
+		      : "=m" (*atomic)
+		      : "ir" (val), "m" (*atomic)
+		      : "memory", "cc"  );
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
-/* Sun C++ compiler wants __asm__ not __asm */
-	__asm__ volatile ("lock\n\t"
-			  "addl %1, %0"
-		       :: "r" (val), "m" (*atomic)  );
-#elif defined( __sun )
+	asm volatile (	"lock\n\t"
+			"addl %1, %0"
+		      :: "r" (val), "m" (*atomic)  );
+#elif defined( sun )
 	atomic_add_32 (atomic, (int32_t)val);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	__sync_fetch_and_add (atomic, val);
@@ -97,7 +93,7 @@ pgm_atomic_inc32 (
 {
 #if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || ((defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 )))
 	pgm_atomic_add32 (atomic, 1);
-#elif defined( __sun )
+#elif defined( sun )
 	atomic_inc_32 (atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, 1);
@@ -114,7 +110,7 @@ pgm_atomic_dec32 (
 {
 #if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || ((defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 )))
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
-#elif defined( __sun )
+#elif defined( sun )
 	atomic_dec_32 (atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, (uint32_t)-1);

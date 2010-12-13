@@ -2,7 +2,7 @@
  * 
  * Shared math routines.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,9 +23,7 @@
 #       error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_MATH_H__
 #define __PGM_IMPL_MATH_H__
 

@@ -54,8 +54,8 @@ static pgm_slist_t*	mock_pgm_sock_list;
 START_TEST (test_init_pass_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_http_init (8080, &err), "init failed");
-	fail_unless (NULL == err, "init failed");
+	fail_unless (TRUE == pgm_http_init (8080, &err));
+	fail_unless (NULL == err);
 }
 END_TEST
 
@@ -63,8 +63,8 @@ END_TEST
 START_TEST (test_init_fail_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_http_init (8080, &err), "init failed");
-	fail_unless (TRUE == pgm_http_init (8080, &err), "init failed");
+	fail_unless (TRUE == pgm_http_init (8080, &err));
+	fail_unless (TRUE == pgm_http_init (8080, &err));
 }
 END_TEST
 
@@ -76,9 +76,9 @@ END_TEST
 START_TEST (test_shutdown_pass_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_http_init (8080, &err), "init failed");
-	fail_unless (NULL == err, "init failed");
-	fail_unless (TRUE == pgm_http_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_http_init (8080, &err));
+	fail_unless (NULL == err);
+	fail_unless (TRUE == pgm_http_shutdown ());
 }
 END_TEST
 
@@ -87,19 +87,19 @@ END_TEST
 START_TEST (test_shutdown_pass_002)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (TRUE == pgm_http_init (8080, &err), "init failed");
-	fail_unless (NULL == err, "init failed");
-	fail_unless (TRUE == pgm_http_shutdown (), "shutdown failed");
-	fail_unless (TRUE == pgm_http_init (8080, &err), "init failed");
-	fail_unless (NULL == err, "init failed");
-	fail_unless (TRUE == pgm_http_shutdown (), "shutdown failed");
+	fail_unless (TRUE == pgm_http_init (8080, &err));
+	fail_unless (NULL == err);
+	fail_unless (TRUE == pgm_http_shutdown ());
+	fail_unless (TRUE == pgm_http_init (8080, &err));
+	fail_unless (NULL == err);
+	fail_unless (TRUE == pgm_http_shutdown ());
 }
 END_TEST
 
 /* no running server */
 START_TEST (test_shutdown_fail_001)
 {
-	fail_unless (FALSE == pgm_http_shutdown (), "shutdown failed");
+	fail_unless (FALSE == pgm_http_shutdown ());
 }
 END_TEST
 

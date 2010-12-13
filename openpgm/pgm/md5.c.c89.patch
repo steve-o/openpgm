@@ -1,5 +1,5 @@
---- md5.c	2010-12-13 17:32:39.000000000 +0800
-+++ md5.c89.c	2010-12-13 17:33:19.000000000 +0800
+--- md5.c	2010-12-13 18:00:09.000000000 +0800
++++ md5.c89.c	2010-12-13 18:00:36.000000000 +0800
 @@ -92,6 +92,7 @@
  	pgm_assert (len > 0);
  	pgm_assert (NULL != ctx);
@@ -8,15 +8,6 @@
  	uint32_t correct_words[16];
  	const uint32_t *words = buffer;
  	const size_t nwords = len / sizeof (uint32_t);
-@@ -104,7 +105,7 @@
- /* First increment the byte count.  RFC 1321 specifies the possible
-    length of the file up to 2^64 bits.  Here we only compute the
-    number of bytes.  Do a double word increment.  */
--	ctx->total[0] += len;
-+	ctx->total[0] += (uint32_t)len;
- 	if (ctx->total[0] < len)
- 		++ctx->total[1];
- 
 @@ -243,6 +244,7 @@
  	ctx->B = B;
  	ctx->C = C;
@@ -25,15 +16,6 @@
  }
  
  void
-@@ -297,7 +299,7 @@
- 			left_over -= 64;
- 			memcpy (ctx->buffer, &ctx->buffer[64], left_over);
- 		}
--		ctx->buflen = left_over;
-+		ctx->buflen = (uint32_t)left_over;
- 	}
- }
- 
 @@ -343,6 +345,7 @@
  	pgm_assert (NULL != resbuf);
  

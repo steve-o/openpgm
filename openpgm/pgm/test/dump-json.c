@@ -223,7 +223,7 @@ verify_ip_header (
 	int sum = in_cksum((char*)ip, ip_header_length, 0);
 	if (sum != 0) {
 		const int ip_sum = g_ntohs(ip->ip_sum);
-		printf ("\t\"message\": \"IP: IP header checksum incorrect: %#x.\",\n", ip_sum);
+		printf ("\t\"message\": \"IP: IP header checksum incorrect: 0x%x.\",\n", ip_sum);
 		return -2;
 	}
 #endif
@@ -333,7 +333,7 @@ verify_pgm_header (
 		int pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)pgm, pgm_len, 0));
 		pgm->pgm_checksum = sum;
 		if (pgm_sum != sum) {
-			printf ("\t\"message\": \"PGM: PGM packet checksum incorrect, packet %#x calculated %#x.\",\n", sum, pgm_sum);
+			printf ("\t\"message\": \"PGM: PGM packet checksum incorrect, packet 0x%x calculated 0x%x.\",\n", sum, pgm_sum);
 			return -2;
 		}
 	} else {
@@ -1201,7 +1201,7 @@ print_options (
 
 	puts ("\t\t\"pgmOptions\": [");
 	puts ("\t\t\t{");
-	printf ("\t\t\t\t\"length\": \"%#x\",\n", opt_len->opt_length);
+	printf ("\t\t\t\t\"length\": 0x%x,\n", opt_len->opt_length);
 	puts ("\t\t\t\t\"type\": \"OPT_LENGTH\",");
 	printf ("\t\t\t\t\"totalLength\": %i\n", g_ntohs (opt_len->opt_total_length));
 	printf ("\t\t\t}");
@@ -1213,7 +1213,7 @@ print_options (
 
 		puts (",");
 		puts ("\t\t\t{");
-		printf ("\t\t\t\t\"length\": \"%#x\",\n", opt_header->opt_length);
+		printf ("\t\t\t\t\"length\": 0x%x,\n", opt_header->opt_length);
 
 		switch (opt_header->opt_type & PGM_OPT_MASK) {
 		case PGM_OPT_FRAGMENT:
@@ -1296,7 +1296,7 @@ print_options (
 		default:
 		{
 			guint8 opt_reserved = *(guint8*)(opt_header + 1);
-			printf ("\t\t\t\t\"type\": \"%#x%s\",\n", opt_header->opt_type & PGM_OPT_MASK, (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
+			printf ("\t\t\t\t\"type\": \"0x%x%s\",\n", opt_header->opt_type & PGM_OPT_MASK, (opt_header->opt_type & PGM_OPT_END) ? "|OPT_END" : "");
 			printf ("\t\t\t\t\"F-bit\": %s,\n", (opt_header->opt_reserved & PGM_OP_ENCODED) ? "true" : "false");
 			printf ("\t\t\t\t\"OPX\": \"%s\",\n", opx_text[opt_header->opt_reserved & PGM_OPX_MASK]);
 			printf ("\t\t\t\t\"U-bit\": %s\n", (opt_reserved & PGM_OP_ENCODED_NULL) ? "true" : "false");

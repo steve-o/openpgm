@@ -168,7 +168,7 @@ sub wait_for_spm {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /SPM$/);
 		}
 		alarm 0;
@@ -191,7 +191,7 @@ sub wait_for_spmr {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /SPMR/);
 		}
 		alarm 0;
@@ -214,7 +214,7 @@ sub die_on_spmr {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /SPMR/);
 		}
 		alarm 0;
@@ -266,7 +266,7 @@ sub wait_for_odata {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /ODATA/);
 		}
 		alarm 0;
@@ -289,7 +289,7 @@ sub wait_for_rdata {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /RDATA/);
 		}
 		alarm 0;
@@ -312,7 +312,7 @@ sub die_on_nak {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /NAK/);
 		}
 		alarm 0;
@@ -335,7 +335,7 @@ sub wait_for_nak {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /NAK/);
 		}
 		alarm 0;
@@ -358,7 +358,7 @@ sub wait_for_ncf {
 		alarm $timeout;
 		for (;;) {
 			my $block = $self->wait_for_block;
-			$obj = $json->decode($block);
+			$obj = $json->jsonToObj($block);
 			last if ($obj->{PGM}->{type} =~ /NCF/);
 		}
 		alarm 0;

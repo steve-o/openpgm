@@ -1,5 +1,5 @@
---- rxw.c	2010-12-06 12:05:08.000000000 +0800
-+++ rxw.c89.c	2010-12-06 12:05:16.000000000 +0800
+--- rxw.c	2010-12-10 20:55:25.000000000 +0800
++++ rxw.c89.c	2010-12-10 20:57:13.000000000 +0800
 @@ -193,10 +193,11 @@
  	}
  
@@ -251,17 +251,6 @@
  }
  
  /* flush packets but instead of calling on_data append the contiguous data packets
-@@ -1357,8 +1397,8 @@
- 		}
- 	} while (*pmsg <= msg_end && !_pgm_rxw_incoming_is_empty (window));
- 
--	window->bytes_delivered += bytes_read;
--	window->msgs_delivered  += data_read;
-+	window->bytes_delivered += (uint32_t)bytes_read;
-+	window->msgs_delivered  += (uint32_t)data_read;
- 	return data_read > 0 ? bytes_read : -1;
- }
- 
 @@ -1397,7 +1437,7 @@
  	const uint32_t		tg_sqn		/* transmission group sequence */
  	)

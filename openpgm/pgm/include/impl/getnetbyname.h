@@ -23,9 +23,7 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_GETNETBYNAME_H__
 #define __PGM_IMPL_GETNETBYNAME_H__
 
@@ -39,7 +37,9 @@ struct pgm_netent_t
 {
 	char*	n_name;		/* Official network name */
 	char**	n_aliases;	/* Alias list */
-	struct sockaddr_storage n_net;	/* Network address */
+	int	n_addrtype;	/* Net address type, AF_INET or AF_INET6 */
+	int	n_length;
+	char*	n_net;		/* Network address */
 };
 
 struct pgm_netent_t* pgm_getnetbyname (const char*);

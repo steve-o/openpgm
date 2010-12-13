@@ -2,7 +2,7 @@
  * 
  * Rate regulation.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,9 +23,7 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_RATE_CONTROL_H__
 #define __PGM_IMPL_RATE_CONTROL_H__
 
@@ -49,9 +47,7 @@ struct pgm_rate_t {
 
 PGM_GNUC_INTERNAL void pgm_rate_create (pgm_rate_t*, const ssize_t, const size_t, const uint16_t);
 PGM_GNUC_INTERNAL void pgm_rate_destroy (pgm_rate_t*);
-PGM_GNUC_INTERNAL bool pgm_rate_check2 (pgm_rate_t*, pgm_rate_t*, const size_t, const bool);
 PGM_GNUC_INTERNAL bool pgm_rate_check (pgm_rate_t*, const size_t, const bool);
-PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining2 (pgm_rate_t*, pgm_rate_t*, const size_t);
 PGM_GNUC_INTERNAL pgm_time_t pgm_rate_remaining (pgm_rate_t*, const size_t);
 
 PGM_END_DECLS

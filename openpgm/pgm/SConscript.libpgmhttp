@@ -41,13 +41,12 @@ if env['WITH_CHECK'] == 'true':
  	te['SHOBJSUFFIX'] = '.http' + te['SHOBJSUFFIX'];
 	te['OBJSUFFIX']   = '.http' + te['OBJSUFFIX'];
 
-	te.MergeFlags(env['GLIB_FLAGS']);
-	te.MergeFlags(env['CHECK_FLAGS']);
 	newCCFLAGS = [];
 	for flag in te['CCFLAGS']:
 		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):
 			newCCFLAGS.append(flag);
 	te['CCFLAGS'] = newCCFLAGS;
+	te.ParseConfig ('pkg-config --cflags --libs check glib-2.0');
 	te.Program (['http_unittest.c',
 # framework
 			te.Object('checksum.c'),
@@ -79,9 +78,7 @@ if env['WITH_CHECK'] == 'true':
 # sockets
 			te.Object('tsi.c'),
 			te.Object('gsi.c'),
-			te.Object('version.c'),
-# sunpro linking
-			te.Object('skbuff.c')
-		]);
+			te.Object('version.c')
+			]);
 
 # end of file

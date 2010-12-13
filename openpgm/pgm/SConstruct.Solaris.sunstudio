@@ -91,13 +91,7 @@ env = conf.Finish();
 env = Environment(
 	variables = vars,
 	ENV = os.environ,
-	CCFLAGS = [
-# strict C
-			'-v',
-# enable warnings
-			'+w',
-# strict ISO C
-			'-Xc',
+	CCFLAGS = [	'-v',
 # C99
 			'-xc99=all',
 			'-D_XOPEN_SOURCE=600',
@@ -106,13 +100,8 @@ env = Environment(
 			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
-# POSIX spinlocks
-			'-DCONFIG_HAVE_POSIX_SPINLOCK',
-# NSS protocol lookup
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
-# NSS networks lookup, IPv4 only
-# 			'-DCONFIG_HAVE_GETNETENT',
 # variadic macros
 			'-DCONFIG_HAVE_ISO_VARARGS',
 #			'-DCONFIG_HAVE_GNUC_VARARGS',

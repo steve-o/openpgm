@@ -19,9 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_FRAMEWORK_H__
 #define __PGM_IMPL_FRAMEWORK_H__
 
@@ -49,7 +47,6 @@
 #include <impl/getifaddrs.h>
 #include <impl/getnetbyname.h>
 #include <impl/getnodeaddr.h>
-#include <impl/getprotobyname.h>
 #include <impl/hashtable.h>
 #include <impl/histogram.h>
 #include <impl/indextoaddr.h>

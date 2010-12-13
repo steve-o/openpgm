@@ -49,9 +49,7 @@
 #       error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_IP_H__
 #define __PGM_IMPL_IP_H__
 
@@ -66,7 +64,7 @@ PGM_BEGIN_DECLS
 /* Byte alignment for packet memory maps.
  * NB: Solaris and OpenSolaris don't support #pragma pack(push) even on x86.
  */
-#if defined( __GNUC__ ) && !defined( __sun )
+#if defined( __GNUC__ ) && !defined( sun )
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -76,7 +74,7 @@ PGM_BEGIN_DECLS
 /* nb: first four bytes are forced bitfields for win32 "feature" */
 struct pgm_ip
 {
-#if (defined( __sun ) && defined( _BIT_FIELDS_LTOH )) || (!defined( __sun ) && __BYTE_ORDER == __LITTLE_ENDIAN)
+#if (defined( sun ) && defined( _BIT_FIELDS_LTOH )) || (!defined( sun ) && __BYTE_ORDER == __LITTLE_ENDIAN)
 	unsigned 	ip_hl:4;		/* header length */
 	unsigned 	ip_v:4;			/* version */
 #else
@@ -142,7 +140,7 @@ struct pgm_udphdr
 
 PGM_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 
-#if defined( __GNUC__ ) && !defined( __sun )
+#if defined( __GNUC__ ) && !defined( sun )
 #	pragma pack(pop)
 #else
 #	pragma pack()

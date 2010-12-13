@@ -65,7 +65,7 @@ START_TEST (test_set_error_pass_001)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 }
 END_TEST
 
@@ -75,7 +75,7 @@ START_TEST (test_set_error_pass_002)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred: value=%d.", 123);
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 }
 END_TEST
 
@@ -96,7 +96,7 @@ START_TEST (test_set_error_pass_004)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 	pgm_set_error (&err, err_domain, err_code, "another error occurred.");
 }
 END_TEST
@@ -116,7 +116,7 @@ START_TEST (test_prefix_error_pass_001)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 	pgm_prefix_error (&err, "i am a prefix:");
 	pgm_prefix_error (&err, "i am another prefix, value=%d:", 123);
 }
@@ -145,9 +145,9 @@ START_TEST (test_propagate_error_pass_001)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 	pgm_propagate_error (&dest, err);
-	fail_unless (NULL != dest, "propagate_error failed");
+	fail_unless (NULL != dest);
 }
 END_TEST
 
@@ -158,7 +158,7 @@ START_TEST (test_propagate_error_pass_002)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 	pgm_propagate_error (NULL, err);
 }
 END_TEST
@@ -185,9 +185,9 @@ START_TEST (test_clear_error_pass_001)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 	pgm_clear_error (&err);
-	fail_unless (NULL == err, "clear_error failed");
+	fail_unless (NULL == err);
 }
 END_TEST
 
@@ -195,7 +195,7 @@ START_TEST (test_clear_error_pass_002)
 {
 	pgm_error_t* err = NULL;
 	pgm_clear_error (&err);
-	fail_unless (NULL == err, "clear_error failed");
+	fail_unless (NULL == err);
 }
 END_TEST
 
@@ -218,7 +218,7 @@ START_TEST (test_error_free_pass_001)
 	const gint err_domain = PGM_ERROR_DOMAIN_ENGINE;
 	const gint err_code = 100;
 	pgm_set_error (&err, err_domain, err_code, "an error occurred.");
-	fail_unless (NULL != err, "set_error failed");
+	fail_unless (NULL != err);
 	pgm_error_free (err);
 }
 END_TEST

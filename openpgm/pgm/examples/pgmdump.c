@@ -38,8 +38,6 @@
 
 #include <pgm/pgm.h>
 
-#define GETTEXT_PACKAGE		"pgmdump"
-
 /* PGM internals */
 #include <impl/packet_test.h>
 

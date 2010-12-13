@@ -998,7 +998,6 @@ send_spmr (
 	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
 		sent = pgm_sendto_hops (sock,
 					FALSE,			/* not rate limited */
-					NULL,
 					FALSE,			/* regular socket */
 					1,
 					header,
@@ -1010,7 +1009,6 @@ send_spmr (
 /* send unicast SPMR with regular TTL */
 	sent = pgm_sendto (sock,
 			   FALSE,
-			   NULL,
 			   FALSE,
 			   header,
 			   tpdu_length,
@@ -1083,7 +1081,6 @@ send_nak (
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
-			   NULL,
 			   TRUE,			/* with router alert */
 			   header,
 			   tpdu_length,
@@ -1158,7 +1155,6 @@ send_parity_nak (
 
 	sent = pgm_sendto (sock,
 			   FALSE,		/* not rate limited */
-			   NULL,
 			   TRUE,		/* with router alert */
 			   header,
 			   tpdu_length,
@@ -1273,7 +1269,6 @@ send_nak_list (
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
-			   NULL,
 			   FALSE,			/* regular socket */
 			   header,
 			   tpdu_length,
@@ -1370,7 +1365,6 @@ send_ack (
 
 	sent = pgm_sendto (sock,
 			   FALSE,			/* not rate limited */
-			   NULL,
 			   FALSE,			/* regular socket */
 			   header,
 			   tpdu_length,

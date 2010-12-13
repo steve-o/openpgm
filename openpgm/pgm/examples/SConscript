@@ -77,7 +77,7 @@ if e['WITH_CC'] == 'true':
 	pcc = p.Clone();
 	newCCFLAGS = [];
 	for flag in pcc['CCFLAGS']:
-		if ("-W" != flag[:2]) and ("-std=gnu99" != flag[:10]) and ("-pedantic" != flag[:9]) and ("-D_XOPEN_SOURCE=600" != flag[:19]) and ("-xc99=all" != flag[:9]) and ("-std=c99" != flag[:8]):
+		if ("-W" != flag[:2]) and ("-std=gnu99" != flag[:10]) and ("-pedantic" != flag[:9]) and ("-D_XOPEN_SOURCE=600" != flag[:19]) and ("-xc99=all" != flag[:9]):
 			newCCFLAGS.append(flag);
 		if ("-D_XOPEN_SOURCE=600" == flag[:19]):
 			newCCFLAGS.append("-D_XOPEN_SOURCE=500");

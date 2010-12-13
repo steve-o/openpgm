@@ -19,9 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_SOCKET_H__
 #define __PGM_SOCKET_H__
 
@@ -130,11 +128,7 @@ enum {
 	PGM_LEAVE_SOURCE_GROUP,
 	PGM_MSFILTER,
 	PGM_UDP_ENCAP_UCAST_PORT,
-	PGM_UDP_ENCAP_MCAST_PORT,
-	PGM_UNCONTROLLED_ODATA,
-	PGM_UNCONTROLLED_RDATA,
-	PGM_ODATA_MAX_RTE,
-	PGM_RDATA_MAX_RTE
+	PGM_UDP_ENCAP_MCAST_PORT
 };
 
 /* IO status */
@@ -178,9 +172,7 @@ int pgm_recvfrom (pgm_sock_t*const restrict, void*restrict, const size_t, const 
 bool pgm_getsockname (pgm_sock_t*const restrict, struct pgm_sockaddr_t*restrict, socklen_t*restrict);
 int pgm_select_info (pgm_sock_t*const restrict, fd_set*const restrict, fd_set*const restrict, int*const restrict);
 #ifdef CONFIG_HAVE_POLL
-int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const short);
-#elif defined(CONFIG_HAVE_WSAPOLL)
-int pgm_poll_info (pgm_sock_t*const restrict, WSAPOLLFD*const restrict, ULONG*const restrict, const short);
+int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const int);
 #endif
 #ifdef CONFIG_HAVE_EPOLL
 int pgm_epoll_ctl (pgm_sock_t*const, const int, const int, const int);

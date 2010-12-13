@@ -2,7 +2,7 @@
  * 
  * OpenPGM, an implementation of the PGM network protocol.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2008 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,18 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_H__
 #define __PGM_H__
 
 #ifdef _MSC_VER
 /* library dependencies for Visual Studio application builds */
 #	pragma comment (lib, "libpgm")
-#	pragma comment (lib, "ws2_32")
 #	pragma comment (lib, "iphlpapi")
-#	pragma comment (lib, "winmm")
+#	pragma comment (lib, "ws2_32")
 #endif
 
 #include <pgm/atomic.h>

@@ -148,7 +148,7 @@ http_sock_rcvtimeo (
 	int			seconds
 	)
 {
-#if defined( __sun )
+#if defined( sun )
 	return 0;
 #elif !defined( _WIN32 )
 	const struct timeval timeout = { .tv_sec = seconds, .tv_usec = 0 };
@@ -166,7 +166,7 @@ http_sock_sndtimeo (
 	int			seconds
 	)
 {
-#if defined( __sun )
+#if defined( sun )
 	return 0;
 #elif !defined( _WIN32 )
 	const struct timeval timeout = { .tv_sec = seconds, .tv_usec = 0 };

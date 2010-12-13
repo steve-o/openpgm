@@ -1,5 +1,5 @@
---- engine.c	2010-12-09 12:32:06.000000000 +0800
-+++ engine.c89.c	2010-12-09 12:35:45.000000000 +0800
+--- engine.c	2010-10-05 14:42:49.000000000 +0800
++++ engine.c89	2010-10-06 13:21:30.000000000 +0800
 @@ -90,6 +90,7 @@
  	pgm_rand_init();
  
@@ -8,7 +8,7 @@
  	WORD wVersionRequested = MAKEWORD (2, 2);
  	WSADATA wsaData;
  	if (WSAStartup (wVersionRequested, &wsaData) != 0)
-@@ -147,9 +148,11 @@
+@@ -147,6 +148,7 @@
  		closesocket (sock);
  	}
  #	endif
@@ -16,22 +16,27 @@
  #endif /* _WIN32 */
  
  /* find PGM protocol id overriding default value, use first value from NIS */
+@@ -173,6 +175,7 @@
+ 		}
+ 	}
+ #else
 +	{
- 	const struct pgm_protoent_t *proto = pgm_getprotobyname ("pgm");
+ 	const struct protoent *proto = getprotobyname ("pgm");
  	if (proto != NULL) {
  		if (proto->p_proto != pgm_ipproto_pgm) {
-@@ -158,8 +161,10 @@
+@@ -186,9 +189,11 @@
  			pgm_ipproto_pgm = proto->p_proto;
  		}
  	}
 +	}
+ #endif
  
  /* ensure timing enabled */
 +	{
  	pgm_error_t* sub_error = NULL;
  	if (!pgm_time_init (&sub_error)) {
  		if (sub_error)
-@@ -169,9 +174,11 @@
+@@ -198,9 +203,11 @@
  #endif
  		goto err_shutdown;
  	}
@@ -43,7 +48,7 @@
  	char* env;
  	size_t envlen;
  
-@@ -184,6 +191,7 @@
+@@ -213,6 +220,7 @@
  		}
  		free (env);
  	}

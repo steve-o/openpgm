@@ -3,9 +3,7 @@
  *        : mib2c.notify.conf,v 5.3 2004/04/15 12:29:19 dts12 Exp $
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_MIB_H__
 #define __PGM_IMPL_MIB_H__
 

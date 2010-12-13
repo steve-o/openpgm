@@ -21,9 +21,7 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_WSASTRERROR_H__
 #define __PGM_IMPL_WSASTRERROR_H__
 

@@ -19,9 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_SOCKET_H__
 #define __PGM_IMPL_SOCKET_H__
 
@@ -84,14 +82,10 @@ struct pgm_sock_t {
 	unsigned			txw_sqns, txw_secs;
 	unsigned			rxw_sqns, rxw_secs;
 	ssize_t				txw_max_rte, rxw_max_rte;
-	ssize_t				odata_max_rte;
-	ssize_t				rdata_max_rte;
 	size_t				sndbuf, rcvbuf;		    /* setsockopt (SO_SNDBUF/SO_RCVBUF) */
 
 	pgm_txw_t* restrict    		window;
 	pgm_rate_t			rate_control;
-	pgm_rate_t			odata_rate_control;
-	pgm_rate_t			rdata_rate_control;
 	pgm_time_t			adv_ivl;		/* advancing with data */
 	unsigned			adv_mode;		/* 0 = time, 1 = data */
 	bool				is_controlled_spm;

@@ -23,9 +23,7 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_SECURITY_H__
 #define __PGM_IMPL_SECURITY_H__
 
@@ -171,22 +169,6 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 	if (0 != strerror_r (errnum, buffer, size))
 		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error %d"), errnum);
 	return buffer;
-#endif
-}
-
-static inline
-errno_t
-pgm_fopen_s (FILE **pFile, const char *filename, const char *mode)
-{
-#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
-	FILE* stream;
-
-	if (NULL == (stream = fopen (filename, mode)))
-		return errno;
-	*pFile = stream;
-	return 0;
-#else
-	return fopen_s (pFile, filename, mode);
 #endif
 }
 

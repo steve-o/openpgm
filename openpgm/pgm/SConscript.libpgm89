@@ -25,7 +25,6 @@ src = Split("""
 		getifaddrs.c
 		getnetbyname.c
 		getnodeaddr.c
-		getprotobyname.c
 		indextoaddr.c
 		indextoname.c
 		nametoindex.c
@@ -99,14 +98,14 @@ if env['WITH_CHECK'] == 'true':
 			newCCFLAGS.append(flag);
 	te['CCFLAGS'] = newCCFLAGS;
 # log dependencies
-	tlog = [	te.Object('messages.c'),
-			te.Object('thread.c'),
-			te.Object('galois_tables.c'),
-			te.Object('mem.c'),
-			te.Object('histogram.c'),
-			te.Object('string.c'),
-			te.Object('slist.c'),
-			te.Object('wsastrerror.c')
+	tlog = [	e.Object('messages.c'),
+			e.Object('thread.c'),
+			e.Object('galois_tables.c'),
+			e.Object('mem.c'),
+			e.Object('histogram.c'),
+			e.Object('string.c'),
+			e.Object('slist.c'),
+			e.Object('wsastrerror.c')
 		];
 # framework
 	te.Program (['atomic_unittest.c']);
@@ -114,116 +113,97 @@ if env['WITH_CHECK'] == 'true':
 	te.Program (['error_unittest.c'] + tlog);
 	te.Program (['md5_unittest.c'] + tlog);
 	te.Program (['getifaddrs_unittest.c',
-			te.Object('error.c'),
-			te.Object('sockaddr.c'),
-			te.Object('list.c'),
+			e.Object('error.c'),
+			e.Object('sockaddr.c'),
+			e.Object('list.c'),
 # mingw linking
-			te.Object('indextoaddr.c'),
-			te.Object('nametoindex.c')
-		] + tlog);
-	te.Program (['getnetbyname_unittest.c',
-			te.Object('inet_network.c'),
-			te.Object('sockaddr.c'),
-# mingw linking
-			te.Object('error.c'),
-			te.Object('getifaddrs.c'),
-			te.Object('indextoaddr.c'),
-			te.Object('nametoindex.c')
+			e.Object('indextoaddr.c'),
+			e.Object('nametoindex.c')
 		] + tlog);
 	te.Program (['getnodeaddr_unittest.c',
-			te.Object('error.c'),
-			te.Object('sockaddr.c'),
+			e.Object('error.c'),
+			e.Object('sockaddr.c'),
 # mingw linking
-			te.Object('getifaddrs.c'),
-			te.Object('indextoaddr.c'),
-			te.Object('nametoindex.c')
-		] + tlog);
-	te.Program (['getprotobyname_unittest.c',
-			te.Object('sockaddr.c'),
-# mingw linking
-			te.Object('error.c'),
-			te.Object('getifaddrs.c'),
-			te.Object('indextoaddr.c'),
-			te.Object('nametoindex.c')
+			e.Object('getifaddrs.c'),
+			e.Object('indextoaddr.c'),
+			e.Object('nametoindex.c')
 		] + tlog);
 	te.Program (['indextoaddr_unittest.c',
-			te.Object('error.c'),
-			te.Object('sockaddr.c')] + tlog);
+			e.Object('error.c'),
+			e.Object('sockaddr.c')] + tlog);
 	te.Program (['inet_network_unittest.c',
-			te.Object('sockaddr.c'),
+			e.Object('sockaddr.c'),
 # mingw linking
-			te.Object('error.c'),
-			te.Object('getifaddrs.c'),
-			te.Object('indextoaddr.c'),
-			te.Object('nametoindex.c')
+			e.Object('error.c'),
+			e.Object('getifaddrs.c'),
+			e.Object('indextoaddr.c'),
+			e.Object('nametoindex.c')
 		] + tlog);
 	te.Program (['rate_control_unittest.c'] + tlog);
 	te.Program (['reed_solomon_unittest.c'] + tlog);
 	te.Program (['time_unittest.c',
-			te.Object('error.c')] + tlog);
+			e.Object('error.c')] + tlog);
 # collate
-	tframework = [	te.Object('checksum.c'),
-			te.Object('error.c'),
-			te.Object('galois_tables.c'),
-			te.Object('getifaddrs.c'),
-			te.Object('getnetbyname.c'),
-			te.Object('getnodeaddr.c'),
-			te.Object('getprotobyname.c'),
-			te.Object('hashtable.c'),
-			te.Object('histogram.c'),
-			te.Object('indextoaddr.c'),
-			te.Object('indextoname.c'),
-			te.Object('inet_network.c'),
-			te.Object('list.c'),
-			te.Object('math.c'),
-			te.Object('md5.c'),
-			te.Object('mem.c'),
-			te.Object('messages.c'),
-			te.Object('nametoindex.c'),
-			te.Object('queue.c'),
-			te.Object('rand.c'),
-			te.Object('rate_control.c'),
-			te.Object('reed_solomon.c'),
-			te.Object('slist.c'),
-			te.Object('sockaddr.c'),
-			te.Object('string.c'),
-			te.Object('thread.c'),
-			te.Object('time.c'),
-			te.Object('wsastrerror.c')
+	tframework = [	e.Object('checksum.c'),
+			e.Object('error.c'),
+			e.Object('galois_tables.c'),
+			e.Object('getifaddrs.c'),
+			e.Object('getnodeaddr.c'),
+			e.Object('hashtable.c'),
+			e.Object('histogram.c'),
+			e.Object('indextoaddr.c'),
+			e.Object('indextoname.c'),
+			e.Object('inet_network.c'),
+			e.Object('list.c'),
+			e.Object('math.c'),
+			e.Object('md5.c'),
+			e.Object('mem.c'),
+			e.Object('messages.c'),
+			e.Object('nametoindex.c'),
+			e.Object('queue.c'),
+			e.Object('rand.c'),
+			e.Object('rate_control.c'),
+			e.Object('reed_solomon.c'),
+			e.Object('slist.c'),
+			e.Object('sockaddr.c'),
+			e.Object('string.c'),
+			e.Object('thread.c'),
+			e.Object('time.c'),
+			e.Object('wsastrerror.c')
 		];
 # library
 	te.Program (['txw_unittest.c',
-			te.Object('tsi.c'),
+			e.Object('tsi.c'),
 			te.Object('skbuff.c')] + tframework);
 	te.Program (['rxw_unittest.c',
-			te.Object('tsi.c'),
+			e.Object('tsi.c'),
 			te.Object('skbuff.c')] + tframework);
 	te.Program (['engine_unittest.c',
-			te.Object('version.c')] + tframework);
+			e.Object('version.c')] + tframework);
 	te.Program (['gsi_unittest.c',
-			te.Object('if.c')] + tframework);
+			e.Object('if.c')] + tframework);
 	te.Program (['tsi_unittest.c'] + tframework);
 	te.Program (['if_unittest.c'] + tframework);
 	te.Program (['socket_unittest.c',
-			te.Object('if.c'),
-			te.Object('tsi.c')] + tframework);
+			e.Object('if.c'),
+			e.Object('tsi.c')] + tframework);
 	te.Program (['source_unittest.c',
 			te.Object('skbuff.c')] + tframework);
 	te.Program (['receiver_unittest.c',
-			te.Object('tsi.c')] + tframework);
+			e.Object('tsi.c')] + tframework);
 	te.Program (['recv_unittest.c',
-			te.Object('tsi.c'),
-			te.Object('gsi.c'),
+			e.Object('tsi.c'),
+			e.Object('gsi.c'),
 			te.Object('skbuff.c')] + tframework);
 	te.Program (['net_unittest.c'] + tframework);
 	te.Program (['timer_unittest.c'] + tframework);
 	te.Program (['packet_parse_unittest.c'] + tframework);
 	te.Program (['packet_test_unittest.c'] + tframework);
 	te.Program (['ip_unittest.c',
-			te.Object('if.c')] + tframework);
+			e.Object('if.c')] + tframework);
 # performance tests
 	te.Program (['checksum_perftest.c',
-			te.Object('time.c'),
-			te.Object('error.c')] + tlog);
+			e.Object('time.c'),
+			e.Object('error.c')] + tlog);
 
 # end of file

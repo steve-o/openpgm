@@ -121,7 +121,7 @@ if (my $pid = fork) {
 			if ($l =~ /^}$/) {
 				$state = 0;
 
-				my $obj = $json->decode($b);
+				my $obj = $json->jsonToObj($b);
 				if ($obj->{PGM}->{type} =~ /NAK/) {
 					$cnt++;
 					my $elapsed = tv_interval ( $t0, [gettimeofday] );

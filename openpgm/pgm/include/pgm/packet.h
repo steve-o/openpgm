@@ -2,7 +2,7 @@
  * 
  * PGM packet formats, RFC 3208.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_PACKET_H__
 #define __PGM_PACKET_H__
 
@@ -109,7 +107,7 @@ enum pgm_type_e {
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
 /* byte alignment for packet memory maps */
-#if defined( __GNUC__ ) && !defined( __sun )
+#if defined( __GNUC__ ) && !defined( sun )
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -450,7 +448,7 @@ struct pgm_opt6_path_nla {
 };
 
 
-#if defined( __GNUC__ ) && !defined( __sun )
+#if defined( __GNUC__ ) && !defined( sun )
 #	pragma pack(pop)
 #else
 #	pragma pack()

@@ -27,24 +27,14 @@
 #include <glib.h>
 #include <check.h>
 
-#if defined( BYTE_ORDER )
+#ifdef BYTE_ORDER
 #	define PGM_BYTE_ORDER		BYTE_ORDER
 #	define PGM_BIG_ENDIAN		BIG_ENDIAN
 #	define PGM_LITTLE_ENDIAN	LITTLE_ENDIAN
-#elif defined( __BYTE_ORDER )
+#elif defined(__BYTE_ORDER)
 #	define PGM_BYTE_ORDER		__BYTE_ORDER
 #	define PGM_BIG_ENDIAN		__BIG_ENDIAN
-#	define PGM_LITTLE_ENDIAN	__LITTLE_ENDIAN
-#elif defined( __sun )
-#	define PGM_LITTLE_ENDIAN	1234
-#	define PGM_BIG_ENDIAN		4321
-#	if defined( _BIT_FIELDS_LTOH )
-#		define PGM_BYTE_ORDER		PGM_LITTLE_ENDIAN
-#	elif defined( _BIT_FIELDS_HTOL )
-#		define PGM_BYTE_ORDER		PGM_BIG_ENDIAN
-#	else
-#		error "Unknown bit field order for Sun Solaris."
-#	endif
+#	define PGM_LITTLE_ENDIAN	__LITTLE_ENDIAND
 #else
 #	error "BYTE_ORDER not supported."
 #endif
@@ -90,8 +80,8 @@ START_TEST (test_inet_pass_001)
 	guint16 csum = pgm_inet_checksum (source, sizeof(source), 0);
 /* function calculates answer in host order */
 	csum = g_htons (csum);
-	g_message ("IP checksum of \"%s\" (%u) is %u (%u)",
-		source, (unsigned)sizeof(source), csum, answer);
+	g_message ("IP checksum of \"%s\" (%d) is %u (%u)",
+		source, sizeof(source), csum, answer);
 
 	fail_unless (answer == csum, "checksum mismatch");
 }

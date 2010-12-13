@@ -1,5 +1,5 @@
---- histogram.c	2010-12-06 11:59:59.000000000 +0800
-+++ histogram.c89.c	2010-12-06 11:59:13.000000000 +0800
+--- histogram.c	2010-10-07 17:53:02.000000000 +0800
++++ histogram.c89	2010-10-07 17:53:39.000000000 +0800
 @@ -61,10 +61,12 @@
  		value = INT_MAX - 1;
  	if (value < 0)
@@ -13,7 +13,7 @@
  }
  
  void
-@@ -74,19 +76,21 @@
+@@ -74,12 +76,14 @@
  {
  	if (!pgm_histograms)
  		return;
@@ -28,14 +28,6 @@
  }
  
  static
- void
- pgm_histogram_write_html_graph (
- 	pgm_histogram_t* restrict histogram,
--	pgm_string_t*	 restrict string
-+	pgm_string_t*    restrict string
- 	)
- {
- 	pgm_string_append (string, "<PRE>");
 @@ -119,8 +123,11 @@
  	)
  {

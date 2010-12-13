@@ -637,7 +637,7 @@ do_csum_vector (
 			{
 				uint64_t carry = 0;
 				while (count) {
-					__asm volatile ("addq %1, %0\n\t"
+					asm volatile (	"addq %1, %0\n\t"
 							"adcq %2, %0"
 					     	      : "=r" (acc)
 					      	      : "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc)
@@ -741,7 +741,7 @@ do_csumcpy_vector (
 				{
 					pgm_prefetch (&srcbuf[ 64 ]);
 					pgm_prefetchw (&dstbuf[ 64 ]);
-					__asm volatile ("movq 0*8(%1), %%r8\n\t"	/* load */
+					asm volatile (	"movq 0*8(%1), %%r8\n\t"	/* load */
 							"movq 1*8(%1), %%r9\n\t"
 							"movq 2*8(%1), %%r10\n\t"
 							"movq 3*8(%1), %%r11\n\t"
@@ -776,7 +776,7 @@ do_csumcpy_vector (
 				count %= 8;
 /* last 56 bytes */
 				while (count) {
-					__asm volatile ("addq %1, %0\n\t"
+					asm volatile (	"addq %1, %0\n\t"
 							"adcq %2, %0"
 						      : "=r" (acc)
 						      : "m" (*(const uint64_t*restrict)srcbuf), "r" (carry), "0" (acc)

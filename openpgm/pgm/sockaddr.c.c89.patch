@@ -1,14 +1,5 @@
---- sockaddr.c	2010-10-26 15:56:31.000000000 +0800
-+++ sockaddr.c89.c	2010-11-05 06:29:30.000000000 +0800
-@@ -134,7 +134,7 @@
- 	)
- {
- 	return getnameinfo (sa, pgm_sockaddr_len (sa),
--			    host, hostlen,
-+			    host, (DWORD)hostlen,
- 			    NULL, 0,
- 			    NI_NUMERICHOST);
- }
+--- sockaddr.c	2010-12-10 20:49:34.000000000 +0800
++++ sockaddr.c89.c	2010-12-10 20:51:22.000000000 +0800
 @@ -145,12 +145,13 @@
  	struct sockaddr* restrict dst		/* will error on wrong size */
  	)

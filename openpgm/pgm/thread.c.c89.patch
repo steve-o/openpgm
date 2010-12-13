@@ -1,5 +1,5 @@
---- thread.c	2010-12-13 16:22:59.000000000 +0800
-+++ thread.c89.c	2010-12-13 16:21:44.000000000 +0800
+--- thread.c	2010-12-13 18:02:10.000000000 +0800
++++ thread.c89.c	2010-12-13 18:02:31.000000000 +0800
 @@ -121,9 +121,11 @@
  #ifndef _WIN32
  	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
@@ -32,10 +32,10 @@
  #endif /* !_WIN32 */
  }
  
-@@ -185,11 +191,13 @@
+@@ -183,11 +189,13 @@
  	pgm_assert (NULL != spinlock);
  
- #ifdef CONFIG_HAVE_POSIX_SPINLOCK
+ #ifndef _WIN32
 +	{
  	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
  	if (EBUSY == result)
@@ -43,10 +43,10 @@
  	posix_check_err (result, "pthread_spinlock_trylock");
  	return TRUE;
 +	}
- #elif defined(_WIN32)
+ #else
  	return TryEnterCriticalSection (&spinlock->win32_spinlock);
- #else	/* GCC atomics */
-@@ -270,8 +278,11 @@
+ #endif /* !_WIN32 */
+@@ -262,8 +270,11 @@
  	WakeAllConditionVariable (&cond->win32_cond);
  #else
  	EnterCriticalSection (&cond->win32_spinlock);
@@ -59,7 +59,7 @@
  	cond->len = 0;
  	LeaveCriticalSection (&cond->win32_spinlock);
  #endif /* !_WIN32 */
-@@ -302,6 +313,7 @@
+@@ -294,6 +305,7 @@
  #	if defined(CONFIG_HAVE_WIN_COND)
  	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
  #	else
@@ -67,7 +67,7 @@
  	DWORD status;
  	HANDLE event = TlsGetValue (cond_event_tls);
  
-@@ -325,7 +337,9 @@
+@@ -317,7 +329,9 @@
  
  	if (WAIT_TIMEOUT == status) {
  		EnterCriticalSection (&cond->win32_spinlock);
@@ -78,7 +78,7 @@
  			if (cond->phandle[ i ] == event) {
  				if (i != cond->len - 1)
  					memmove (&cond->phandle[ i ], &cond->phandle[ i + 1 ], sizeof(HANDLE) * (cond->len - i - 1));
-@@ -333,9 +347,11 @@
+@@ -325,9 +339,11 @@
  				break;
  			}
  		}
@@ -90,7 +90,7 @@
  #	endif /* !CONFIG_HAVE_WIN_COND */
  }
  #endif /* !_WIN32 */
-@@ -436,7 +452,7 @@
+@@ -428,7 +444,7 @@
  	bool status = FALSE;
  
  	pgm_assert (NULL != rwlock);

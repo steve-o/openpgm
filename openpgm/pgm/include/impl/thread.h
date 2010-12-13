@@ -21,9 +21,7 @@
 #	error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_THREAD_H__
 #define __PGM_IMPL_THREAD_H__
 
@@ -52,12 +50,10 @@ struct pgm_mutex_t {
 };
 
 struct pgm_spinlock_t {
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifndef _WIN32
 	pthread_spinlock_t	pthread_spinlock;
-#elif defined(_WIN32)
-	CRITICAL_SECTION	win32_spinlock;
 #else
-	volatile uint32_t	taken;
+	CRITICAL_SECTION	win32_spinlock;
 #endif
 };
 
@@ -115,26 +111,19 @@ PGM_GNUC_INTERNAL void pgm_spinlock_free (pgm_spinlock_t*);
 PGM_GNUC_INTERNAL bool pgm_spinlock_trylock (pgm_spinlock_t*);
 
 static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifndef _WIN32
 	pthread_spin_lock (&spinlock->pthread_spinlock);
-#elif defined(_WIN32)
+#else
 	EnterCriticalSection (&spinlock->win32_spinlock);
-#else /* GCC atomics */
-	uint32_t prev;
-	do {
-		prev = __sync_lock_test_and_set (&spinlock->taken, 1);
-	} while (prev);
-#endif
+#endif /* !_WIN32 */
 }
 
 static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifndef _WIN32
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
-#elif defined(_WIN32)
+#else
 	LeaveCriticalSection (&spinlock->win32_spinlock);
-#else /* GCC atomics */
-	spinlock->taken = 0;
-#endif
+#endif /* !_WIN32 */
 }
 
 PGM_GNUC_INTERNAL void pgm_cond_init (pgm_cond_t*);
@@ -180,7 +169,7 @@ static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
 	AcquireSRWLockExclusive (&rwlock->win32_rwlock);
 }
 static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
-	return TryAcquireSRWLockExclusive (&rwlock->win32_rwlock);
+	return AcquireSRWLockExclusive (&rwlock->win32_rwlock);
 }
 static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
 	ReleaseSRWLockExclusive (&rwlock->win32_rwlock);

@@ -1,5 +1,5 @@
---- packet_test.c	2010-11-05 06:21:15.000000000 +0800
-+++ packet_test.c89.c	2010-11-05 06:21:02.000000000 +0800
+--- packet_test.c	2010-12-10 21:01:34.000000000 +0800
++++ packet_test.c89.c	2010-12-10 21:02:10.000000000 +0800
 @@ -61,11 +61,12 @@
  	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
  	{

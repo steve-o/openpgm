@@ -101,9 +101,7 @@ env = Environment(
 				'-Wmissing-format-attribute',
 				'-Wredundant-decls',
 				'-Wnested-externs',
-#				'-Winline',
-				'-Wno-inline',
-				'-Wno-unused-function',
+				'-Winline',
 			'-pedantic',
 # C99
 			'-std=gnu99',
@@ -111,13 +109,8 @@ env = Environment(
 			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
-# POSIX spinlocks
-			'-DCONFIG_HAVE_POSIX_SPINLOCK',
-# NSS protocol lookup
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
-# NSS networks lookup, IPv4 only
-#			'-DCONFIG_HAVE_GETNETENT',
 # variadic macros
 			'-DCONFIG_HAVE_ISO_VARARGS',
 #			'-DCONFIG_HAVE_GNUC_VARARGS',
@@ -173,10 +166,7 @@ env = Environment(
 			'm',
 # clock_gettime()
 			'rt'
-		],
-	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.3.0/gcc32/include',
-	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.3.0/gcc32/lib/libprotobuf.a',
-	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.3.0/gcc32/bin/protoc'
+		]
 )
 
 # Branch prediction

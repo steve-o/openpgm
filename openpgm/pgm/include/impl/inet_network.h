@@ -2,7 +2,7 @@
  *
  * portable implementations of inet_network and inet_network6.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2009 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,9 +23,7 @@
 #       error "Only <framework.h> can be included directly."
 #endif
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
-#endif
+#pragma once
 #ifndef __PGM_IMPL_INET_NETWORK_H__
 #define __PGM_IMPL_INET_NETWORK_H__
 
@@ -39,7 +37,6 @@ PGM_BEGIN_DECLS
 PGM_GNUC_INTERNAL int pgm_inet_network (const char*restrict, struct in_addr*restrict);
 PGM_GNUC_INTERNAL int pgm_inet6_network (const char*restrict, struct in6_addr*restrict);
 PGM_GNUC_INTERNAL int pgm_sa6_network (const char*restrict, struct sockaddr_in6*restrict);
-PGM_GNUC_INTERNAL struct in_addr pgm_inet_makeaddr (uint32_t, uint32_t);
 
 PGM_END_DECLS
 

@@ -98,7 +98,7 @@ START_TEST (test_inet_network_pass_001)
 	const char* answer  = cases_001[_i].answer;
 
 	struct in_addr host_order, network_order;
-	fail_unless (0 == pgm_inet_network (network, &host_order), "inet_network failed");
+	fail_unless (0 == pgm_inet_network (network, &host_order));
 	network_order.s_addr = g_htonl (host_order.s_addr);
 
 	g_message ("Resolved \"%s\" to \"%s\"",
@@ -110,13 +110,13 @@ g_message ("inet_network (%s) = %s", network, inet_ntoa (t));
 }
 #endif
 
-	fail_unless (0 == strcmp (answer, inet_ntoa (network_order)), "unexpected answer");
+	fail_unless (0 == strcmp (answer, inet_ntoa (network_order)));
 }
 END_TEST
 
 START_TEST (test_inet_network_fail_001)
 {
-	fail_unless (-1 == pgm_inet_network (NULL, NULL), "inet_network failed");
+	fail_unless (-1 == pgm_inet_network (NULL, NULL));
 }
 END_TEST
 
@@ -125,7 +125,7 @@ START_TEST (test_inet_network_fail_002)
 	const char* network = "192.168.0.1/0";
 
 	struct in_addr host_order;
-	fail_unless (-1 == pgm_inet_network (network, &host_order), "inet_network failed");
+	fail_unless (-1 == pgm_inet_network (network, &host_order));
 }
 END_TEST
 
@@ -152,37 +152,17 @@ START_TEST (test_inet6_network_pass_001)
 
 	char snetwork[INET6_ADDRSTRLEN];
 	struct in6_addr addr;
-	fail_unless (0 == pgm_inet6_network (network, &addr), "inet6_network failed");
+	fail_unless (0 == pgm_inet6_network (network, &addr));
 	g_message ("Resolved \"%s\" to \"%s\"",
 		   network, pgm_inet_ntop (AF_INET6, &addr, snetwork, sizeof(snetwork)));
 
-	fail_unless (0 == strcmp (answer, snetwork), "unexpected answer");
+	fail_unless (0 == strcmp (answer, snetwork));
 }
 END_TEST
 
 START_TEST (test_inet6_network_fail_001)
 {
-	fail_unless (-1 == pgm_inet6_network (NULL, NULL), "inet6_network failed");
-}
-END_TEST
-
-START_TEST (test_sa6_network_pass_001)
-{
-	const char* network = cases6_001[_i].network;
-	const char* answer  = cases6_001[_i].answer;
-
-	char snetwork[INET6_ADDRSTRLEN];
-	struct sockaddr_in6 addr;
-	fail_unless (0 == pgm_sa6_network (network, &addr), "sa6_network failed");
-	pgm_sockaddr_ntop ((struct sockaddr*)&addr, snetwork, sizeof (snetwork));
-	g_message ("Resolved \"%s\" to \"%s\"", network, snetwork);
-	fail_unless (0 == strcmp (answer, snetwork), "unexpected answer");
-}
-END_TEST
-
-START_TEST (test_sa6_network_fail_001)
-{
-	fail_unless (-1 == pgm_sa6_network (NULL, NULL), "sa6_network failed");
+	fail_unless (-1 == pgm_inet6_network (NULL, NULL));
 }
 END_TEST
 
@@ -204,11 +184,6 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_inet6_network);
 	tcase_add_loop_test (tc_inet6_network, test_inet6_network_pass_001, 0, G_N_ELEMENTS(cases6_001));
 	tcase_add_test (tc_inet6_network, test_inet6_network_fail_001);
-
-	TCase* tc_sa6_network = tcase_create ("sa6-network");
-	suite_add_tcase (s, tc_sa6_network);
-	tcase_add_loop_test (tc_sa6_network, test_sa6_network_pass_001, 0, G_N_ELEMENTS(cases6_001));
-	tcase_add_test (tc_sa6_network, test_sa6_network_fail_001);
 	return s;
 }
 
