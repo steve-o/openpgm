@@ -16,7 +16,7 @@ int *pgm_poll_info* (
 </pre>
 
 === Purpose ===
-Set parameters suitable for feeding into <tt>poll()</tt>.
+Set parameters suitable for feeding into <tt>poll()</tt> or <tt>[http://msdn.microsoft.com/en-us/library/ms741669(v=vs.85).aspx WSAPoll()]</tt>.
 
 === Remarks ===
 An assertion will be raised if insufficient file descriptors are provided.  1 file descriptor is required for basic <tt>POLLIN</tt> events, another is required if the transport has a receive channel (default configuration, or setting <tt>PGM_SEND_ONLY</tt> with <tt>false</tt>).  1 file descriptor is required for basic <tt>POLLOUT</tt> events.
@@ -73,4 +73,5 @@ Using <tt>WSAPoll()</tt> for non-blocking send on Windows,
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSelectInfo pgm_select_info()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmEpollCtl pgm_epoll_ctl()]</tt><br>
+  * <tt>[http://msdn.microsoft.com/en-us/library/ms741669(v=vs.85).aspx WSAPoll()]</tt> in MSDN Library.<br>
   * [OpenPgm5CReferenceSocket Socket] in OpenPGM C Reference.
