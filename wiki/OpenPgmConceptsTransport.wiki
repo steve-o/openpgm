@@ -68,6 +68,8 @@ Notes:
   * Specifying an interface name in a multi-scoped IPv6 environment will return an error, the IP or network address should be specified instead.
   * A default Linux DHCP install will have the hostname resolving to 127.0.1.1 and will broadcast this address for repairs in effect disabling PGM reliability.  Ensure that the hostname resolves to an Ethernet link or specify the Ethernet network as the first entity.
   * On Linux incoming multicast packets are multiplexed to all listeners regardless of the group joined on the socket.  For example when _application A_ joins groups 239.192.0.1 and 239.192.0.2, whilst _application B_ joins only 239.192.0.1, both will receive packets sent to 239.192.0.2.
+  * On POSIX platforms network names are resolved through the [http://en.wikipedia.org/wiki/Name_Service_Switch Name Service Switch] function which allows administrators to deploy configuration through files, LDAP, NIS, and other services.  The networks name service does not support IPv6.  An alternative system is provided to read the files databases directly and as such extends compatibility to Microsoft Windows patforms that do not export an API for reading <tt>%SystemRoot%\system32\drivers\etc\networks</tt>.  Define the environment variable <tt>PGM_NETDB</tt> to override default function usage.
+  * IPv6 zone identifiers may be used to simplify link-local usage, e.g. <tt>[fe80::%19/64]</tt> to use adapter #19.
 
 
 ===== Part Two—Receive Groups =====

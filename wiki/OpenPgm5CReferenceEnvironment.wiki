@@ -24,6 +24,9 @@ This section describes the functions relating to the global dependencies of Open
 <td><tt>PGM_DEBUG</tt></td>
 <td>Debugging and memory profiling options.</td>
 </tr><tr>
+<td><tt>PGM_NETDB</tt></td>
+<td>Override Network Service Switch for networks naming.</td>
+</tr><tr>
 <td><tt>[OpenPgmCReferenceRunWithTheseCapabilities PGM_TIMER]</tt></td>
 <td>Timing source device.</td>
 </tr><tr>
