@@ -54,9 +54,19 @@ Poll the PGM transport for incoming events.
 {{{
  int nfds = IP_MAX_MEMBERSHIPS;
  struct pollfd fds[ IP_MAX_MEMBERSHIPS ];
- memset (fds, 0, sizeof(fds));
+ memset (fds, 0, sizeof (fds));
  pgm_poll_info (sock, &fds, &nfds, POLLIN);
  poll (fds, nfds, 1000 /* ms */);
+}}}
+
+Using <tt>WSAPoll()</tt> for non-blocking send on Windows,
+
+{{{
+ ULONG nfds = PGM_BUS_SOCKET_WRITE_COUNT;
+ WSAPOLLFD fds[ PGM_BUS_SOCKET_WRITE_COUNT ];
+ ZeroMemory (fds, sizeof (WSAPOLLFD) * n_fds);
+ pgm_poll_info (sock, &fds, &nfds, POLLOUT);
+ WSAPoll (fds, n_fds, 1000 /* ms */);
 }}}
 
 === See Also ===

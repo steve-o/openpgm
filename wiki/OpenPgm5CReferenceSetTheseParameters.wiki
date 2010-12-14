@@ -6,7 +6,7 @@ OpenPGM does not default with a set of PGM parameters as it is necessary to cust
 
 <table border="1" cellpadding="5" cellspacing="0">
 <tr>
-<th>Function Name</th>
+<th>Socket Option</th>
 <th>Description</th>
 </tr>
 <tr>
@@ -125,7 +125,9 @@ Worst case recovery is RTTâœ•3/2 + <tt>NAK_BO_IVL</tt> + <tt>NAK_RPT_IVL</tt> âœ
 
 For example, this could be 100us, 50ms, 200s, although the window size is likely to be the lower limit.
 
-The important factor when choosing times is also what the target architecture can reliably provide in terms of resolution, how many cores there are and the likelyhood of context switches.  Do you have a reliable TSC?  Do you have a HPET?  Is POSIX select wait 1-16ms resolution?
+The important factor when choosing times is also what the target architecture can reliably provide in terms of resolution, how many cores there are and the likelyhood of context switches.  Do you have a reliable TSC?  Do you have a HPET?  What is the granularity and resolution of event watching wait?
+
+On Microsoft Windows the minimum wait period is by default 16ms, using <tt>[http://msdn.microsoft.com/en-us/library/dd757624(v=vs.85).aspx timeBeginPeriod]</tt> this is reduced to 1ms with the tradeoff of increased power usage.  As of OpenPGM 5.1, <tt>[OpenPgm5CReferencePgmInit pgm_init]</tt> will configure Windows for 1ms timers by default.  Note that Windows sleep functions round down time values which will result in extended busy-wait states which may adversely affect system performance.  It is recommended on Windows to always round timers up to 1ms in order to sleep and yield time to other threads.
 
 
 ==6:  End of stream notification==
@@ -139,3 +141,6 @@ The important factor when choosing times is also what the target architecture ca
 SPMs are used to keep multicast path in your routing infrastructure, to update clients with the lead sequence of the transmit window, to provide an address to request repairs.  Imagine sending three packets and the last is lost, when is the client aware of that loss?
 
 Imagine late joins, when a client starts and receives packets mid-stream of a publisher.  When packet loss occurs, excluding FEC enabled broadcast-only transports, the client needs the address of the source to request a re-transmission.  Heartbeat SPMs are used to broadcast the source address to clients, SPM-Requests are used to request early transmission of a SPM.
+
+In order for SPMs to be broadcast it is necessary that applications [OpenPgm5CReferenceEvents dispatch protocol events] by using the asynchronous receiver or simply calling <tt>[OpenPgm5CReferencePgmRecv pgm_recv]</tt> as and when notifications are raised.
+

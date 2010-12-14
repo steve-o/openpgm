@@ -12,6 +12,8 @@ void *pgm_drop_superuser* (void);
 === Purpose ===
 Drop superuser privileges needed to create PGM protocol sockets.
 
+=== Remarks ===
+This function has no effect on Microsoft Windows platforms.
 
 === Example ===
 {{{

@@ -12,10 +12,14 @@ bool *pgm_shutdown* (void);
 === Purpose ===
 Shutdown OpenPGM internal machinery.
 
+=== Remarks ===
+On Microsoft Windows platforms <tt>pgm_shutdown()</tt> will relinquish use of 1ms high resolution timers via the <tt>[http://msdn.microsoft.com/en-us/library/dd757626(v=vs.85).aspx timeEndPeriod()]</tt> function.
+
 === Return Value ===
 On success, returns <tt>true</tt>.  On failure, returns <tt>false</tt>.
 
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmSupported pgm_supported()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmInit pgm_init()]</tt><br>
+  * <tt>[http://msdn.microsoft.com/en-us/library/dd757626(v=vs.85).aspx timeEndPeriod()]</tt> in MSDN Library.<br>
   * [OpenPgm5CReferenceEnvironment Environment] in OpenPGM C Reference.

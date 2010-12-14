@@ -17,9 +17,9 @@ bool *pgm_bind3* (
 	[OpenPgm5CReferencePgmSockT pgm_sock_t]`*`                        restrict sock,
 	const struct [OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]`*` const restrict sockaddr,
 	const socklen_t                             sockaddrlen,
-	const struct group_req`*`                     restrict send_req,
+	const struct group_req`*`            restrict send_req,
 	const socklen_t                             send_req_len,
-	const struct group_req`*`                     restrict recv_req,
+	const struct group_req`*`            restrict recv_req,
 	const socklen_t                             recv_req_len,
 	[OpenPgm5CReferencePgmErrorT pgm_error_t]`*``*`                      restrict error
 	);

@@ -35,9 +35,9 @@ OpenPGM C programs must link the appropriate library files.
 </table>
 
 
-== Microsoft Visual Studio Compiler ==
+== Microsoft Windows Cross Compiles ==
 
-As the Microsoft Windows 32-bit and 64-bit builds are cross compiled additional dependencies are
+For Microsoft Windows 32-bit and 64-bit cross compile builds additional dependencies are
 introduced from the compiler in addition to the Windows platform dependencies,
 
 <table border="1" cellpadding="5" cellspacing="0">
@@ -57,6 +57,9 @@ introduced from the compiler in addition to the Windows platform dependencies,
 </tr><tr>
 <td><tt>ws2_32.lib</tt></td>
 <td>Windows Sockets support.</td>
+</tr><tr>
+<td><tt>winmm.lib</tt></td>
+<td>Windows high resolution timers.</td>
 </tr>
 </table>
 
@@ -97,3 +100,27 @@ To build the example applications in MSVC use the following screenshots for conf
 <td><a href="http://miru.hk/wiki/msvc-libs.png"><img src="http://miru.hk/wiki/320px-msvc-libs.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>Additional Dependencies</td>
 </tr>
 </table>
+
+== Microsoft Visual Studio Native ==
+
+Library dependencies are automagically pulled in through the compilers support for <tt>[http://msdn.microsoft.com/en-us/library/7f0aews7(v=vs.71).aspx #pragma comment]</tt>.  It is only necessary to specify directories and any compiler preferences.
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc2010-compile as.png"><img src="http://miru.hk/wiki/320px-msvc2010-compile as.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>Compile as C++ Code</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc2010-includes.png"><img src="http://miru.hk/wiki/320px-msvc2010-includes.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>Additional Include Directories</td>
+</tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0">
+<tr>
+<td><a href="http://miru.hk/wiki/msvc2010-libpath.png"><img src="http://miru.hk/wiki/320px-msvc2010-libpath.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>Additional Library Directories</td>
+</tr>
+</table>
+
+

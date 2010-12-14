@@ -24,11 +24,13 @@ This call creates the internal machinery that OpenPGM requires for its operation
  
 Until the first call to <tt>pgm_init()</tt>, all events, queues, and transports are unusable.
 
-<tt>pgm_init()</tt> implements reference counting, every call needs to be matched with a call to [OpenPgm5CReferencePgmShutdown pgm_shutdown()]. If you want to make sure that the PGM engine is initialized without references, you can do this:
+<tt>pgm_init()</tt> implements reference counting, every call needs to be matched with a call to <tt>[OpenPgm5CReferencePgmShutdown pgm_shutdown()]</tt>. If you want to make sure that the PGM engine is initialized without references, you can do this:
 
 {{{
  if (!pgm_supported ()) pgm_init (NULL);
 }}}
+
+On Microsoft Windows platforms <tt>pgm_init()</tt> will request 1ms minimum resolution timers via the <tt>[http://msdn.microsoft.com/en-us/library/dd757624(v=vs.85).aspx timeBeginPeriod()]</tt> function.  The resolution period is relinquished on shutdown of the PGM engine via <tt>[OpenPgm5CReferencePgmShutdown pgm_shutdown()]</tt>.
 
 === Parameters ===
 
@@ -39,7 +41,7 @@ Until the first call to <tt>pgm_init()</tt>, all events, queues, and transports 
 </tr>
 <tr>
 <td><tt>err</tt></td>
-<td>a return location for a [OpenPgm5CReferencePgmErrorT pgm_error_t], or <tt>NULL</tt>.</td>
+<td>a return location for a <tt>[OpenPgm5CReferencePgmErrorT pgm_error_t]</tt>, or <tt>NULL</tt>.</td>
 </tr>
 </table>
 
@@ -61,5 +63,6 @@ On success, returns <tt>true</tt>.  On failure, returns <tt>false</tt>.  If <tt>
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmSupported pgm_supported()]</tt><br>
   * <tt>[OpenPgm5CReferencePgmShutdown pgm_shutdown()]</tt><br>
+  * <tt>[http://msdn.microsoft.com/en-us/library/dd757624(v=vs.85).aspx timeBeginPeriod()]</tt> in MSDN Library.<br>
   * [OpenPgm5CReferenceEnvironment Environment] in OpenPGM C Reference.<br>
   * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.

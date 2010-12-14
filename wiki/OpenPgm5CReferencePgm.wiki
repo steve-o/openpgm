@@ -129,6 +129,8 @@ struct group_filter {
 <dd>Set or read <tt>NAK_RPT_IVL</tt>, the interval (in microseconds) for suspending repeat NAK generation whilst waiting for corresponding NCFs.</dd>
 <dt><tt>PGM_NOBLOCK</tt></dt>
 <dd>Set or read a boolean integer argument that when not enabled PGM socket calls are blocked until the operation can complete.  If <tt>PGM_NOBLOCK</tt> is enabled then calls will fail with the error <tt>PGM_IO_STATUS_WOULD_BLOCK</tt>.</dd>
+<dt><tt>PGM_ODATA_MAX_RTE</tt></dt>
+<dd>Set or read <tt>ODATA_MAX_RTE</tt>, the maximum original-data (ODATA) packet bitrate for rate control.</dd>
 <dt><tt>PGM_PASSIVE</tt></dt>
 <dd>Set or read a boolean integer argument that determines whether to enable back channel communication from a PGM receiver to a PGM source.</dd>
 <dt><tt>PGM_PDU</tt></dt>
@@ -140,6 +142,8 @@ struct group_filter {
 <dd></dd>
 <dt><tt>PGM_RATE_REMAIN</tt></dt>
 <dd>Read the remaining time period (in microseconds) that the socket is rate limited from transmission.  Only valid as a <tt>[OpenPgm5CReferencePgmGetSockOpt pgm_getsockopt()]</tt>.</dd>
+<dt><tt>PGM_RDATA_MAX_RTE</tt></dt>
+<dd>Set or read <tt>RDATA_MAX_RTE</tt>, the maximum repair-data (RDATA) packet bitrate for rate control.</dd>
 <dt><tt>PGM_RECV_ONLY</tt></dt>
 <dd>Set or read a boolean integer argument that when enabled disables the transmission channel on the PGM data-destination port.  Equivalent to <tt>socket (tcp_socket, SHUT_WR)</tt> causing future transmissions to be disallowed.</dd>
 <dt><tt>PGM_RECV_SOCK</tt></dt>
@@ -178,6 +182,10 @@ struct group_filter {
 <dd>Set or read the UDP encapsulated unicast port.</dd>
 <dt><tt>PGM_UNBLOCK_SOURCE</tt></dt>
 <dd>Unblocks a blocked source.  Argument is a <tt>group_source_req</tt> structure as <tt>PGM_BLOCK_SOURCE</tt>.  Only valid as a <tt>[OpenPgm5CReferencePgmGetSockOpt pgm_setsockopt()]</tt>.</dd>
+<dt><tt>PGM_UNCONTROLLED_ODATA</tt></dt>
+<dd>Set or read an integer argument indicating whether original-data (ODATA) packets should be rate limited.</dd>
+<dt><tt>PGM_UNCONTROLLED_RDATA</tt></dt>
+<dd>Set or read an integer argument indicating whether repair-data (RDATA) packets should be rate limited.</dd>
 <dt><tt>PGM_USE_CR</tt></dt>
 <dd>Set or read an integer argument that when enabled sends congestion reports from PGM receivers to congestion report-requesting PGM sources.</dd>
 <dt><tt>PGM_USE_FEC</tt></dt>

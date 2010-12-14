@@ -21,7 +21,7 @@ When relying on the underlying network transport for event generation the develo
 <td><tt>select()</tt></td>
 <td><tt>[OpenPgm5CReferencePgmSelectInfo pgm_select_info()]</tt></td>
 </tr><tr>
-<td><tt>poll()</tt></td>
+<td><tt>poll()</tt> or <tt>WSAPoll()</tt></td>
 <td><tt>[OpenPgm5CReferencePgmPollInfo pgm_poll_info()]</tt></td>
 </tr><tr>
 <td><tt>epoll()</tt></td>
