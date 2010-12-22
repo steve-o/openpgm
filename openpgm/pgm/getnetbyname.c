@@ -207,6 +207,7 @@ _pgm_native_getnetbyname (
 	)
 {
 	struct sockaddr_in sa;
+	struct in_addr addr;
 	struct netent *ne;
 	char **cp, **q, **r;
 	size_t len;
@@ -243,8 +244,9 @@ found:
 	if (AF_INET != ne->n_addrtype)
 		return NULL;
 	memset (&sa, 0, sizeof (sa));
-	sa->sin_family = ne->n_addrtype;
-	sa->sin_addr.s_addr = ntohl (pgm_inet_makeaddr (ne->n_net));
+	sa.sin_family = ne->n_addrtype;
+	addr = pgm_inet_makeaddr (ne->n_net, 0);
+	sa.sin_addr.s_addr = ntohl (addr.s_addr);
 	memcpy (&net.n_net, &sa, sizeof (sa));
 	endnetent();
 	return &net;
