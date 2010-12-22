@@ -124,7 +124,7 @@ env = Environment(
 			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
 #			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
 # NSS networks lookup, IPv4 only
-# 			'-DCONFIG_HAVE_GETNETENT',
+ 			'-DCONFIG_HAVE_GETNETENT',
 # variadic macros
 			'-DCONFIG_HAVE_ISO_VARARGS',
 #			'-DCONFIG_HAVE_GNUC_VARARGS',
