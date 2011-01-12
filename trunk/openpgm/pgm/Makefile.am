@@ -48,7 +48,8 @@ libpgm_la_SOURCES = \
 	histogram.c \
 	version.c
 
-include_HEADERS = \
+libincludedir = $(includedir)/pgm-5.1/pgm
+libinclude_HEADERS = \
 	include/pgm/atomic.h \
 	include/pgm/engine.h \
 	include/pgm/error.h \
@@ -85,6 +86,9 @@ libpgm_la_CFLAGS = \
 	-DGETTEXT_PACKAGE='"pgm"'
 
 libpgm_la_LDFLAGS = -release 5.1 -version-info 0:101
+
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = openpgm-5.1.pc
 
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
 libtool: $(LIBTOOL_DEPS)
