@@ -48,6 +48,30 @@ libpgm_la_SOURCES = \
 	histogram.c \
 	version.c
 
+include_HEADERS = \
+	include/pgm/atomic.h \
+	include/pgm/engine.h \
+	include/pgm/error.h \
+	include/pgm/gsi.h \
+	include/pgm/if.h \
+	include/pgm/in.h \
+	include/pgm/list.h \
+	include/pgm/macros.h \
+	include/pgm/mem.h \
+	include/pgm/messages.h \
+	include/pgm/msgv.h \
+	include/pgm/packet.h \
+	include/pgm/pgm.h \
+	include/pgm/skbuff.h \
+	include/pgm/socket.h \
+	include/pgm/time.h \
+	include/pgm/tsi.h \
+	include/pgm/types.h \
+	include/pgm/version.h \
+	include/pgm/winint.h \
+	include/pgm/wininttypes.h \
+	include/pgm/zinttypes.h
+
 version.c: version_generator.py
 	$(PYTHON) $< > $@
 
