@@ -34,6 +34,9 @@ LC_INIT
 AC_SUBST([LIBTOOL_DEPS])
 
 # Checks for libraries.
+AC_SEARCH_LIBS([sqrt], [m])
+AC_SEARCH_LIBS([pthread_mutex_trylock], [pthread])
+AC_SEARCH_LIBS([clock_gettime], [rt])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -210,5 +213,5 @@ case "$host_os" in
 	;;
 esac
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile openpgm-5.1.pc])
 AC_OUTPUT
