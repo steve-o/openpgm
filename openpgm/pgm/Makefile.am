@@ -74,10 +74,10 @@ libinclude_HEADERS = \
 	include/pgm/zinttypes.h
 
 version.c: version_generator.py
-	$(PYTHON) $< > $@
+	$(AM_V_GEN)$(PYTHON) $< > $@
 
 galois_tables.c: galois_generator.pl
-	$(PERL) $< > $@
+	$(AM_V_GEN)$(PERL) $< > $@
 
 libpgm_la_CFLAGS = \
 	-I$(top_srcdir)/include \

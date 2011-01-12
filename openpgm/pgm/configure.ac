@@ -1,11 +1,11 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.67])
+AC_PREREQ([2.61])
 AC_INIT([OpenPGM], [5.1], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
-AM_INIT_AUTOMAKE([1.11 no-define foreign])
-AM_SILENT_RULES([yes])
+AM_INIT_AUTOMAKE([1.10 no-define foreign])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES])
 
 # Apply system specific rules.
 AC_CANONICAL_HOST
@@ -129,6 +129,7 @@ AC_CHECK_FILE([/dev/rtc],
 AC_MSG_CHECKING([for RDTSC instruction])
 case "$host_os" in
 darwin*)
+	AC_MSG_RESULT([no])
 	;;
 *)
 AC_COMPILE_IFELSE(
