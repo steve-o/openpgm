@@ -1,4 +1,4 @@
 #!/bin/sh
 aclocal
-automake --add-missing
+automake --add-missing --copy
 autoreconf --install
