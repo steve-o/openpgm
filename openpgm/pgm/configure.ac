@@ -5,7 +5,7 @@ AC_PREREQ([2.61])
 AC_INIT([OpenPGM], [5.1], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
 AM_INIT_AUTOMAKE([1.10 no-define foreign])
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 # Apply system specific rules.
 AC_CANONICAL_HOST
