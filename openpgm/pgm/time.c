@@ -427,10 +427,14 @@ pgm_time_init (
 #endif
 
 	return TRUE;
-#ifndef _WIN32
+#if defined(CONFIG_HAVE_RTC) || (defined(CONFIG_HAVE_TSC) && !defined(_WIN32)) || defined(CONFIG_HAVE_HPET)
 err_cleanup:
 	pgm_atomic_dec32 (&time_ref_count);
 	return FALSE;
+#endif
+#if !defined(CONFIG_HAVE_RTC) && !defined(CONFIG_HAVE_TSC) && !defined(CONFIG_HAVE_HPET)
+/* unused parameters */
+	(void)error;
 #endif
 }
 
