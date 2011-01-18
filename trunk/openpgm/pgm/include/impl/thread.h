@@ -39,6 +39,9 @@ typedef struct pgm_rwlock_t pgm_rwlock_t;
 #	define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
 #endif
+#ifdef __APPLE__
+#	include <libkern/OSAtomic.h>
+#endif
 #include <pgm/types.h>
 
 PGM_BEGIN_DECLS
@@ -56,6 +59,8 @@ struct pgm_spinlock_t {
 	pthread_spinlock_t	pthread_spinlock;
 #elif defined(_WIN32)
 	CRITICAL_SECTION	win32_spinlock;
+#elif defined(__APPLE__)
+	OSSpinLock		darwin_spinlock;
 #else
 	volatile uint32_t	taken;
 #endif
@@ -119,6 +124,8 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 	pthread_spin_lock (&spinlock->pthread_spinlock);
 #elif defined(_WIN32)
 	EnterCriticalSection (&spinlock->win32_spinlock);
+#elif defined(__APPLE__)
+	OSSpinLockLock (&spinlock->darwin_spinlock);
 #else /* GCC atomics */
 	uint32_t prev;
 	do {
@@ -132,6 +139,8 @@ static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
 #elif defined(_WIN32)
 	LeaveCriticalSection (&spinlock->win32_spinlock);
+#elif defined(__APPLE__)
+	OSSpinLockUnlock (&spinlock->darwin_spinlock);
 #else /* GCC atomics */
 	spinlock->taken = 0;
 #endif

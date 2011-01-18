@@ -25,6 +25,8 @@
 
 #if defined( __sun )
 #	include <atomic.h>
+#elif defined( __APPLE__ )
+#	include <libkern/OSAtomic.h>
 #endif
 #include <pgm/types.h>
 
@@ -51,11 +53,18 @@ pgm_atomic_exchange_and_add32 (
 		       :: "r" (result), "m" (*atomic)  );
 	return result;
 #elif defined( __sun )
+/* Solaris intrinsic */
 	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
 	return nv - val;
+#elif defined( __APPLE__ )
+/* Darwin intrinsic */
+	const uint32_t nv = OSAtomicAdd32Barrier ((int32_t)val, (volatile int32_t*)atomic);
+	return nv - val;
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+/* GCC 4.0.1 intrinsic */
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
+/* Windows intrinsic */
 	return InterlockedExchangeAdd ((volatile LONG*)atomic, val);
 #else
 #	error "No supported atomic operations for this platform."
@@ -82,6 +91,8 @@ pgm_atomic_add32 (
 		       :: "r" (val), "m" (*atomic)  );
 #elif defined( __sun )
 	atomic_add_32 (atomic, (int32_t)val);
+#elif defined( __APPLE__ )
+	OSAtomicAdd32Barrier ((int32_t)val, (volatile int32_t*)atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	__sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
@@ -99,6 +110,8 @@ pgm_atomic_inc32 (
 	pgm_atomic_add32 (atomic, 1);
 #elif defined( __sun )
 	atomic_inc_32 (atomic);
+#elif defined( __APPLE__ )
+	OSAtomicIncrement32Barrier ((volatile int32_t*)atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, 1);
 #elif defined( _WIN32 )
@@ -116,6 +129,8 @@ pgm_atomic_dec32 (
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
 #elif defined( __sun )
 	atomic_dec_32 (atomic);
+#elif defined( __APPLE__ )
+	OSAtomicDecrement32Barrier ((volatile int32_t*)atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
 #elif defined( _WIN32 )

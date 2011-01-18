@@ -1,5 +1,5 @@
---- time.c	2010-11-05 05:07:57.000000000 +0800
-+++ time.c89.c	2010-11-05 05:07:48.000000000 +0800
+--- time.c	2011-01-18 13:33:52.000000000 +0800
++++ time.c89.c	2011-01-18 13:35:37.000000000 +0800
 @@ -320,6 +320,7 @@
  /* attempt to parse clock ticks from kernel
   */
@@ -40,7 +40,7 @@
  #endif
  
  	return TRUE;
-@@ -778,11 +783,15 @@
+@@ -782,11 +787,15 @@
  /* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
   * the value must be <= 0x05f5e100 or 100ns.
   */
