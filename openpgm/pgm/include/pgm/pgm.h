@@ -31,6 +31,7 @@
 #	pragma comment (lib, "ws2_32")
 #	pragma comment (lib, "iphlpapi")
 #	pragma comment (lib, "winmm")
+#	pragma comment (lib, "advapi32")
 #endif
 
 #include <pgm/atomic.h>
