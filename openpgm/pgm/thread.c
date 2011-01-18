@@ -172,6 +172,8 @@ pgm_spinlock_init (
 	posix_check_cmd (pthread_spin_init (&spinlock->pthread_spinlock, PTHREAD_PROCESS_PRIVATE));
 #elif defined(_WIN32)
 	InitializeCriticalSection (&spinlock->win32_spinlock);
+#elif defined(__APPLE__)
+	spinlock->darwin_spinlock = OS_SPINLOCK_INIT;
 #else	/* GCC atomics */
 	spinlock->taken = 0;
 #endif
@@ -192,6 +194,8 @@ pgm_spinlock_trylock (
 	return TRUE;
 #elif defined(_WIN32)
 	return TryEnterCriticalSection (&spinlock->win32_spinlock);
+#elif defined(__APPLE__)
+	return OSSpinLockTry (&spinlock->darwin_spinlock);
 #else	/* GCC atomics */
 	uint32_t prev;
 	prev = __sync_lock_test_and_set (&spinlock->taken, 1);
@@ -211,6 +215,8 @@ pgm_spinlock_free (
 	pthread_spin_destroy (&spinlock->pthread_spinlock);
 #elif defined(_WIN32)
 	DeleteCriticalSection (&spinlock->win32_spinlock);
+#elif defined(__APPLE__)
+	/* NOP */
 #else	/* GCC atomics */
 	/* NOP */
 #endif

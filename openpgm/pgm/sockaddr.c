@@ -664,6 +664,11 @@ pgm_sockaddr_block_source (
 
 	default: break;
 	}
+#else
+/* unused parameters */
+	(void)s;
+	(void)sa_family;
+	(void)gsr;
 #endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
@@ -703,6 +708,11 @@ pgm_sockaddr_unblock_source (
 
 	default: break;
 	}
+#else
+/* unused parameters */
+	(void)s;
+	(void)sa_family;
+	(void)gsr;
 #endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
