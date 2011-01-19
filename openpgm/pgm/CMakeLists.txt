@@ -26,10 +26,10 @@ find_package(Perl REQUIRED)
 find_program(PATCH_EXECUTABLE patch)
 
 #-----------------------------------------------------------------------------
-# default to Debug build
+# default to Release build
 
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING
+  set(CMAKE_BUILD_TYPE Release CACHE STRING
       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
       FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
@@ -53,7 +53,7 @@ add_definitions(
 #-----------------------------------------------------------------------------
 # source files
 
-set(c99-source
+set(c99-sources
         thread.c
         mem.c
         string.c
@@ -101,6 +101,30 @@ set(c99-source
 include_directories(
 	include
 )
+set(headers
+	include/pgm/atomic.h
+	include/pgm/engine.h
+	include/pgm/error.h
+	include/pgm/gsi.h
+	include/pgm/if.h
+	include/pgm/in.h
+	include/pgm/list.h
+	include/pgm/macros.h
+	include/pgm/mem.h
+	include/pgm/messages.h
+	include/pgm/msgv.h
+	include/pgm/packet.h
+	include/pgm/pgm.h
+	include/pgm/skbuff.h
+	include/pgm/socket.h
+	include/pgm/time.h
+	include/pgm/tsi.h
+	include/pgm/types.h
+	include/pgm/version.h
+	include/pgm/winint.h
+	include/pgm/wininttypes.h
+	include/pgm/zinttypes.h
+)
 
 add_definitions(
 	-DCONFIG_16BIT_CHECKSUM
@@ -111,7 +135,7 @@ add_definitions(
 #-----------------------------------------------------------------------------
 # source generators
 
-foreach (source ${c99-source})
+foreach (source ${c99-sources})
 	string(REGEX REPLACE "\\.c$" "" source "${source}")
 	if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${source}.c.c89.patch)
 		add_custom_command(
@@ -168,5 +192,36 @@ set(sources
 # output
 
 add_library(libpgm STATIC ${sources})
+
+set(docs
+	COPYING
+	LICENSE
+	README
+)
+file(GLOB mibs "${CMAKE_CURRENT_SOURCE_DIR}/mibs/*.txt")
+set(examples
+	examples/async.c
+	examples/async.h
+	examples/daytime.c
+	examples/getopt.c
+	examples/getopt.h
+	examples/purinrecv.c
+	examples/purinsend.c
+	examples/shortcakerecv.c
+)
+
+install (TARGETS libpgm DESTINATION lib)
+install (FILES ${headers} DESTINATION include/pgm)
+install (FILES ${docs} DESTINATION doc)
+install (FILES ${mibs} DESTINATION mibs)
+install (FILES ${examples} DESTINATION examples)
+
+include (InstallRequiredSystemLibraries)
+set (CPACK_PACKAGE_VENDOR "Miru Limited")
+set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set (CPACK_PACKAGE_VERSION_MAJOR "5")
+set (CPACK_PACKAGE_VERSION_MINOR "1")
+set (CPACK_PACKAGE_VERSION_PATCH "102")
+include (CPack)
 
 # end of file
