@@ -12,7 +12,7 @@ Platforms supported by paid contract.
   * [OpenPgm5CReferenceBuildLibrarySolarisSunGcc GCC 3.4.3] on Solaris 10 on SPARC (32-bit), supplied on Solaris 10 Companion Software CD
   * [OpenPgm5CReferenceBuildLibrarySolarisGcc64 GCC 3.4.6] on Solaris 10 on SPARC (64-bit)
   * [OpenPgm5CReferenceBuildLibrarySolarisSunStudio Sun Studio 12u1] on Solaris 10 on SPARC (64-bit)
-  * MSVC 2010 on Microsoft Windows 7 (32-bit & 64-bit)
+  * [OpenPgm5CReferenceBuildLibraryWindows MSVC 2010] on Microsoft Windows 7 (32-bit & 64-bit)
 
 === Untested Platforms ===
 <img align="right" src="http://miru.hk/wiki/womm.png" width="200" height="193"/>Functional build but no available test report.

@@ -1,0 +1,36 @@
+﻿#summary OpenPGM 5 : C Reference : Build Library : MSVC 2010 on Windows 7
+#labels Phase-Implementation
+#sidebar TOC5CReferenceProgrammersChecklist
+=== Building with MSVC 2010 for Windows 7 ===
+First install [http://www.microsoft.com/express/Windows/ Microsoft Visual C++ 2010 Express], [http://www.microsoft.com/visualstudio/en-us/ Professional] (x64 support), 
+etc.  Install the build system [http://www.cmake.org/cmake/resources/software.html CMake] and the PGM build dependencies [http://strawberryperl.com/ Perl] and [http://www.python.org/download/ Python 2.7].
+
+Checkout the repository as per the [http://code.google.com/p/openpgm/source/checkout Subversion guide], or download the latest source archive and extract.  You can use Cygwin and Subversion to checkout
+the source.
+<pre>
+ $ *cd /cygdrive/c * 
+ $ *svn checkout http://openpgm.googlecode.com/svn/tags/release-5-1-102 libpgm-5.1.102 *
+</pre>
+Configure using a Visual Studio Command Prompt.
+<pre>
+ C:\> *cd \libpgm-5.1.102\openpgm\pgm* 
+ C:\libpgm-5.1.102\openpgm\pgm> *mkdir build* 
+ C:\libpgm-5.1.102\openpgm\pgm> *cd build* 
+ C:\libpgm-5.1.102\openpgm\pgm\build> *cmake ..* 
+</pre>
+CMake will build a Makefile in the current directory with the PGM library to be built in the sub-directory <tt>lib</tt>.
+
+To configure the release version use the following command or change the parameter using <tt>cmake-gui</tt>.
+<pre>
+ C:\libpgm-5.1.102\openpgm\pgm\build> *cmake -DCMAKE_BUILD_TYPE=Release ..* 
+</pre>
+
+Build.
+<pre>
+ C:\libpgm-5.1.102\openpgm\pgm\build> *nmake* 
+</pre>
+
+If you want a redistributable installer use CPack to build the package.
+<pre>
+  C:\libpgm-5.1.102\openpgm\pgm\build> *nmake package* 
+</pre>
