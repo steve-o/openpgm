@@ -27,11 +27,15 @@
 
 /* Globals */
 
+#define PGM_ADAPTIVE_MUTEX_SPINCOUNT	4000
+
+
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
 static DWORD cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
 
 static volatile uint32_t thread_ref_count = 0;
+static bool pgm_smp_system = TRUE;
 
 
 #if !defined( _WIN32 ) && defined( __GNU__ )
@@ -96,6 +100,9 @@ pgm_thread_init (void)
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
 	win32_check_cmd (TLS_OUT_OF_INDEXES != (cond_event_tls = TlsAlloc ()));
 #endif
+
+	if (pgm_get_nprocs() <= 1)
+		pgm_smp_system = FALSE;
 }
 
 void
@@ -111,6 +118,12 @@ pgm_thread_shutdown (void)
 #endif
 }
 
+/* prefer adaptive-mutexes over regular mutexes, an adaptive mutex is wrapped by
+ * a count-limited spinlock to optimize short waits.
+ *
+ * a mutex here is defined as process-private and contention can be 2 or more threads.
+ */
+
 void
 pgm_mutex_init (
 	pgm_mutex_t*	mutex
@@ -118,13 +131,23 @@ pgm_mutex_init (
 {
 	pgm_assert (NULL != mutex);
 
-#ifndef _WIN32
+#ifdef PTHREAD_MUTEX_ADAPTIVE_NP
+/* non-portable but define on Linux & FreeBSD, uses spinlock for 200 spins then waits as mutex */
+	pthread_mutexattr_t attr;
+	posix_check_cmd (pthread_mutexattr_init (&attr));
+	pthread_mutexattr_settype (&attr, PTHREAD_MUTEX_ADAPTIVE_NP);
+	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, &attr));
+	pthread_mutexattr_destroy (&attr);
+#elif !defined( _WIN32 )
 	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
+#elif defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
+/* reduce memory consumption on mutexes on Vista+ */
+	InitializeCriticalSectionEx (&mutex->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT, CRITICAL_SECTION_NO_DEBUG_INFO);
 #else
-	HANDLE handle;
-	win32_check_cmd (NULL != (handle = CreateMutex (NULL, FALSE, NULL)));
-	mutex->win32_mutex = handle;
-#endif /* !_WIN32 */
+/* Windows "mutexes" are default shared, "critical sections" are default process-private */
+	InitializeCriticalSection (&mutex->win32_crit);
+	SetCriticalSectionSpinCount (&mutex->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT);
+#endif
 }
 
 bool
@@ -141,9 +164,7 @@ pgm_mutex_trylock (
 	posix_check_err (result, "pthread_mutex_trylock");
 	return TRUE;
 #else
-	DWORD result;
-	win32_check_cmd (WAIT_FAILED != (result = WaitForSingleObject (mutex->win32_mutex, 0)));
-	return WAIT_TIMEOUT != result;
+	return TryEnterCriticalSection (&mutex->win32_crit);
 #endif /* !_WIN32 */
 }
 
@@ -157,9 +178,12 @@ pgm_mutex_free (
 #ifndef _WIN32
 	posix_check_cmd (pthread_mutex_destroy (&mutex->pthread_mutex));
 #else
-	win32_check_cmd (CloseHandle (mutex->win32_mutex));
+	DeleteCriticalSection (&mutex->win32_crit);
 #endif /* !_WIN32 */
 }
+
+/* contention on spin-locks is limited to two threads, a receiving thread and a sending thread.
+ */
 
 void
 pgm_spinlock_init (
@@ -170,11 +194,9 @@ pgm_spinlock_init (
 
 #ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	posix_check_cmd (pthread_spin_init (&spinlock->pthread_spinlock, PTHREAD_PROCESS_PRIVATE));
-#elif defined(_WIN32)
-	InitializeCriticalSection (&spinlock->win32_spinlock);
-#elif defined(__APPLE__)
+#elif defined( __APPLE__ )
 	spinlock->darwin_spinlock = OS_SPINLOCK_INIT;
-#else	/* GCC atomics */
+#else	/* Win32/GCC atomics */
 	spinlock->taken = 0;
 #endif
 }
@@ -192,13 +214,13 @@ pgm_spinlock_trylock (
 		return FALSE;
 	posix_check_err (result, "pthread_spinlock_trylock");
 	return TRUE;
-#elif defined(_WIN32)
-	return TryEnterCriticalSection (&spinlock->win32_spinlock);
-#elif defined(__APPLE__)
+#elif defined( __APPLE__ )
 	return OSSpinLockTry (&spinlock->darwin_spinlock);
+#elif defined( _WIN32 )
+	const LONG prev = _InterlockedExchange (&spinlock->taken, 1);
+	return (0 == prev);
 #else	/* GCC atomics */
-	uint32_t prev;
-	prev = __sync_lock_test_and_set (&spinlock->taken, 1);
+	const uint32_t prev = __sync_lock_test_and_set (&spinlock->taken, 1);
 	return (0 == prev);
 #endif
 }
@@ -213,11 +235,9 @@ pgm_spinlock_free (
 #ifdef CONFIG_HAVE_POSIX_SPINLOCK
 /* ignore return value */
 	pthread_spin_destroy (&spinlock->pthread_spinlock);
-#elif defined(_WIN32)
-	DeleteCriticalSection (&spinlock->win32_spinlock);
 #elif defined(__APPLE__)
 	/* NOP */
-#else	/* GCC atomics */
+#else	/* Win32/GCC atomics */
 	/* NOP */
 #endif
 }

@@ -1,52 +1,41 @@
-#!/usr/bin/python
-
-import os
-import platform
-import time
-
-build_date = time.strftime ("%Y-%m-%d")
-build_time = time.strftime ("%H:%M:%S")
-build_rev = os.popen('svnversion -n .').read();
-
-print """
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
- * 
- * OpenPGM version.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * portable function to return number of available, online, or
+ * configured processors.
+ *
+ * Copyright (c) 2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <impl/framework.h>
-#include <pgm/version.h>
+#if !defined (__PGM_IMPL_FRAMEWORK_H_INSIDE__) && !defined (PGM_COMPILATION)
+#	error "Only <framework.h> can be included directly."
+#endif
 
+#if defined(_MSC_VER) && (_MSC_VER >= 1200)
+#	pragma once
+#endif
+#ifndef __PGM_IMPL_GET_NPROCS_H__
+#define __PGM_IMPL_GET_NPROCS_H__
 
-/* globals */
+#include <pgm/types.h>
 
-const unsigned pgm_major_version = 5;
-const unsigned pgm_minor_version = 1;
-const unsigned pgm_micro_version = 103;
-const char* pgm_build_date = "%s";
-const char* pgm_build_time = "%s";
-const char* pgm_build_system = "%s";
-const char* pgm_build_machine = "%s";
-const char* pgm_build_revision = "%s";
+PGM_BEGIN_DECLS
 
+PGM_GNUC_INTERNAL int pgm_get_nprocs (void);
 
-/* eof */
-"""%(build_date, build_time, platform.system(), platform.machine(), build_rev)
+PGM_END_DECLS
 
-# end of file
+#endif /* __PGM_IMPL_GET_NPROCS_H__ */
