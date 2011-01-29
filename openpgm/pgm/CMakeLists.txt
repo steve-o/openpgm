@@ -70,6 +70,7 @@ set(c99-sources
         time.c
         if.c
         getifaddrs.c
+	get_nprocs.c
         getnetbyname.c
         getnodeaddr.c
         getprotobyname.c
@@ -221,7 +222,7 @@ set (CPACK_PACKAGE_VENDOR "Miru Limited")
 set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set (CPACK_PACKAGE_VERSION_MAJOR "5")
 set (CPACK_PACKAGE_VERSION_MINOR "1")
-set (CPACK_PACKAGE_VERSION_PATCH "102")
+set (CPACK_PACKAGE_VERSION_PATCH "103")
 include (CPack)
 
 # end of file

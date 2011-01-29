@@ -334,6 +334,11 @@ pgm_time_init (
 			fclose (fp);
 		}
 #elif defined(_WIN32)
+/* iff reading TSC we could use HKLM/Hardware/Description/System/CentralProcessor/0/~Mhz
+ *
+ * MSDN statement: The frequency cannot change while the system is running.
+ * http://msdn.microsoft.com/en-us/library/ms644905(v=vs.85).aspx
+ */
 		LARGE_INTEGER frequency;
 		if (QueryPerformanceFrequency (&frequency))
 		{

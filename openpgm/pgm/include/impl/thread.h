@@ -36,6 +36,7 @@ typedef struct pgm_rwlock_t pgm_rwlock_t;
 #	include <pthread.h>
 #	include <unistd.h>
 #else
+#	define VC_EXTRALEAN
 #	define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
 #endif
@@ -50,17 +51,17 @@ struct pgm_mutex_t {
 #ifndef _WIN32
 	pthread_mutex_t		pthread_mutex;
 #else
-	HANDLE			win32_mutex;
+	CRITICAL_SECTION	win32_crit;
 #endif /* !_WIN32 */
 };
 
 struct pgm_spinlock_t {
 #ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spinlock_t	pthread_spinlock;
-#elif defined(_WIN32)
-	CRITICAL_SECTION	win32_spinlock;
 #elif defined(__APPLE__)
 	OSSpinLock		darwin_spinlock;
+#elif defined(_WIN32)
+	volatile LONG		taken;
 #else
 	volatile uint32_t	taken;
 #endif
@@ -103,7 +104,7 @@ static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
 #ifndef _WIN32
 	pthread_mutex_lock (&mutex->pthread_mutex);
 #else
-	WaitForSingleObject (mutex->win32_mutex, INFINITE);
+	EnterCriticalSection (&mutex->win32_crit);
 #endif /* !_WIN32 */
 }
 
@@ -111,7 +112,7 @@ static inline void pgm_mutex_unlock (pgm_mutex_t* mutex) {
 #ifndef _WIN32
 	pthread_mutex_unlock (&mutex->pthread_mutex);
 #else
-	ReleaseMutex (mutex->win32_mutex);
+	LeaveCriticalSection (&mutex->win32_crit);
 #endif /* !_WIN32 */
 }
 
@@ -122,27 +123,32 @@ PGM_GNUC_INTERNAL bool pgm_spinlock_trylock (pgm_spinlock_t*);
 static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 #ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spin_lock (&spinlock->pthread_spinlock);
-#elif defined(_WIN32)
-	EnterCriticalSection (&spinlock->win32_spinlock);
-#elif defined(__APPLE__)
+#elif defined( __APPLE__ )
+/* Anderson's exponential back-off */
 	OSSpinLockLock (&spinlock->darwin_spinlock);
+#elif defined( _WIN32 )
+/* Segall and Rudolph bus-optimised spinlock acquire with Intel's recommendation
+ * for a pause instruction for hyper-threading.
+ */
+	while (_InterlockedExchange (&spinlock->taken, 1))
+		while (spinlock->taken)
+			YieldProcessor();
 #else /* GCC atomics */
-	uint32_t prev;
-	do {
-		prev = __sync_lock_test_and_set (&spinlock->taken, 1);
-	} while (prev);
+	while (__sync_lock_test_and_set (&spinlock->taken, 1))
+		while (spinlock->taken)
+			pthread_yield();
 #endif
 }
 
 static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
 #ifdef CONFIG_HAVE_POSIX_SPINLOCK
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
-#elif defined(_WIN32)
-	LeaveCriticalSection (&spinlock->win32_spinlock);
 #elif defined(__APPLE__)
 	OSSpinLockUnlock (&spinlock->darwin_spinlock);
+#elif defined(_WIN32)
+	_InterlockedExchange (&spinlock->taken, 0);
 #else /* GCC atomics */
-	spinlock->taken = 0;
+	__sync_lock_release (&spinlock->taken);
 #endif
 }
 
