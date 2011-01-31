@@ -505,6 +505,10 @@ parse_interface (
 		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
 		switch (eai) {
 		case 0:
+/* NB: getaddrinfo may return multiple addresses, one per interface & family.
+ * The sorting order of the list defined by RFC 3484 and /etc/gai.conf.  Walk
+ * the list for first reasonable address or err with details from first result.
+ */
 			if (AF_INET == res->ai_family &&
 			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
@@ -894,6 +898,9 @@ parse_group (
 		return FALSE;
 	}
 
+/* NB: getaddrinfo may return multiple addresses, one per interface & family, only the first
+ * return result is used.  The sorting order of the list defined by RFC 3484 and /etc/gai.conf
+ */
 	if ((AF_INET6 != family && IN_MULTICAST(ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
 	    (AF_INET  != family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
 	{
