@@ -27,6 +27,11 @@
 
 /* Globals */
 
+bool pgm_smp_system = TRUE;
+
+
+/* Locals */
+
 #define PGM_ADAPTIVE_MUTEX_SPINCOUNT	4000
 
 
@@ -35,7 +40,6 @@ static DWORD cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
 
 static volatile uint32_t thread_ref_count = 0;
-static bool pgm_smp_system = TRUE;
 
 
 #if !defined( _WIN32 ) && defined( __GNU__ )
@@ -150,24 +154,6 @@ pgm_mutex_init (
 #endif
 }
 
-bool
-pgm_mutex_trylock (
-	pgm_mutex_t*	mutex
-	)
-{
-	pgm_assert (NULL != mutex);
-
-#ifndef _WIN32
-	const int result = pthread_mutex_trylock (&mutex->pthread_mutex);
-	if (EBUSY == result)
-		return FALSE;
-	posix_check_err (result, "pthread_mutex_trylock");
-	return TRUE;
-#else
-	return TryEnterCriticalSection (&mutex->win32_crit);
-#endif /* !_WIN32 */
-}
-
 void
 pgm_mutex_free (
 	pgm_mutex_t*	mutex
@@ -192,36 +178,14 @@ pgm_spinlock_init (
 {
 	pgm_assert (NULL != spinlock);
 
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifdef CONFIG_TICKET_SPINLOCK
+	pgm_ticket_init (&spinlock->ticket_lock);
+#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
 	posix_check_cmd (pthread_spin_init (&spinlock->pthread_spinlock, PTHREAD_PROCESS_PRIVATE));
 #elif defined( __APPLE__ )
 	spinlock->darwin_spinlock = OS_SPINLOCK_INIT;
 #else	/* Win32/GCC atomics */
 	spinlock->taken = 0;
-#endif
-}
-
-bool
-pgm_spinlock_trylock (
-	pgm_spinlock_t*	spinlock
-	)
-{
-	pgm_assert (NULL != spinlock);
-
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
-	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
-	if (EBUSY == result)
-		return FALSE;
-	posix_check_err (result, "pthread_spinlock_trylock");
-	return TRUE;
-#elif defined( __APPLE__ )
-	return OSSpinLockTry (&spinlock->darwin_spinlock);
-#elif defined( _WIN32 )
-	const LONG prev = _InterlockedExchange (&spinlock->taken, 1);
-	return (0 == prev);
-#else	/* GCC atomics */
-	const uint32_t prev = __sync_lock_test_and_set (&spinlock->taken, 1);
-	return (0 == prev);
 #endif
 }
 
@@ -232,7 +196,9 @@ pgm_spinlock_free (
 {
 	pgm_assert (NULL != spinlock);
 
-#ifdef CONFIG_HAVE_POSIX_SPINLOCK
+#ifdef CONFIG_TICKET_SPINLOCK
+	pgm_ticket_free (&spinlock->ticket_lock);
+#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
 /* ignore return value */
 	pthread_spin_destroy (&spinlock->pthread_spinlock);
 #elif defined(__APPLE__)
@@ -390,12 +356,14 @@ pgm_rwlock_init (
 {
 	pgm_assert (NULL != rwlock);
 
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
+#ifdef CONFIG_TICKET_SPINLOCK
+	pgm_rwticket_init (&rwlock->rwticket_lock);
+#elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	InitializeSRWLock (&rwlock->win32_rwlock);
-#elif !defined(_WIN32)
+#elif !defined( _WIN32 )
 	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
 #else
-	InitializeCriticalSection (&rwlock->win32_spinlock);
+	InitializeCriticalSection (&rwlock->win32_crit);
 	pgm_cond_init (&rwlock->read_cond);
 	pgm_cond_init (&rwlock->write_cond);
 	rwlock->read_counter	= 0;
@@ -412,18 +380,20 @@ pgm_rwlock_free (
 {
 	pgm_assert (NULL != rwlock);
 
-#ifdef CONFIG_HAVE_WIN_SRW_LOCK
+#ifdef CONFIG_TICKET_SPINLOCK
+	pgm_rwticket_free (&rwlock->rwticket_lock);
+#elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	/* nop */
 #elif !defined(_WIN32)
 	pthread_rwlock_destroy (&rwlock->pthread_rwlock);
 #else
 	pgm_cond_free (&rwlock->read_cond);
 	pgm_cond_free (&rwlock->write_cond);
-	DeleteCriticalSection (&rwlock->win32_spinlock);
+	DeleteCriticalSection (&rwlock->win32_crit);
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
 
-#if !defined(CONFIG_HAVE_WIN_SRW_LOCK) && defined(_WIN32)
+#if !defined(CONFIG_TICKET_SPINLOCK) && !defined(CONFIG_HAVE_WIN_SRW_LOCK) && defined(_WIN32)
 static inline
 void
 _pgm_rwlock_signal (
@@ -445,13 +415,13 @@ pgm_rwlock_reader_lock (
 {
 	pgm_assert (NULL != rwlock);
 
-	EnterCriticalSection (&rwlock->win32_spinlock);
+	EnterCriticalSection (&rwlock->win32_crit);
 	rwlock->want_to_read++;
 	while (rwlock->have_writer || rwlock->want_to_write)
-		pgm_cond_wait (&rwlock->read_cond, &rwlock->win32_spinlock);
+		pgm_cond_wait (&rwlock->read_cond, &rwlock->win32_crit);
 	rwlock->want_to_read--;
 	rwlock->read_counter++;
-	LeaveCriticalSection (&rwlock->win32_spinlock);
+	LeaveCriticalSection (&rwlock->win32_crit);
 }
 
 bool
@@ -463,12 +433,12 @@ pgm_rwlock_reader_trylock (
 
 	pgm_assert (NULL != rwlock);
 
-	EnterCriticalSection (&rwlock->win32_spinlock);
+	EnterCriticalSection (&rwlock->win32_crit);
 	if (!rwlock->have_writer && !rwlock->want_to_write) {
 		rwlock->read_counter++;
 		status = TRUE;
 	}
-	LeaveCriticalSection (&rwlock->win32_spinlock);
+	LeaveCriticalSection (&rwlock->win32_crit);
 	return status;
 }
 
@@ -479,11 +449,11 @@ pgm_rwlock_reader_unlock(
 {
 	pgm_assert (NULL != rwlock);
 
-	EnterCriticalSection (&rwlock->win32_spinlock);
+	EnterCriticalSection (&rwlock->win32_crit);
 	rwlock->read_counter--;
 	if (rwlock->read_counter == 0)
 		_pgm_rwlock_signal (rwlock);
-	LeaveCriticalSection (&rwlock->win32_spinlock);
+	LeaveCriticalSection (&rwlock->win32_crit);
 }
 
 void
@@ -493,13 +463,13 @@ pgm_rwlock_writer_lock (
 {
 	pgm_assert (NULL != rwlock);
 
-	EnterCriticalSection (&rwlock->win32_spinlock);
+	EnterCriticalSection (&rwlock->win32_crit);
 	rwlock->want_to_write++;
 	while (rwlock->have_writer || rwlock->read_counter)
-		pgm_cond_wait (&rwlock->write_cond, &rwlock->win32_spinlock);
+		pgm_cond_wait (&rwlock->write_cond, &rwlock->win32_crit);
 	rwlock->want_to_write--;
 	rwlock->have_writer = TRUE;
-	LeaveCriticalSection (&rwlock->win32_spinlock);
+	LeaveCriticalSection (&rwlock->win32_crit);
 }
 
 bool
@@ -511,12 +481,12 @@ pgm_rwlock_writer_trylock (
 
 	pgm_assert (NULL != rwlock);
 
-	EnterCriticalSection (&rwlock->win32_spinlock);
+	EnterCriticalSection (&rwlock->win32_crit);
 	if (!rwlock->have_writer && !rwlock->read_counter) {
 		rwlock->have_writer = TRUE;
 		status = TRUE;
 	}
-	LeaveCriticalSection (&rwlock->win32_spinlock);
+	LeaveCriticalSection (&rwlock->win32_crit);
 	return status;
 }
 
@@ -527,10 +497,10 @@ pgm_rwlock_writer_unlock (
 {
 	pgm_assert (NULL != rwlock);
 
-	EnterCriticalSection (&rwlock->win32_spinlock);
+	EnterCriticalSection (&rwlock->win32_crit);
 	rwlock->have_writer = FALSE;
 	_pgm_rwlock_signal (rwlock);
-	LeaveCriticalSection (&rwlock->win32_spinlock);
+	LeaveCriticalSection (&rwlock->win32_crit);
 }
 #endif /* !_WIN32 && !CONFIG_HAVE_WIN_SRW_LOCK */
 

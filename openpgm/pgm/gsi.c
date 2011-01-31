@@ -152,6 +152,9 @@ pgm_gsi_create_from_addr (
 			     pgm_gai_strerror_s (errbuf, sizeof (errbuf), retval));
 		return FALSE;
 	}
+/* NB: getaddrinfo may return multiple addresses, one per interface & family, only the first
+ * return result is used.  The sorting order of the list defined by RFC 3484 and /etc/gai.conf
+ */
 	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
 	freeaddrinfo (res);
 	const uint16_t random_val = pgm_random_int_range (0, UINT16_MAX);
