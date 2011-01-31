@@ -1,5 +1,5 @@
---- time.c	2011-01-18 13:33:52.000000000 +0800
-+++ time.c89.c	2011-01-18 13:35:37.000000000 +0800
+--- time.c	2011-01-30 02:42:29.000000000 +0800
++++ time.c89.c	2011-01-31 09:45:26.000000000 +0800
 @@ -320,6 +320,7 @@
  /* attempt to parse clock ticks from kernel
   */
@@ -8,15 +8,15 @@
  		if (fp)
  		{
  			char buffer[1024];
-@@ -334,6 +335,7 @@
- 			fclose (fp);
- 		}
- #elif defined(_WIN32)
+@@ -339,6 +340,7 @@
+  * MSDN statement: The frequency cannot change while the system is running.
+  * http://msdn.microsoft.com/en-us/library/ms644905(v=vs.85).aspx
+  */
 +		{
  		LARGE_INTEGER frequency;
  		if (QueryPerformanceFrequency (&frequency))
  		{
-@@ -349,6 +351,7 @@
+@@ -354,6 +356,7 @@
  				       _("No supported high-resolution performance counter: %s"),
  				       pgm_win_strerror (winstr, sizeof (winstr), save_errno));
  		}
@@ -24,7 +24,7 @@
  #endif /* !_WIN32 */
  
  /* e.g. export RDTSC_FREQUENCY=3200.000000
-@@ -413,6 +416,7 @@
+@@ -418,6 +421,7 @@
  
  /* update Windows timer resolution to 1ms */
  #ifdef _WIN32
@@ -32,7 +32,7 @@
  	TIMECAPS tc;
  	if (TIMERR_NOERROR == timeGetDevCaps (&tc, sizeof (TIMECAPS)))
  	{
-@@ -424,6 +428,7 @@
+@@ -429,6 +433,7 @@
  	{
  		pgm_warn (_("Unable to determine timer device resolution."));
  	}
@@ -40,7 +40,7 @@
  #endif
  
  	return TRUE;
-@@ -782,11 +787,15 @@
+@@ -787,11 +792,15 @@
  /* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
   * the value must be <= 0x05f5e100 or 100ns.
   */
