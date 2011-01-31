@@ -86,7 +86,7 @@ libpgm_la_CFLAGS = \
 	-DCONFIG_GALOIS_MUL_LUT \
 	-DGETTEXT_PACKAGE='"pgm"'
 
-libpgm_la_LDFLAGS = -release 5.1 -version-info 0:103
+libpgm_la_LDFLAGS = -release 5.1 -version-info 0:104
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = openpgm-5.1.pc

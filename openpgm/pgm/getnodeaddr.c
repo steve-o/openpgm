@@ -83,6 +83,9 @@ pgm_if_getnodeaddr (
 
 	int e = getaddrinfo (hostname, NULL, &hints, &res);
 	if (0 == e) {
+/* NB: getaddrinfo may return multiple addresses, one per interface & family, only the first
+ * return result is used.  The sorting order of the list defined by RFC 3484 and /etc/gai.conf
+ */
 		const socklen_t addrlen = (socklen_t)res->ai_addrlen;
 		memcpy (addr, res->ai_addr, addrlen);
 		freeaddrinfo (res);
