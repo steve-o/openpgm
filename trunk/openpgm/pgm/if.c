@@ -94,6 +94,7 @@ void
 pgm_if_print_all (void)
 {
 	struct pgm_ifaddrs_t *ifap, *ifa;
+	struct pgm_addrinfo_t* res = NULL;
 
 	if (!pgm_getifaddrs (&ifap, NULL))
 		return;
@@ -143,6 +144,31 @@ pgm_if_print_all (void)
 	}
 
 	pgm_freeifaddrs (ifap);
+
+/* discover default network parameter */
+	if (pgm_getaddrinfo ("", NULL, &res, NULL)) {
+		char network[INET6_ADDRSTRLEN], group[INET6_ADDRSTRLEN];
+		struct sockaddr_storage ifaddr;
+		struct sockaddr* addr = (struct sockaddr*)&res->ai_recv_addrs[0].gsr_group;
+		pgm_if_getnodeaddr (addr->sa_family, (struct sockaddr*)&ifaddr, sizeof (ifaddr), NULL);
+		pgm_sockaddr_ntop ((struct sockaddr*)&ifaddr, network, sizeof (network));
+		if (AF_INET == addr->sa_family) {
+			struct sockaddr_in sin;
+			memset (&sin, 0, sizeof (sin));
+			sin.sin_family = AF_INET;
+			sin.sin_addr.s_addr = htonl (IF_DEFAULT_GROUP);
+			memcpy (&ifaddr, &sin, sizeof (sin));
+		} else if (AF_INET6 == addr->sa_family) {
+			struct sockaddr_in6 sin6;
+			memset (&sin6, 0, sizeof (sin6));
+			sin6.sin6_family = AF_INET6;
+			memcpy (&sin6.sin6_addr, &if6_default_group_addr, sizeof(if6_default_group_addr));
+		} else
+			memset (&ifaddr, 0, sizeof (ifaddr));
+		pgm_sockaddr_ntop ((struct sockaddr*)&ifaddr, group, sizeof (group));
+		pgm_info (_("Default network: \"%s;%s\""), network, group);
+		pgm_freeaddrinfo (res);
+	}
 }
 
 /* Equivalent to the description of inet_lnaof(), extract the host
@@ -951,7 +977,6 @@ parse_interface_entity (
 	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
 	pgm_assert (NULL != interface_list);
 	pgm_assert (NULL == *interface_list);
-	pgm_assert (NULL != error);
 
 	pgm_debug ("parse_interface_entity (family:%s entity:%s%s%s interface_list:%p error:%p)",
 		pgm_family_string (family),
@@ -1036,7 +1061,6 @@ parse_receive_entity (
 	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
 	pgm_assert (NULL != recv_list);
 	pgm_assert (NULL == *recv_list);
-	pgm_assert (NULL != error);
 
 	pgm_debug ("parse_receive_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p error:%p)",
 		pgm_family_string (family),
@@ -1262,7 +1286,6 @@ parse_send_entity (
 	pgm_assert (NULL != *recv_list);
 	pgm_assert (NULL != send_list);
 	pgm_assert (NULL == *send_list);
-	pgm_assert (NULL != error);
 
 	pgm_debug ("parse_send_entity (family:%s entity:%s%s%s interface_list:%p recv_list:%p send_list:%p error:%p)",
 		pgm_family_string (family),
