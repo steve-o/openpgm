@@ -30,6 +30,13 @@
 #endif
 #include <pgm/types.h>
 
+/* returns previous value:
+ *
+ * 	uint32_t tmp = *atomic;
+ * 	*atomic += val;
+ * 	return tmp;
+ */
+
 static inline
 uint32_t
 pgm_atomic_exchange_and_add32 (
@@ -71,6 +78,11 @@ pgm_atomic_exchange_and_add32 (
 #endif
 }
 
+/* vanilla addition:
+ *
+ * 	*atomic += val;
+ */
+
 static inline
 void
 pgm_atomic_add32 (
@@ -94,11 +106,17 @@ pgm_atomic_add32 (
 #elif defined( __APPLE__ )
 	OSAtomicAdd32Barrier ((int32_t)val, (volatile int32_t*)atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-	__sync_fetch_and_add (atomic, val);
+/* interchangable with __sync_fetch_and_add () */
+	__sync_add_and_fetch (atomic, val);
 #elif defined( _WIN32 )
 	InterlockedExchangeAdd ((volatile LONG*)atomic, val);
 #endif
 }
+
+/* vanilla addition:
+ *
+ * 	*atomic++;
+ */
 
 static inline
 void
@@ -118,6 +136,11 @@ pgm_atomic_inc32 (
 	InterlockedIncrement ((volatile LONG*)atomic);
 #endif
 }
+
+/* vanilla subtraction:
+ *
+ * 	*atomic--;
+ */
 
 static inline
 void

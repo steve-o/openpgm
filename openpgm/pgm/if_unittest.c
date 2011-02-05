@@ -343,6 +343,12 @@ pgm_transport_pkt_offset2 (
         return 0;
 }
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
+
 bool
 mock_pgm_getifaddrs (
 	struct pgm_ifaddrs_t**	ifap,

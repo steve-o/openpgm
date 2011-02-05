@@ -110,6 +110,11 @@ pgm_pkt_offset (
         return 0;
 }
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
 
 /* generate valid skb, data pointer pointing to PGM payload
  */
