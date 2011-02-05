@@ -275,6 +275,12 @@ pgm_pkt_offset (
         return 0;
 }
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
+
 static 
 bool
 mock_pgm_getifaddrs (

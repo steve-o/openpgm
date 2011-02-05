@@ -341,6 +341,11 @@ _mock_pgm_time_update_now (void)
 	return 0x1;
 }
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
 
 /* mock functions for external references */
 

@@ -94,6 +94,12 @@ if env['WITH_CHECK'] == 'true':
 		];
 # framework
 	te.Program (['atomic_unittest.c']);
+	te.Program (['thread_unittest.c',
+		te.Object('messages.c'),
+		te.Object('mem.c'),
+		te.Object('string.c'),
+		te.Object('slist.c')
+		]);
 	te.Program (['checksum_unittest.c',
 # sunpro linking
 			te.Object('skbuff.c')

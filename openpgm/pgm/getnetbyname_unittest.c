@@ -39,6 +39,12 @@
 #define GETNETBYNAME_DEBUG
 #include "getnetbyname.c"
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
+
 static
 void
 mock_setup (void)
