@@ -122,6 +122,9 @@ static inline bool pgm_mutex_trylock (pgm_mutex_t* mutex) {
 #endif /* !_WIN32 */
 }
 
+/* call to pgm_mutex_lock on locked mutex or non-init pointer is undefined.
+ */
+
 static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
 #ifndef _WIN32
 	pthread_mutex_lock (&mutex->pthread_mutex);
@@ -129,6 +132,9 @@ static inline void pgm_mutex_lock (pgm_mutex_t* mutex) {
 	EnterCriticalSection (&mutex->win32_crit);
 #endif /* !_WIN32 */
 }
+
+/* call to pgm_mutex_unlock on unlocked mutex or non-init pointer is undefined.
+ */
 
 static inline void pgm_mutex_unlock (pgm_mutex_t* mutex) {
 #ifndef _WIN32
@@ -249,7 +255,7 @@ static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
 }
 static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
 #	if defined( CONFIG_TICKET_SPINLOCK )
-	pgm_rwticket_writer_unlock (&rwlock->rwticket_lock);
+	pgm_rwticket_writer_lock (&rwlock->rwticket_lock);
 #	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	AcquireSRWLockExclusive (&rwlock->win32_rwlock);
 #	else

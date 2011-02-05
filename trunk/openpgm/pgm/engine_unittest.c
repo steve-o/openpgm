@@ -78,6 +78,12 @@ pgm_pkt_offset (
         return 0;
 }
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
+
 PGM_GNUC_INTERNAL
 bool
 mock_pgm_time_init (

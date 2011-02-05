@@ -87,6 +87,12 @@ pgm_transport_pkt_offset2 (
 }
 
 int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
+
+int
 mock_gethostname (
 	char*		name,
 	size_t		len

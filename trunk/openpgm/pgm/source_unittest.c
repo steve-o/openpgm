@@ -521,6 +521,12 @@ pgm_pkt_offset (
 			    : ( sizeof(struct pgm_header) + sizeof(struct pgm_data) );
 }
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
+
 bool
 mock_pgm_setsockopt (
 	pgm_sock_t* const	sock,

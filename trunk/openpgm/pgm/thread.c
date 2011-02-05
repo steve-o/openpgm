@@ -126,6 +126,8 @@ pgm_thread_shutdown (void)
  * a count-limited spinlock to optimize short waits.
  *
  * a mutex here is defined as process-private and contention can be 2 or more threads.
+ *
+ * multiple calls to pgm_mutex_init is undefined.
  */
 
 void
@@ -153,6 +155,10 @@ pgm_mutex_init (
 	SetCriticalSectionSpinCount (&mutex->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT);
 #endif
 }
+
+/* multiple calls to pgm_mutex_free is undefined.
+ * call to pgm_mutex_free on locked mutex or non-init pointer is undefined.
+ */
 
 void
 pgm_mutex_free (

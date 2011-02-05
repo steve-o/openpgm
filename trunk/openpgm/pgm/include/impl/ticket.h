@@ -190,7 +190,8 @@ static inline void pgm_ticket_unlock (pgm_ticket_t* ticket) {
 #ifdef _WIN32
 	_InterlockedIncrement16 (&ticket->pgm_tkt_ticket);
 #else
-	__sync_fetch_and_add (&ticket->pgm_tkt_ticket, 1);
+/* interchangable with __sync_fetch_and_add () */
+	__sync_add_and_fetch (&ticket->pgm_tkt_ticket, 1);
 #endif
 }
 
@@ -222,12 +223,12 @@ static inline void pgm_rwticket_reader_lock (pgm_rwticket_t* rwticket) {
 			sched_yield();
 		else
 			__asm volatile ("pause" ::: "memory");
-	__sync_fetch_and_add (&rwticket->pgm_rwtkt_read, 1);
+	__sync_add_and_fetch (&rwticket->pgm_rwtkt_read, 1);
 #else
 	const uint8_t user = __sync_fetch_and_add (&rwticket->pgm_rwtkt_user, 1);
 	while (rwticket->pgm_rwtkt_read != user)
 		sched_yield();
-	__sync_fetch_and_add (&rwticket->pgm_rwtkt_read, 1);
+	__sync_add_and_fetch (&rwticket->pgm_rwtkt_read, 1);
 #endif
 }
 
@@ -254,7 +255,7 @@ static inline void pgm_rwticket_reader_unlock(pgm_rwticket_t* rwticket) {
 #ifdef _WIN32
 	_InterlockedIncrement8 (&rwticket->pgm_rwtkt_write);
 #else
-	__sync_fetch_and_add (&rwticket->pgm_rwtkt_write, 1);
+	__sync_add_and_fetch (&rwticket->pgm_rwtkt_write, 1);
 #endif
 }
 
@@ -301,8 +302,11 @@ static inline bool pgm_rwticket_writer_trylock (pgm_rwticket_t* rwticket) {
 	return (comparand.pgm_rwtkt_data32 == previous);
 }
 
+/* requires 16-bit atomic read and write */
+
 static inline void pgm_rwticket_writer_unlock (pgm_rwticket_t* rwticket) {
-	pgm_rwticket_t t = *rwticket;
+	pgm_rwticket_t t;
+	t.pgm_rwtkt_data16 = rwticket->pgm_rwtkt_data16;
 	t.pgm_rwtkt_write++;
 	t.pgm_rwtkt_read++;
 	rwticket->pgm_rwtkt_data16 = t.pgm_rwtkt_data16;
