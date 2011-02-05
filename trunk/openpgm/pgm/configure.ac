@@ -2,13 +2,13 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.61])
-AC_INIT([OpenPGM], [m4_esyscmd_s([perl version.pl %major.%minor])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
+AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
 AM_INIT_AUTOMAKE([1.10 no-define foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
-AC_SUBST([RELEASE_INFO], [m4_esyscmd_s([perl version.pl %major.%minor])])
-AC_SUBST([VERSION_INFO], [m4_esyscmd_s([perl version.pl 0:%micro])])
+AC_SUBST([RELEASE_INFO], [m4_esyscmd([perl version.pl %major.%minor])])
+AC_SUBST([VERSION_INFO], [m4_esyscmd([perl version.pl 0:%micro])])
 
 # Apply system specific rules.
 AC_CANONICAL_HOST
