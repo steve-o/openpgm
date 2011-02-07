@@ -44,8 +44,8 @@ static inline uint32_t add32_with_carry (uint32_t, uint32_t) PGM_GNUC_CONST;
 #if defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
-	__asm (	"addl %2, %0 \n\t"
-		"adcl $0, %0"
+	__asm__ ( "addl %2, %0 \n\t"
+		  "adcl $0, %0"
 		: "=r" (a)			/* output operands */
 		: "0" (a), "r" (b));		/* input operands */
 	return a;
@@ -53,8 +53,8 @@ static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 #elif defined( __sparc__ ) || defined( __sparc ) || defined( __sparcv9 )
 static inline uint32_t add32_with_carry (uint32_t a, uint32_t b)
 {
-	__asm (	"addcc %2, %0, %0 \n\t"
-		"addx %0, %%g0, %0"
+	__asm__ ( "addcc %2, %0, %0 \n\t"
+		  "addx %0, %%g0, %0"
 		: "=r" (a)			/* output operands */
 		: "0" (a), "r" (b)		/* input operands */
 		: "cc");			/* list of clobbered registers */
