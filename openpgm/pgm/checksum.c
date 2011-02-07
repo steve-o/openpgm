@@ -637,11 +637,11 @@ do_csum_vector (
 			{
 				uint64_t carry = 0;
 				while (count) {
-					__asm volatile ("addq %1, %0\n\t"
-							"adcq %2, %0"
-					     	      : "=r" (acc)
-					      	      : "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc)
-						      : "cc"  );
+					__asm__ volatile ("addq %1, %0\n\t"
+							  "adcq %2, %0"
+					     		: "=r" (acc)
+							: "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc)
+							: "cc"  );
 					buf  = &buf[ 8 ];
 					count--;
 				}
@@ -741,34 +741,34 @@ do_csumcpy_vector (
 				{
 					pgm_prefetch (&srcbuf[ 64 ]);
 					pgm_prefetchw (&dstbuf[ 64 ]);
-					__asm volatile ("movq 0*8(%1), %%r8\n\t"	/* load */
-							"movq 1*8(%1), %%r9\n\t"
-							"movq 2*8(%1), %%r10\n\t"
-							"movq 3*8(%1), %%r11\n\t"
-							"movq 4*8(%1), %%r12\n\t"
-							"movq 5*8(%1), %%r13\n\t"
-							"movq 6*8(%1), %%r14\n\t"
-							"movq 7*8(%1), %%r15\n\t"
-							"adcq %%r8, %0\n\t"		/* checksum */
-							"adcq %%r9, %0\n\t"
-							"adcq %%r10, %0\n\t"
-							"adcq %%r11, %0\n\t"
-							"adcq %%r12, %0\n\t"
-							"adcq %%r13, %0\n\t"
-							"adcq %%r14, %0\n\t"
-							"adcq %%r15, %0\n\t"
-							"adcq %3, %0\n\t"
-							"movq %%r8, 0*8(%2)\n\t"	/* save */
-							"movq %%r9, 1*8(%2)\n\t"
-							"movq %%r10, 2*8(%2)\n\t"
-							"movq %%r11, 3*8(%2)\n\t"
-							"movq %%r12, 4*8(%2)\n\t"
-							"movq %%r13, 5*8(%2)\n\t"
-							"movq %%r14, 6*8(%2)\n\t"
-							"movq %%r15, 7*8(%2)"
-						      : "=r" (acc)
-						      : "r" (srcbuf), "r" (dstbuf), "r" (carry), "0" (acc)
-						      : "cc", "memory", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"  );
+					__asm__ volatile ("movq 0*8(%1), %%r8\n\t"	/* load */
+							  "movq 1*8(%1), %%r9\n\t"
+							  "movq 2*8(%1), %%r10\n\t"
+							  "movq 3*8(%1), %%r11\n\t"
+							  "movq 4*8(%1), %%r12\n\t"
+							  "movq 5*8(%1), %%r13\n\t"
+							  "movq 6*8(%1), %%r14\n\t"
+							  "movq 7*8(%1), %%r15\n\t"
+							  "adcq %%r8, %0\n\t"		/* checksum */
+							  "adcq %%r9, %0\n\t"
+							  "adcq %%r10, %0\n\t"
+							  "adcq %%r11, %0\n\t"
+							  "adcq %%r12, %0\n\t"
+							  "adcq %%r13, %0\n\t"
+							  "adcq %%r14, %0\n\t"
+							  "adcq %%r15, %0\n\t"
+							  "adcq %3, %0\n\t"
+							  "movq %%r8, 0*8(%2)\n\t"	/* save */
+							  "movq %%r9, 1*8(%2)\n\t"
+							  "movq %%r10, 2*8(%2)\n\t"
+							  "movq %%r11, 3*8(%2)\n\t"
+							  "movq %%r12, 4*8(%2)\n\t"
+							  "movq %%r13, 5*8(%2)\n\t"
+							  "movq %%r14, 6*8(%2)\n\t"
+							  "movq %%r15, 7*8(%2)"
+							: "=r" (acc)
+							: "r" (srcbuf), "r" (dstbuf), "r" (carry), "0" (acc)
+							: "cc", "memory", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"  );
 					srcbuf = &srcbuf[ 64 ];
 					dstbuf = &dstbuf[ 64 ];
 					count64--;
@@ -776,11 +776,11 @@ do_csumcpy_vector (
 				count %= 8;
 /* last 56 bytes */
 				while (count) {
-					__asm volatile ("addq %1, %0\n\t"
-							"adcq %2, %0"
-						      : "=r" (acc)
-						      : "m" (*(const uint64_t*restrict)srcbuf), "r" (carry), "0" (acc)
-						      : "cc"  );
+					__asm__ volatile ("addq %1, %0\n\t"
+							  "adcq %2, %0"
+							: "=r" (acc)
+							: "m" (*(const uint64_t*restrict)srcbuf), "r" (carry), "0" (acc)
+							: "cc"  );
 					srcbuf  = &srcbuf[ 8 ];
 					count--;
 				}

@@ -49,7 +49,7 @@ extern bool pgm_smp_system;
 #	include <libkern/OSAtomic.h>
 #endif
 #include <pgm/types.h>
-#ifdef CONFIG_TICKET_SPINLOCK
+#if defined( CONFIG_TICKET_SPINLOCK )
 #	include <impl/ticket.h>
 #endif
 

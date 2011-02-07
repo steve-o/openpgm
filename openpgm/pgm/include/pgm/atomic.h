@@ -30,7 +30,8 @@
 #endif
 #include <pgm/types.h>
 
-/* returns previous value:
+
+/* 32-bit word addition returning original atomic value.
  *
  * 	uint32_t tmp = *atomic;
  * 	*atomic += val;
@@ -46,17 +47,14 @@ pgm_atomic_exchange_and_add32 (
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint32_t result;
-	__asm volatile (  "lock\n\t"
-		   	  "xaddl %0, %1"
+	__asm__ volatile ("lock; xaddl %0, %1"
 		        : "=r" (result), "=m" (*atomic)
 		        : "0" (val), "m" (*atomic)
 		        : "memory", "cc"  );
 	return result;
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
-/* Sun C++ compiler wants __asm__ not __asm */
 	uint32_t result = val;
-	__asm__ volatile ("lock\n\t"
-			  "xaddl %0, %1"
+	__asm__ volatile ("lockl; xaddl %0, %1"
 		       :: "r" (result), "m" (*atomic)  );
 	return result;
 #elif defined( __sun )
@@ -72,13 +70,13 @@ pgm_atomic_exchange_and_add32 (
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
 /* Windows intrinsic */
-	return InterlockedExchangeAdd ((volatile LONG*)atomic, val);
+	return _InterlockedExchangeAdd ((volatile LONG*)atomic, val);
 #else
 #	error "No supported atomic operations for this platform."
 #endif
 }
 
-/* vanilla addition:
+/* 32-bit word addition.
  *
  * 	*atomic += val;
  */
@@ -91,15 +89,12 @@ pgm_atomic_add32 (
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	__asm volatile (  "lock\n\t"
-			  "addl %1, %0"
+	__asm__ volatile ("lock; addl %1, %0"
 		        : "=m" (*atomic)
 		        : "ir" (val), "m" (*atomic)
 		        : "memory", "cc"  );
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
-/* Sun C++ compiler wants __asm__ not __asm */
-	__asm__ volatile ("lock\n\t"
-			  "addl %1, %0"
+	__asm__ volatile ("lock; addl %1, %0"
 		       :: "r" (val), "m" (*atomic)  );
 #elif defined( __sun )
 	atomic_add_32 (atomic, (int32_t)val);
@@ -109,11 +104,11 @@ pgm_atomic_add32 (
 /* interchangable with __sync_fetch_and_add () */
 	__sync_add_and_fetch (atomic, val);
 #elif defined( _WIN32 )
-	InterlockedExchangeAdd ((volatile LONG*)atomic, val);
+	_InterlockedExchangeAdd ((volatile LONG*)atomic, val);
 #endif
 }
 
-/* vanilla addition:
+/* 32-bit word increment.
  *
  * 	*atomic++;
  */
@@ -124,8 +119,14 @@ pgm_atomic_inc32 (
 	volatile uint32_t*	atomic
 	)
 {
-#if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || ((defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 )))
-	pgm_atomic_add32 (atomic, 1);
+#if defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))
+	__asm__ volatile ("lock; incl %0"
+		        : "+m" (*atomic)
+		        :
+		        : "memory", "cc"  );
+#elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
+	__asm__ volatile ("lock; incl %0"
+		       :: "m" (*atomic)  );
 #elif defined( __sun )
 	atomic_inc_32 (atomic);
 #elif defined( __APPLE__ )
@@ -133,11 +134,11 @@ pgm_atomic_inc32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, 1);
 #elif defined( _WIN32 )
-	InterlockedIncrement ((volatile LONG*)atomic);
+	_InterlockedIncrement ((volatile LONG*)atomic);
 #endif
 }
 
-/* vanilla subtraction:
+/* 32-bit word decrement.
  *
  * 	*atomic--;
  */
@@ -148,8 +149,15 @@ pgm_atomic_dec32 (
 	volatile uint32_t*	atomic
 	)
 {
-#if (defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))) || ((defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 )))
-	pgm_atomic_add32 (atomic, (uint32_t)-1);
+#if defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))
+	__asm__ volatile ("lock; decl %0"
+		        : "+m" (*atomic)
+		        :
+		        : "memory", "cc"  );
+#elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
+	__asm__ volatile ("lock\n\t"
+			  "decl %0"
+		       :: "m" (*atomic)  );
 #elif defined( __sun )
 	atomic_dec_32 (atomic);
 #elif defined( __APPLE__ )
@@ -157,9 +165,12 @@ pgm_atomic_dec32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
 #elif defined( _WIN32 )
-	InterlockedDecrement ((volatile LONG*)atomic);
+	_InterlockedDecrement ((volatile LONG*)atomic);
 #endif
 }
+
+/* 32-bit word load 
+ */
 
 static inline
 uint32_t
@@ -169,6 +180,9 @@ pgm_atomic_read32 (
 {
 	return *atomic;
 }
+
+/* 32-bit word store
+ */
 
 static inline
 void
