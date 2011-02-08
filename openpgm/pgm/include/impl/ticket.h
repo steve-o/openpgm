@@ -39,6 +39,7 @@ typedef union pgm_rwticket_t pgm_rwticket_t;
 #	define VC_EXTRALEAN
 #	define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
+#	include <intrin.h>
 #endif
 #include <pgm/types.h>
 #include <pgm/atomic.h>
@@ -143,7 +144,9 @@ pgm_atomic_compare_and_exchange32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	return __sync_bool_compare_and_swap (atomic, oldval, newval);
 #elif defined( _WIN32 )
-	return (oldval == _InterlockedCompareExchange ((volatile LONG*)atomic, newval, oldval));
+	LONG original;
+	original = _InterlockedCompareExchange ((volatile LONG*)atomic, newval, oldval);
+	return (oldval == original);
 #endif
 }
 
@@ -169,6 +172,13 @@ pgm_atomic_add8 (
 	__sync_add_and_fetch (atomic, val);
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd8() */
+	_ReadWriteBarrier();
+	__asm {
+		mov ecx, atomic
+		mov al, val
+		lock add al, byte ptr [ecx]
+	}
+	_ReadWriteBarrier();
 #endif
 }
 
@@ -197,6 +207,16 @@ pgm_atomic_fetch_and_add8 (
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd8() */
+	uint8_t result;
+	_ReadWriteBarrier();
+	__asm {
+		mov ecx, atomic
+		mov al, val
+		lock xadd byte ptr [ecx], al
+		mov result, al
+	}
+	_ReadWriteBarrier();
+	return result;
 #endif
 }
 
@@ -216,8 +236,15 @@ pgm_atomic_inc8 (
 			: "+m" (*atomic)
 			:
 			: "memory", "cc"  );
-#else
+#elif defined( _WIN32 )
 /* there is no _InterlockedIncrement8() */
+	_ReadWriteBarrier();
+	__asm {
+		mov ecx, atomic
+		lock inc byte ptr [ecx]
+	}
+	_ReadWriteBarrier();
+#else
 	pgm_atomic_add8 (atomic, 1);
 #endif
 }
@@ -258,6 +285,13 @@ pgm_atomic_add16 (
 	__sync_add_and_fetch (atomic, val);
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
+	_ReadWriteBarrier();
+	__asm {
+		mov ecx, atomic
+		mov ax, val
+		lock add ax, word ptr [ecx]
+	}
+	_ReadWriteBarrier();
 #endif
 }
 
@@ -282,6 +316,16 @@ pgm_atomic_fetch_and_add16 (
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
+	uint16_t result;
+	_ReadWriteBarrier();
+	__asm {
+		mov ecx, atomic
+		mov ax, val
+		lock xadd word ptr [ecx], ax
+		mov result, ax
+	}
+	_ReadWriteBarrier();
+	return result;
 #endif
 }
 
@@ -300,7 +344,13 @@ pgm_atomic_inc16 (
 			:
 			: "memory", "cc"  );
 #elif defined( _WIN32 )
-	_InterlockedIncrement16 ((volatile SHORT*)atomic);
+/* _InterlockedIncrement16() operates on 32-bit boundaries */
+	_ReadWriteBarrier();
+	__asm {
+		mov ecx, atomic
+		lock inc word ptr [ecx]
+	}
+	_ReadWriteBarrier();
 #else
 	pgm_atomic_add16 (atomic, 1);
 #endif
@@ -315,11 +365,7 @@ pgm_atomic_fetch_and_inc16 (
 	volatile uint16_t*	atomic
 	)
 {
-#if defined( _WIN32 )
-	return _InterlockedIncrement16 ((volatile SHORT*)atomic);
-#else
 	return pgm_atomic_fetch_and_add16 (atomic, 1);
-#endif
 }
 
 /* 16-bit word load.
