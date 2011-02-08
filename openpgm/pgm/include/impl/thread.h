@@ -32,6 +32,10 @@ typedef struct pgm_spinlock_t pgm_spinlock_t;
 typedef struct pgm_cond_t pgm_cond_t;
 typedef struct pgm_rwlock_t pgm_rwlock_t;
 
+/* spins before yielding, 200 (Linux) - 4,000 (Windows)
+ */
+#define PGM_ADAPTIVE_MUTEX_SPINCOUNT	200
+
 /* On initialisation the number of available processors is queried to determine
  * whether we should spin in locks or yield to other threads and processes.
  */
@@ -181,7 +185,7 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 	unsigned spins = 0;
 	while (_InterlockedExchange (&spinlock->taken, 1))
 		while (spinlock->taken)
-			if (!pgm_smp_system || 0 == (++spins % 200))
+			if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 				SwitchToThread();
 			else
 				YieldProcessor();
@@ -190,7 +194,7 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 	unsigned spins = 0;
 	while (__sync_lock_test_and_set (&spinlock->taken, 1))
 		while (spinlock->taken)
-			if (!pgm_smp_system || 0 == (++spins % 200))
+			if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 				sched_yield();
 			else
 				__asm volatile ("pause" ::: "memory");
