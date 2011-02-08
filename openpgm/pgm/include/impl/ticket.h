@@ -4,6 +4,8 @@
  * Bakery algorithm.  Read-write version per David Howell on LKML derived
  * from Joseph Seigh at IBM.
  *
+ * Copyright (c) 2011 Miru Limited.
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
