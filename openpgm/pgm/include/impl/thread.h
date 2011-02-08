@@ -83,7 +83,7 @@ struct pgm_cond_t {
 #elif defined( CONFIG_HAVE_WIN_COND )
 	CONDITION_VARIABLE	win32_cond;
 #else
-	CRITICAL_SECTION	win32_spinlock;
+	CRITICAL_SECTION	win32_crit;
 	size_t			len;
 	size_t			allocated_len;
 	HANDLE*			phandle;

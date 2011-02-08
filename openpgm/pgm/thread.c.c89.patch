@@ -1,6 +1,6 @@
---- thread.c	2011-01-30 05:58:37.000000000 +0800
-+++ thread.c89.c	2011-01-31 09:55:22.000000000 +0800
-@@ -133,11 +133,13 @@
+--- thread.c	2011-02-08 23:52:02.000000000 +0800
++++ thread.c89.c	2011-02-08 23:55:27.000000000 +0800
+@@ -139,11 +139,13 @@
  
  #ifdef PTHREAD_MUTEX_ADAPTIVE_NP
  /* non-portable but define on Linux & FreeBSD, uses spinlock for 200 spins then waits as mutex */
@@ -14,38 +14,10 @@
  #elif !defined( _WIN32 )
  	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
  #elif defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
-@@ -158,11 +160,13 @@
- 	pgm_assert (NULL != mutex);
- 
- #ifndef _WIN32
-+	{
- 	const int result = pthread_mutex_trylock (&mutex->pthread_mutex);
- 	if (EBUSY == result)
- 		return FALSE;
- 	posix_check_err (result, "pthread_mutex_trylock");
- 	return TRUE;
-+	}
- #else
- 	return TryEnterCriticalSection (&mutex->win32_crit);
- #endif /* !_WIN32 */
-@@ -209,11 +213,13 @@
- 	pgm_assert (NULL != spinlock);
- 
- #ifdef CONFIG_HAVE_POSIX_SPINLOCK
-+	{
- 	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
- 	if (EBUSY == result)
- 		return FALSE;
- 	posix_check_err (result, "pthread_spinlock_trylock");
- 	return TRUE;
-+	}
- #elif defined( __APPLE__ )
- 	return OSSpinLockTry (&spinlock->darwin_spinlock);
- #elif defined( _WIN32 )
-@@ -296,8 +302,11 @@
+@@ -275,8 +277,11 @@
  	WakeAllConditionVariable (&cond->win32_cond);
  #else
- 	EnterCriticalSection (&cond->win32_spinlock);
+ 	EnterCriticalSection (&cond->win32_crit);
 -	for (unsigned i = 0; i < cond->len; i++)
 +	{
 +	unsigned i;
@@ -53,9 +25,9 @@
  		SetEvent (cond->phandle[ i ]);
 +	}
  	cond->len = 0;
- 	LeaveCriticalSection (&cond->win32_spinlock);
+ 	LeaveCriticalSection (&cond->win32_crit);
  #endif /* !_WIN32 */
-@@ -328,6 +337,7 @@
+@@ -307,6 +312,7 @@
  #	if defined(CONFIG_HAVE_WIN_COND)
  	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
  #	else
@@ -63,10 +35,10 @@
  	DWORD status;
  	HANDLE event = TlsGetValue (cond_event_tls);
  
-@@ -351,7 +361,9 @@
+@@ -330,7 +336,9 @@
  
  	if (WAIT_TIMEOUT == status) {
- 		EnterCriticalSection (&cond->win32_spinlock);
+ 		EnterCriticalSection (&cond->win32_crit);
 -		for (unsigned i = 0; i < cond->len; i++) {
 +		{
 +		unsigned i;
@@ -74,13 +46,13 @@
  			if (cond->phandle[ i ] == event) {
  				if (i != cond->len - 1)
  					memmove (&cond->phandle[ i ], &cond->phandle[ i + 1 ], sizeof(HANDLE) * (cond->len - i - 1));
-@@ -359,9 +371,11 @@
+@@ -338,9 +346,11 @@
  				break;
  			}
  		}
 +		}
  		win32_check_cmd (WAIT_FAILED != (status = WaitForSingleObject (event, 0)));
- 		LeaveCriticalSection (&cond->win32_spinlock);
+ 		LeaveCriticalSection (&cond->win32_crit);
  	}
 +	}
  #	endif /* !CONFIG_HAVE_WIN_COND */
