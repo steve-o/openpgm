@@ -27,6 +27,8 @@
 #	include <atomic.h>
 #elif defined( __APPLE__ )
 #	include <libkern/OSAtomic.h>
+#elif defined( _WIN32 )
+#	include <intrin.h>
 #endif
 #include <pgm/types.h>
 
