@@ -13,7 +13,7 @@ print """
  * 
  * OpenPGM version.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -38,7 +38,7 @@ print """
 
 const unsigned pgm_major_version = 5;
 const unsigned pgm_minor_version = 1;
-const unsigned pgm_micro_version = 104;
+const unsigned pgm_micro_version = 105;
 const char* pgm_build_date = "%s";
 const char* pgm_build_time = "%s";
 const char* pgm_build_system = "%s";
