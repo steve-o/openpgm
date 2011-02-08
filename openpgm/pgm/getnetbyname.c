@@ -63,7 +63,7 @@ _pgm_compat_setnetent (void)
 #ifdef _WIN32
 	{
 		char expanded[MAX_PATH];
-		if (0 == ExpandEnvironmentStrings ((LPCWSTR)netdb, (LPWSTR)expanded, sizeof (expanded))) {
+		if (0 == ExpandEnvironmentStrings ((LPCTSTR)netdb, (LPTSTR)expanded, sizeof (expanded))) {
 			const DWORD save_errno = GetLastError();
 			char winstr[1024];
 			pgm_warn (_("Cannot expand netdb path \"%s\": %s"),
