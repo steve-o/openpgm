@@ -32,9 +32,6 @@ bool pgm_smp_system = TRUE;
 
 /* Locals */
 
-#define PGM_ADAPTIVE_MUTEX_SPINCOUNT	4000
-
-
 #if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
 static DWORD cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
