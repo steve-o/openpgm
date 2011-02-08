@@ -224,12 +224,19 @@ pgm_cond_init (
 #ifndef _WIN32
 	posix_check_cmd (pthread_cond_init (&cond->pthread_cond, NULL));
 #elif defined(CONFIG_HAVE_WIN_COND)
+/* requires Vista+ */
 	InitializeConditionVariable (&cond->win32_cond);
 #else
 	cond->len = 0;
 	cond->allocated_len = pgm_nearest_power (1, 2 + 1);
 	cond->phandle = pgm_new (HANDLE, cond->allocated_len);
-	InitializeCriticalSection (&cond->win32_spinlock);
+#	if defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
+/* requires Vista+ */
+	InitializeCriticalSectionEx (&cond->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT, CRITICAL_SECTION_NO_DEBUG_INFO);
+#	else
+	InitializeCriticalSection (&cond->win32_crit);
+	SetCriticalSectionSpinCount (&cond->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT);
+#	endif
 #endif /* !_WIN32 */
 }
 
@@ -245,13 +252,13 @@ pgm_cond_signal (
 #elif defined(CONFIG_HAVE_WIN_COND)
 	WakeConditionVariable (&cond->win32_cond);
 #else
-	EnterCriticalSection (&cond->win32_spinlock);
+	EnterCriticalSection (&cond->win32_crit);
 	if (cond->len > 0) {
 		SetEvent (cond->phandle[ 0 ]);
 		memmove (&cond->phandle[ 0 ], &cond->phandle[ 1 ], cond->len - 1);
 		cond->len--;
 	}
-	LeaveCriticalSection (&cond->win32_spinlock);
+	LeaveCriticalSection (&cond->win32_crit);
 #endif /* !_WIN32 */
 }
 
@@ -267,11 +274,11 @@ pgm_cond_broadcast (
 #elif defined(CONFIG_HAVE_WIN_COND)
 	WakeAllConditionVariable (&cond->win32_cond);
 #else
-	EnterCriticalSection (&cond->win32_spinlock);
+	EnterCriticalSection (&cond->win32_crit);
 	for (unsigned i = 0; i < cond->len; i++)
 		SetEvent (cond->phandle[ i ]);
 	cond->len = 0;
-	LeaveCriticalSection (&cond->win32_spinlock);
+	LeaveCriticalSection (&cond->win32_crit);
 #endif /* !_WIN32 */
 }
 
@@ -308,21 +315,21 @@ pgm_cond_wait (
 		TlsSetValue (cond_event_tls, event);
 	}
 
-	EnterCriticalSection (&cond->win32_spinlock);
+	EnterCriticalSection (&cond->win32_crit);
 	pgm_assert (WAIT_TIMEOUT == WaitForSingleObject (event, 0));
 	if ((cond->len + 1) > cond->allocated_len) {
 		cond->allocated_len = pgm_nearest_power (1, cond->len + 1 + 1);
 		cond->phandle	    = pgm_realloc (cond->phandle, cond->allocated_len);
 	}
 	cond->phandle[ cond->len++ ] = event;
-	LeaveCriticalSection (&cond->win32_spinlock);
+	LeaveCriticalSection (&cond->win32_crit);
 
 	EnterCriticalSection (spinlock);
 	win32_check_cmd (WAIT_FAILED != (status = WaitForSingleObject (event, INFINITE)));
 	LeaveCriticalSection (spinlock);
 
 	if (WAIT_TIMEOUT == status) {
-		EnterCriticalSection (&cond->win32_spinlock);
+		EnterCriticalSection (&cond->win32_crit);
 		for (unsigned i = 0; i < cond->len; i++) {
 			if (cond->phandle[ i ] == event) {
 				if (i != cond->len - 1)
@@ -332,7 +339,7 @@ pgm_cond_wait (
 			}
 		}
 		win32_check_cmd (WAIT_FAILED != (status = WaitForSingleObject (event, 0)));
-		LeaveCriticalSection (&cond->win32_spinlock);
+		LeaveCriticalSection (&cond->win32_crit);
 	}
 #	endif /* !CONFIG_HAVE_WIN_COND */
 }
@@ -350,7 +357,7 @@ pgm_cond_free (
 #elif defined(CONFIG_HAVE_WIN_COND)
 	/* nop */
 #else
-	DeleteCriticalSection (&cond->win32_spinlock);
+	DeleteCriticalSection (&cond->win32_crit);
 	pgm_free (cond->phandle);
 #endif /* !_WIN32 */
 }
@@ -365,11 +372,18 @@ pgm_rwlock_init (
 #ifdef CONFIG_TICKET_SPINLOCK
 	pgm_rwticket_init (&rwlock->rwticket_lock);
 #elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
+/* requires Vista+ */
 	InitializeSRWLock (&rwlock->win32_rwlock);
 #elif !defined( _WIN32 )
 	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
 #else
+#	if defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
+/* requires Vista+ */
+	InitializeCriticalSectionEx (&rwlock->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT, CRITICAL_SECTION_NO_DEBUG_INFO);
+#	else
 	InitializeCriticalSection (&rwlock->win32_crit);
+	SetCriticalSectionSpinCount (&rwlock->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT);
+#	endif
 	pgm_cond_init (&rwlock->read_cond);
 	pgm_cond_init (&rwlock->write_cond);
 	rwlock->read_counter	= 0;

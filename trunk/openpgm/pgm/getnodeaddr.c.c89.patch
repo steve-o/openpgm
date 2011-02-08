@@ -1,5 +1,5 @@
---- getnodeaddr.c	2010-11-05 06:07:19.000000000 +0800
-+++ getnodeaddr.c89.c	2010-11-05 06:07:03.000000000 +0800
+--- getnodeaddr.c	2011-01-31 10:05:03.000000000 +0800
++++ getnodeaddr.c89.c	2011-02-08 23:23:36.000000000 +0800
 @@ -58,6 +58,7 @@
  	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
  		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);
@@ -36,9 +36,9 @@
 -	int e = getaddrinfo (hostname, NULL, &hints, &res);
 +	e = getaddrinfo (hostname, NULL, &hints, &res);
  	if (0 == e) {
- 		const socklen_t addrlen = (socklen_t)res->ai_addrlen;
- 		memcpy (addr, res->ai_addr, addrlen);
-@@ -124,7 +132,9 @@
+ /* NB: getaddrinfo may return multiple addresses, one per interface & family, only the first
+  * return result is used.  The sorting order of the list defined by RFC 3484 and /etc/gai.conf
+@@ -127,7 +135,9 @@
  				);
  		return FALSE;
  	}
@@ -48,7 +48,7 @@
  	struct pgm_ifaddrs_t *ifap, *ifa, *ifa6;
  	if (!pgm_getifaddrs (&ifap, error)) {
  		pgm_prefix_error (error,
-@@ -171,6 +181,8 @@
+@@ -174,6 +184,8 @@
  
  	memcpy (addr, ifa6->ifa_addr, pgm_sockaddr_len (ifa6->ifa_addr));
  	pgm_freeifaddrs (ifap);
