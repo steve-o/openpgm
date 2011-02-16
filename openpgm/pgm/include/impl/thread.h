@@ -63,32 +63,42 @@ PGM_BEGIN_DECLS
 
 struct pgm_mutex_t {
 #ifndef _WIN32
+/* POSIX mutex */
 	pthread_mutex_t		pthread_mutex;
 #else
+/* Windows process-private adaptive mutex */
 	CRITICAL_SECTION	win32_crit;
 #endif /* !_WIN32 */
 };
 
 struct pgm_spinlock_t {
 #if defined( CONFIG_TICKET_SPINLOCK )
+/* ticket based spinlock */
 	pgm_ticket_t		ticket_lock;
 #elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
+/* POSIX spinlock, not available on OSX */
 	pthread_spinlock_t	pthread_spinlock;
 #elif defined( __APPLE__ )
+/* OSX native spinlock */
 	OSSpinLock		darwin_spinlock;
 #elif defined( _WIN32 )
+/* Win32 friendly atomic-op based spinlock */
 	volatile LONG		taken;
 #else
+/* GCC atomic-op based spinlock */
 	volatile uint32_t	taken;
 #endif
 };
 
 struct pgm_cond_t {
 #ifndef _WIN32
+/* POSIX condition variable */
 	pthread_cond_t		pthread_cond;
 #elif defined( CONFIG_HAVE_WIN_COND )
+/* Windows Vista+ condition variable */
 	CONDITION_VARIABLE	win32_cond;
 #else
+/* Windows XP friendly condition variable implementation */
 	CRITICAL_SECTION	win32_crit;
 	size_t			len;
 	size_t			allocated_len;
@@ -98,12 +108,16 @@ struct pgm_cond_t {
 
 struct pgm_rwlock_t {
 #if defined( CONFIG_TICKET_RWSPINLOCK )
+/* ticket based read-write spinlock */
 	pgm_rwticket_t		rwticket_lock;
 #elif !defined( _WIN32 )
+/* POSIX read-write lock */
 	pthread_rwlock_t	pthread_rwlock;
 #elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
+/* Windows Vista+ user-space (slim) read-write lock */
 	SRWLOCK			win32_rwlock;
 #else
+/* Windows XP friendly read-write lock implementation */
 	CRITICAL_SECTION	win32_crit;
 	pgm_cond_t		read_cond;
 	pgm_cond_t		write_cond;
