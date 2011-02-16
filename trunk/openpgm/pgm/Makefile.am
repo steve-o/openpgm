@@ -1,8 +1,8 @@
 # -*- Makefile -*-
 
-lib_LTLIBRARIES = libpgm.la
+noinst_LTLIBRARIES = libpgm_noinst.la
 
-libpgm_la_SOURCES = \
+libpgm_noinst_la_SOURCES = \
 	thread.c \
 	mem.c \
 	string.c \
@@ -80,13 +80,17 @@ version.c: version_generator.py
 galois_tables.c: galois_generator.pl
 	$(AM_V_GEN)$(PERL) $< > $@
 
-libpgm_la_CFLAGS = \
+libpgm_noinst_la_CFLAGS = \
 	-I$(top_srcdir)/include \
 	-DCONFIG_16BIT_CHECKSUM \
 	-DCONFIG_GALOIS_MUL_LUT \
 	-DGETTEXT_PACKAGE='"pgm"'
 
+lib_LTLIBRARIES   = libpgm.la
+libpgm_la_SOURCES =
+libpgm_la_CFLAGS  = $(libpgm_noinst_la_CFLAGS)
 libpgm_la_LDFLAGS = -release @RELEASE_INFO@ -version-info @VERSION_INFO@
+libpgm_la_LIBADD  = libpgm_noinst.la
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = openpgm-@RELEASE_INFO@.pc

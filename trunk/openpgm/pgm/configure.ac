@@ -31,8 +31,9 @@ AC_PATH_PROG(PYTHON, python)
 AC_SUBST(PERL)
 AC_SUBST(PYTHON)
 
-LT_PREREQ([2.2])
-LT_INIT
+# libtool init API since 2.2.6
+m4_ifdef([LT_PREREQ], [LT_PREREQ([2.2])])
+m4_ifdef([LT_INIT], [LT_INIT])
 
 AC_SUBST([LIBTOOL_DEPS])
 
@@ -63,6 +64,7 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
 # Checks for library functions.
+# TODO: gettext() fails out-of-the-box from AutoConf.
 #AM_GNU_GETTEXT
 AC_FUNC_MALLOC
 AC_FUNC_MMAP
@@ -118,6 +120,14 @@ AC_COMPILE_IFELSE(
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DCONFIG_HAVE_ALLOCA_H"],
 	[AC_MSG_RESULT([no])])
+# eventfd API
+AC_MSG_CHECKING([for eventfd])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[#include <sys/eventfd.h>]],
+                [[eventfd (0, 0);]])],
+        [AC_MSG_RESULT([yes])
+                CFLAGS="$CFLAGS -DCONFIG_HAVE_EVENTFD"],
+        [AC_MSG_RESULT([no])])
 # useful /proc system
 AC_CHECK_FILE([/proc/cpuinfo],
 		CFLAGS="$CFLAGS -DCONFIG_HAVE_PROC",)
