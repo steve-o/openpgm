@@ -27,7 +27,7 @@
 
 /* Globals */
 
-bool pgm_smp_system = TRUE;
+bool pgm_smp_system PGM_GNUC_READ_MOSTLY = TRUE;
 
 
 /* Locals */

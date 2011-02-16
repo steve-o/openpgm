@@ -53,7 +53,7 @@ typedef union pgm_rwticket_t pgm_rwticket_t;
 
 PGM_BEGIN_DECLS
 
-/* Byte alignment for packet memory maps.
+/* Byte alignment for CAS friendly unions.
  * NB: Solaris and OpenSolaris don't support #pragma pack(push) even on x86.
  */
 #if defined( __GNUC__ ) && !defined( __sun )
@@ -129,6 +129,8 @@ union pgm_rwticket_t {
  *		return TRUE;
  *	}
  *	return FALSE;
+ *
+ * Sun Studio on x86 GCC-compatible assembler not implemented.
  */
 
 static inline
@@ -188,6 +190,7 @@ pgm_atomic_add8 (
 /* interchangable with __sync_fetch_and_add () */
 	__sync_add_and_fetch (atomic, val);
 #elif defined( __APPLE__ )
+/* order to pickup GCC assembler or intrinsic as preferred implementation */
 #	error "There is no OSAtomicAdd8Barrier() in Darwin."
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd8() */
@@ -507,14 +510,14 @@ static inline void pgm_rwticket_reader_lock (pgm_rwticket_t* rwticket) {
 #ifdef _WIN32
 	unsigned spins = 0;
 	while (rwticket->pgm_rwtkt_read != user)
-		if (!pgm_smp_system || 0 == (++spins % 200))
+		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 			SwitchToThread();
 		else
 			YieldProcessor();
 #elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	while (rwticket->pgm_rwtkt_read != user)
-		if (!pgm_smp_system || 0 == (++spins % 200))
+		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 			sched_yield();
 		else
 			__asm volatile ("pause" ::: "memory");
