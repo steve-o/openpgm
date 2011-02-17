@@ -20,6 +20,18 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef _GNU_SOURCE
+#	define _GNU_SOURCE
+#endif
+
+#ifndef _WIN32
+#	include <sched.h>
+#	include <unistd.h>
+#	if defined ( __sun )
+#		include <sys/pset.h>
+#	endif
+#	include <sys/types.h>
+#endif
 #include <impl/framework.h>
 
 
@@ -50,6 +62,9 @@ _pgm_apple_get_nprocs (void)
 
 	if (online > configured)
 		online = configured;
+
+	pgm_minor (_("Detected %d online %d configured CPUs."),
+		online, configured);
 
 	return (online > 0) ? online : configured;
 }
@@ -82,6 +97,9 @@ _pgm_win32_get_nprocs (void)
 	if (available > online)
 		available = online;
 
+	pgm_minor (_("Detected %d available %d online %d configured CPUs."),
+		available, online, configured);
+
 	return (available > 0) ? available :
 	       ((online > 0) ? online : configured);
 }
@@ -102,7 +120,23 @@ _pgm_pset_get_nprocs (void)
 }
 #endif
 
-#if defined( CPU_ISSET ) && defined( CPU_SETSIZE )
+#if defined( CPU_SETSIZE )
+
+/* returns the caller's thread ID (TID).  In a single-threaded process, the
+ * thread ID is equal to the process ID (PID).
+ */
+
+static
+pid_t
+_pgm_gettid (void)
+{
+#	if defined ( SYS_gettid )
+	return (pid_t) syscall (SYS_gettid);
+#	else
+	return getpid();
+#	endif
+}
+
 /* Linux CPU affinity system calls, also consider pthread_getaffinity_np().
  */
 
@@ -113,7 +147,7 @@ _pgm_sched_get_nprocs (void)
 	int available = 0;
 	cpu_set_t cpu_set;
 
-	if (0 == sched_getaffinity (gettid(), sizeof (cpu_set), &cpu_set))
+	if (0 == sched_getaffinity (_pgm_gettid(), sizeof (cpu_set), &cpu_set))
 		for (int i = 0; i < CPU_SETSIZE; i++)
 			if (CPU_ISSET (i, &cpu_set))
 				available++;
@@ -141,12 +175,15 @@ _pgm_sysconf_get_nprocs (void)
 
 #if defined( PS_MYID )
 	available = _pgm_pset_get_nprocs();
-#elif defined( CPU_ISSET ) && defined( CPU_SETSIZE )
+#elif defined( CPU_SETSIZE )
 	available = _pgm_sched_get_nprocs();
 #endif
 
 	if (available > online)
 		available = online;
+
+	pgm_minor (_("Detected %d available %d online %d configured CPUs."),
+		available, online, configured);
 
 	return (available > 0) ? available :
 	       ((online > 0) ? online : configured);
