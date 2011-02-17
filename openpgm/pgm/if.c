@@ -163,6 +163,7 @@ pgm_if_print_all (void)
 			memset (&sin6, 0, sizeof (sin6));
 			sin6.sin6_family = AF_INET6;
 			memcpy (&sin6.sin6_addr, &if6_default_group_addr, sizeof(if6_default_group_addr));
+			memcpy (&ifaddr, &sin6, sizeof (sin6));
 		} else
 			memset (&ifaddr, 0, sizeof (ifaddr));
 		pgm_sockaddr_ntop ((struct sockaddr*)&ifaddr, group, sizeof (group));
