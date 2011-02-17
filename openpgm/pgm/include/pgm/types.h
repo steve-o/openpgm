@@ -51,6 +51,8 @@
 /* g++ v4 handles C99 headers without complaints */
 #	include <stdbool.h>
 #	include <stdint.h>
+#elif defined( __SUNPRO_CC )
+#	include <stdint.h>
 #else
 /* g++ v3 and other ancient compilers */
 #	define bool		int
