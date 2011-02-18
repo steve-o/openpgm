@@ -33,7 +33,7 @@
 #ifdef _WIN32
 #	include <ws2tcpip.h>
 #	include <winsock2.h>
-#	ifdef _MSC_VER
+#	if defined( _MSC_VER )
 #		define sa_family_t	ADDRESS_FAMILY
 #	else
 #		define sa_family_t	USHORT
@@ -43,19 +43,20 @@
 
 #ifdef _MSC_VER
 #	include <pgm/winint.h>
-#	define bool		BOOL
+#	if !defined( __cplusplus )
+#		define bool		BOOL
+#	endif
 #	define ssize_t		SSIZE_T
 #	define inline		__inline
 #	define restrict		__restrict
-#elif !defined(__cplusplus) || (__GNUC__ >= 4)
-/* g++ v4 handles C99 headers without complaints */
-#	include <stdbool.h>
-#	include <stdint.h>
-#elif defined( __SUNPRO_CC )
-#	include <stdint.h>
 #else
+#	if (defined( __GNUC__ ) && ( __GNUC__ >= 4 )) || defined( __SUNPRO_C )
+/* g++ v4 handles C99 headers without complaints */
+#		include <stdbool.h>
+#	elif !defined( __cplusplus )
 /* g++ v3 and other ancient compilers */
-#	define bool		int
+#		define bool		int
+#	endif
 #	include <stdint.h>
 #endif
 
@@ -63,7 +64,7 @@
 #	define errno_t		int
 #endif
 
-#if !defined(restrict) || (defined(__STDC_VERSION__) && __STDC_VERSION__ < 199901L)
+#if !defined( restrict ) || (defined( __STDC_VERSION__ ) && __STDC_VERSION__ < 199901L)
 /* C89 ANSI standard */
 #	define restrict
 #endif
