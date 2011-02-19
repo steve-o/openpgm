@@ -43,6 +43,7 @@
 #include <pgm/types.h>
 
 #include <impl/checksum.h>
+#include <impl/errno.h>
 #include <impl/features.h>
 #include <impl/fixed.h>
 #include <impl/galois.h>
