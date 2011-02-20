@@ -31,6 +31,8 @@ Bind a transport to the specified network devices.
 === Remarks ===
 Assigns local addresses to the PGM transport sockets which will initiate delivery of reconstructed messages to the asynchronous queue and its associated dispatcher threads.
 
+Note not all operating systems segregate packets from different multicast group addresses as different streams to joined applications.  It is recommended in heterogenous environments to select unique multicast group address together with data-destination and when necessary UDP encapsulation ports, e.g. 239.192.0.1:7501, 239.192.0.2:7502.
+
 === Parameters ===
 
 <table border="1" cellpadding="5" cellspacing="0">

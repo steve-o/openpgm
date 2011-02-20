@@ -2,7 +2,7 @@
 #labels Phase-Implementation
 #sidebar TOC5CReferenceProgrammersChecklist
 === Introduction ===
-There are currently no official releases or pre-built packages in any distributions.  The OpenPGM library must be built from source taken from the projects subversion repository or from a downloaded tarball.
+An official developer package is available for Microsoft Windows from [http://miru.hk/openpgm/ Miru Limited], for other platforms the OpenPGM library must be built from source taken from the projects subversion repository or from a downloaded tarball.
 
 
 === Supported Platforms ===

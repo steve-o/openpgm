@@ -21,6 +21,8 @@ Create a PGM socket.
 === Remarks ===
 A custom network protocol requires super-user privileges to open the necessary raw sockets.  An application can call <tt>pgm_socket()</tt> to create unbound raw sockets, drop the privileges to maintain security, and then bind with <tt>[OpenPgm5CReferencePgmBind pgm_bind()]</tt> and finally <tt>[OpenPgm5CReferencePgmConnect pgm_connect()]</tt> to start processing incoming packets.
 
+Not all networking hardware permits IP Router Alert tagged packets to pass through, tagging may be disabled with the PGM_IP_ROUTER_ALERT socket option.
+
 === Parameters ===
 
 <table border="1" cellpadding="5" cellspacing="0">

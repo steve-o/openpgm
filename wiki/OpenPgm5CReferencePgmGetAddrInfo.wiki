@@ -71,5 +71,6 @@ Basic example using default hints.
   * <tt>[OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmGetSockOpt pgm_setsockopt()]</tt><br>
   * [OpenPgm5CReferenceInterface Interface] in OpenPGM C Reference.<br>
-  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.
+  * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
+  * [OpenPgmConceptsTransport#Network_Parameters Network Parameters] in the article Transport in OpenPGM Concepts.
 
