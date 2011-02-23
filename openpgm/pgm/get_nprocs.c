@@ -27,10 +27,13 @@
 #ifndef _WIN32
 #	include <sched.h>
 #	include <unistd.h>
-#	if defined ( __sun )
+#	if defined( __sun )
 #		include <sys/pset.h>
 #	endif
 #	include <sys/types.h>
+#	if defined( __APPLE__ )
+#		include <sys/sysctl.h>
+#	endif
 #endif
 #include <impl/framework.h>
 
@@ -56,7 +59,7 @@ _pgm_apple_get_nprocs (void)
 	mib[1] = HW_AVAILCPU;
 	len = sizeof (int);
 	sysctl (mib, 2, &online, &len, NULL, 0);
-	mib[1] = HW_NCPU
+	mib[1] = HW_NCPU;
 	len = sizeof (int);
 	sysctl (mib, 2, &configured, &len, NULL, 0);
 
