@@ -10,17 +10,6 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_SUBST([RELEASE_INFO], [m4_esyscmd([perl version.pl %major.%minor])])
 AC_SUBST([VERSION_INFO], [m4_esyscmd([perl version.pl 0:%micro])])
 
-# Apply system specific rules.
-AC_CANONICAL_HOST
-CFLAGS="$CFLAGS -D_REENTRANT"
-case "$host_os" in
-linux*)
-	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_BSD_SOURCE"
-	;;
-*)
-	;;
-esac
-
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C99
@@ -28,14 +17,25 @@ AC_PROG_LIBTOOL
 AC_PATH_PROG(PERL, perl)
 AC_PATH_PROG(PYTHON, python)
 
+m4_ifdef([LT_PREREQ], [LT_PREREQ([2.2])])
+m4_ifdef([LT_INIT], [LT_INIT])
+AC_SUBST([LIBTOOL_DEPS])
 AC_SUBST(PERL)
 AC_SUBST(PYTHON)
 
-# libtool init API since 2.2.6
-m4_ifdef([LT_PREREQ], [LT_PREREQ([2.2])])
-m4_ifdef([LT_INIT], [LT_INIT])
-
-AC_SUBST([LIBTOOL_DEPS])
+# Apply system specific rules.
+AC_CANONICAL_HOST
+CFLAGS="$CFLAGS -D_REENTRANT"
+case "$host_os" in
+linux*)
+	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_BSD_SOURCE"
+	;;
+solaris*)
+	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D__EXTENSIONS__"
+	;;
+*)
+	;;
+esac
 
 # Checks for libraries.
 AC_SEARCH_LIBS([sqrt], [m])
@@ -204,7 +204,12 @@ AC_CHECK_FUNC([vasprintf],
 # symbol linking scope
 AC_MSG_CHECKING([for hidden visibility attribute])
 AC_COMPILE_IFELSE(
-	[AC_LANG_PROGRAM([[__attribute__((visibility("hidden"))) void moo (void) {};]],
+	[AC_LANG_PROGRAM([[#ifdef __SUNPRO_C
+__hidden
+#else
+__attribute__((visibility("hidden")))
+#endif
+void moo (void) {};]],
 		[[moo();]])],
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DCONFIG_HAVE_DSO_VISIBILITY"],
