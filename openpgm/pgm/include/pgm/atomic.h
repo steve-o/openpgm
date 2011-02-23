@@ -56,7 +56,7 @@ pgm_atomic_exchange_and_add32 (
 	return result;
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
 	uint32_t result = val;
-	__asm__ volatile ("lockl; xaddl %0, %1"
+	__asm__ volatile ("lock; xaddl %0, %1"
 		       :: "r" (result), "m" (*atomic)  );
 	return result;
 #elif defined( __sun )
