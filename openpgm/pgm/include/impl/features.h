@@ -45,5 +45,9 @@
 #	define CONFIG_HAVE_FTIME		1
 #	define CONFIG_HAVE_GETTIMEOFDAY		1
 #endif
+#if defined(__sun) || defined(__SUNPRO_C)
+#	define CONFIG_HAVE_FTIME		1
+#	define CONFIG_HAVE_GETTIMEOFDAY		1
+#endif
 
 #endif /* __PGM_IMPL_FEATURES_H__ */
