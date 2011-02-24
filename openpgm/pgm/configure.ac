@@ -235,7 +235,7 @@ esac
 AC_MSG_CHECKING([for unaligned pointers])
 AC_RUN_IFELSE(
 	[AC_LANG_PROGRAM([[char* nezumi = "mouse";]],
-		[[short x = *(short*)(nezumi + 1)]])],
+		[[short x = *(short*)(nezumi + 2)]])],
 	[AC_MSG_RESULT([yes])
 		pgm_unaligned_pointers=yes],
 	[AC_MSG_RESULT([no])
@@ -245,6 +245,8 @@ AC_MSG_CHECKING([for extended atomic ops])
 AC_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([[#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 /* GCC assembler */
+#elif defined( __sun )
+/* Solaris intrinsic */
 #elif defined( __APPLE__ )
 /* Darwin intrinsic */
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
@@ -256,7 +258,7 @@ AC_COMPILE_IFELSE(
 #endif]])],
 	[AC_MSG_RESULT([yes])
 		if test "$pgm_unaligned_pointers" = yes; then
-			CFLAGS="$CFLAGS -DCONFIG_TICKET_SPINLOCK -DCONFIG_TICKET_RWSPINLOCK"
+			CFLAGS="$CFLAGS -DCONFIG_TICKET_SPINLOCK -DCONFIG_DUMB_RWSPINLOCK"
 		fi],
 	[AC_MSG_RESULT([no])])
 
