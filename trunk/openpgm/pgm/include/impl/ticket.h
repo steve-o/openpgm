@@ -494,6 +494,12 @@ static inline void pgm_ticket_unlock (pgm_ticket_t* ticket) {
 	pgm_atomic_inc16 (&ticket->pgm_tkt_ticket);
 }
 
+static inline bool pgm_ticket_is_unlocked (pgm_ticket_t* ticket) {
+	pgm_ticket_t copy;
+	copy.pgm_tkt_data32 = pgm_atomic_read32 (&ticket->pgm_tkt_data32);
+	return (copy.pgm_tkt_ticket == copy.pgm_tkt_user);
+}
+
 /* read-write ticket spinlocks */
 
 static inline void pgm_rwticket_init (pgm_rwticket_t* rwticket) {
@@ -528,6 +534,7 @@ static inline void pgm_rwticket_reader_lock (pgm_rwticket_t* rwticket) {
 	pgm_atomic_inc8 (&rwticket->pgm_rwtkt_read);
 }
 
+/* fails if next immediate ticket is not available */
 static inline bool pgm_rwticket_reader_trylock (pgm_rwticket_t* rwticket) {
 	const uint8_t user = rwticket->pgm_rwtkt_user;
 	pgm_rwticket_t exchange, comparand;
