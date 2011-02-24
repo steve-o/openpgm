@@ -59,10 +59,10 @@ pgm_skb_is_valid (
 	const struct pgm_sk_buff_t*const skb
 	)
 {
-	pgm_return_val_if_fail (skb, FALSE);
+	pgm_return_val_if_fail (NULL != skb, FALSE);
 /* link_ */
 /* socket */
-	pgm_return_val_if_fail (skb->sock, FALSE);
+	pgm_return_val_if_fail (NULL != skb->sock, FALSE);
 /* tstamp */
 	pgm_return_val_if_fail (skb->tstamp > 0, FALSE);
 /* tsi */
@@ -71,20 +71,20 @@ pgm_skb_is_valid (
 /* len can be any value */
 /* zero_padded can be any value */
 /* gpointers */
-	pgm_return_val_if_fail (skb->head, FALSE);
+	pgm_return_val_if_fail (NULL != skb->head, FALSE);
 	pgm_return_val_if_fail ((const char*)skb->head > (const char*)&skb->users, FALSE);
-	pgm_return_val_if_fail (skb->data, FALSE);
+	pgm_return_val_if_fail (NULL != skb->data, FALSE);
 	pgm_return_val_if_fail ((const char*)skb->data >= (const char*)skb->head, FALSE);
-	pgm_return_val_if_fail (skb->tail, FALSE);
+	pgm_return_val_if_fail (NULL != skb->tail, FALSE);
 	pgm_return_val_if_fail ((const char*)skb->tail >= (const char*)skb->data, FALSE);
 	pgm_return_val_if_fail (skb->len == (char*)skb->tail - (const char*)skb->data, FALSE);
-	pgm_return_val_if_fail (skb->end, FALSE);
+	pgm_return_val_if_fail (NULL != skb->end, FALSE);
 	pgm_return_val_if_fail ((const char*)skb->end >= (const char*)skb->tail, FALSE);
 /* pgm_header */
 	if (skb->pgm_header) {
 		pgm_return_val_if_fail ((const char*)skb->pgm_header >= (const char*)skb->head, FALSE);
 		pgm_return_val_if_fail ((const char*)skb->pgm_header + sizeof(struct pgm_header) <= (const char*)skb->tail, FALSE);
-		pgm_return_val_if_fail (skb->pgm_data, FALSE);
+		pgm_return_val_if_fail (NULL != skb->pgm_data, FALSE);
 		pgm_return_val_if_fail ((const char*)skb->pgm_data >= (const char*)skb->pgm_header + sizeof(struct pgm_header), FALSE);
 		pgm_return_val_if_fail ((const char*)skb->pgm_data <= (const char*)skb->tail, FALSE);
 		if (skb->pgm_opt_fragment) {

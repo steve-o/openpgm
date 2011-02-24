@@ -334,6 +334,8 @@ default_none:
 }
 
 /* create an internet address from network & host.
+ *
+ * expect compiler warnings on return type due to compatibility with inet_makeaddr.
  */
 
 struct in_addr
