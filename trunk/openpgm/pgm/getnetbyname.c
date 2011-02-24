@@ -218,7 +218,7 @@ _pgm_native_getnetbyname (
 	setnetent (0);
 	while (NULL != (ne = getnetent())) {
 		if (!strncmp (ne->n_name, name, BUFSIZ))
-			break;
+			goto found;
 		for (cp = ne->n_aliases; *cp != 0; cp++)
 			if (!strncmp (*cp, name, BUFSIZ))
 				goto found;
