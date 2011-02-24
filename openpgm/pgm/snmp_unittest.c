@@ -47,6 +47,12 @@ mock_pgm_mib_init (
 #define pgm_sock_list           mock_pgm_sock_list
 #define pgm_mib_init		mock_pgm_mib_init
 
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
+
 
 #define SNMP_DEBUG
 #include "snmp.c"
