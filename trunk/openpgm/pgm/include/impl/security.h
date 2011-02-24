@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/timeb.h>
 #include <impl/i18n.h>
+#include <impl/errno.h>
 #include <impl/string.h>
 
 PGM_BEGIN_DECLS
