@@ -150,6 +150,15 @@ pgm_atomic_compare_and_exchange32 (
 			: "ir" (newval),  "a" (oldval)
 			: "memory", "cc"  );
 	return (bool)result;
+#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+/* GCC-compatible assembler */
+	uint8_t result;
+	__asm__ volatile ("lock; cmpxchgl %2, %0\n\t"
+			  "setz %1\n\t"
+			: "+m" (*atomic), "=r" (result)
+			: "r" (newval),  "a" (oldval)
+			: "memory", "cc"  );
+	return (bool)result;
 #elif defined( __sun )
 /* Solaris intrinsic */
 	const uint32_t original = atomic_cas_32 (atomic, oldval, newval);
@@ -183,6 +192,11 @@ pgm_atomic_add8 (
 	__asm__ volatile ("lock; addb %1, %0"
 			: "=m" (*atomic)
 			: "ir" (val), "m" (*atomic)
+			: "memory", "cc"  );
+#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	__asm__ volatile ("lock; addb %0, %1"
+			:
+			: "r" (val), "m" (*atomic)
 			: "memory", "cc"  );
 #elif defined( __sun )
 	atomic_add_8 (atomic, (int8_t)val);
@@ -225,6 +239,13 @@ pgm_atomic_fetch_and_add8 (
 			: "0" (val), "m" (*atomic)
 			: "memory", "cc"  );
 	return result;
+#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	uint8_t result = val;
+	__asm__ volatile ("lock; xaddb %0, %1"
+			: "+r" (result)
+			: "m" (*atomic)
+			: "memory", "cc"  );
+	return result;
 #elif defined( __sun )
 	const uint8_t nv = atomic_add_8_nv (atomic, (int8_t)val);
 	return nv - val;
@@ -259,6 +280,11 @@ pgm_atomic_inc8 (
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	__asm__ volatile ("lock; incb %0"
+			: "+m" (*atomic)
+			:
+			: "memory", "cc"  );
+#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; incb %0"
 			: "+m" (*atomic)
 			:
@@ -318,6 +344,11 @@ pgm_atomic_add16 (
 			: "=m" (*atomic)
 			: "ir" (val), "m" (*atomic)
 			: "memory", "cc"  );
+#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	__asm__ volatile ("lock; addw %0, %1"
+			:
+			: "r" (val), "m" (*atomic)
+			: "memory", "cc"  );
 #elif defined( __sun )
 	atomic_add_16 (atomic, val);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
@@ -354,6 +385,13 @@ pgm_atomic_fetch_and_add16 (
 			: "0" (val), "m" (*atomic)
 			: "memory", "cc"  );
 	return result;
+#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	uint16_t result = val;
+	__asm__ volatile ("lock; xaddw %0, %1"
+			: "+r" (result)
+			: "m" (*atomic)
+			: "memory", "cc"  );
+	return result;
 #elif defined( __sun )
 	const uint16_t nv = atomic_add_16_nv (atomic, val);
 	return nv - val;
@@ -386,6 +424,11 @@ pgm_atomic_inc16 (
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+	__asm__ volatile ("lock; incw %0"
+			: "+m" (*atomic)
+			:
+			: "memory", "cc"  );
+#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; incw %0"
 			: "+m" (*atomic)
 			:
