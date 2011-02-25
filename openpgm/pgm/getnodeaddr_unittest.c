@@ -588,11 +588,13 @@ main (void)
 	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
 	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
 #endif
+	pgm_messages_init();
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+	pgm_messages_shutdown();
 #ifdef _WIN32
 	WSACleanup();
 #endif
