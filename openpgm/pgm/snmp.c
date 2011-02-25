@@ -170,6 +170,7 @@ pgm_snmp_shutdown (void)
 #ifndef _WIN32
 	pthread_join (snmp_thread, NULL);
 #else
+	WaitForSingleObject (snmp_thread, INFINITE);
 	CloseHandle (snmp_thread);
 #endif
 	pgm_notify_destroy (&snmp_notify);
