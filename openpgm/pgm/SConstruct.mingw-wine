@@ -149,7 +149,7 @@ env = Environment(
 #			'-DCONFIG_HAVE_GETIFADDRS',
 #			'-DCONFIG_HAVE_IFR_NETMASK',
 # win32 cmsg
-#			'-DCONFIG_HAVE_WSACMSGHDR',
+			'-DCONFIG_HAVE_WSACMSGHDR',
 # multicast
 #			'-DCONFIG_HAVE_MCAST_JOIN',
 #			'-DCONFIG_HAVE_IP_MREQN',
@@ -163,6 +163,11 @@ env = Environment(
 # IP header order as per IP(4) on FreeBSD
 #			'-DCONFIG_HOST_ORDER_IP_LEN',
 #			'-DCONFIG_HOST_ORDER_IP_OFF',
+# ticket based spinlocks
+			'-DCONFIG_TICKET_SPINLOCK',
+#			'-DCONFIG_TICKET_RWSPINLOCK',
+# dumb read-write spinlock
+			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
 # Wine limited API support
