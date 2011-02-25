@@ -27,7 +27,8 @@
 #	include <atomic.h>
 #elif defined( __APPLE__ )
 #	include <libkern/OSAtomic.h>
-#elif defined( _WIN32 )
+#elif defined( _MSC_VER )
+/* not implemented in MinGW */
 #	include <intrin.h>
 #endif
 #include <pgm/types.h>

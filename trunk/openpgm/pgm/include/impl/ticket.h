@@ -42,7 +42,10 @@ typedef union pgm_rwticket_t pgm_rwticket_t;
 #	define VC_EXTRALEAN
 #	define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
-#	include <intrin.h>
+#	if defined( _MSC_VER )
+/* not implemented in MinGW */
+#		include <intrin.h>
+#	endif
 #else
 #	include <pthread.h>
 #	include <unistd.h>
@@ -62,19 +65,11 @@ PGM_BEGIN_DECLS
 #pragma pack(1)
 
 union pgm_ticket_t {
-#if defined( _WIN32 )
-	volatile LONG		pgm_tkt_data32;
-	struct {
-		volatile SHORT		pgm_un_ticket;
-		volatile SHORT		pgm_un_user;
-	} pgm_un;
-#else
 	volatile uint32_t	pgm_tkt_data32;
 	struct {
 		volatile uint16_t	pgm_un_ticket;
 		volatile uint16_t	pgm_un_user;
 	} pgm_un;
-#endif
 };
 
 #define pgm_tkt_ticket	pgm_un.pgm_un_ticket
@@ -82,19 +77,6 @@ union pgm_ticket_t {
 
 
 union pgm_rwticket_t {
-#if defined( _WIN32 )
-	volatile LONG		pgm_rwtkt_data32;
-	struct {
-		union {
-			volatile SHORT		pgm_un2_data16;
-			struct {
-				volatile CHAR		pgm_un3_write;
-				volatile CHAR		pgm_un3_read;
-			} pgm_un3;
-		} pgm_un2;
-		volatile CHAR		pgm_un_user;
-	} pgm_un;
-#else
 	volatile uint32_t	pgm_rwtkt_data32;
 	struct {
 		union {
@@ -106,7 +88,6 @@ union pgm_rwticket_t {
 		} pgm_un2;
 		volatile uint8_t	pgm_un_user;
 	} pgm_un;
-#endif
 };
 
 #define pgm_rwtkt_data16	pgm_un.pgm_un2.pgm_un2_data16
@@ -518,7 +499,11 @@ static inline void pgm_ticket_lock (pgm_ticket_t* ticket) {
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 			SwitchToThread();
 		else
+#	ifdef _MSC_VER
 			YieldProcessor();			/* hyper-threading pause */
+#	else
+			__asm volatile ("pause" ::: "memory");
+#	endif
 #elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 /* GCC atomics */
 	unsigned spins = 0;
@@ -562,7 +547,11 @@ static inline void pgm_rwticket_reader_lock (pgm_rwticket_t* rwticket) {
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 			SwitchToThread();
 		else
+#	ifdef _MSC_VER
 			YieldProcessor();
+#	else
+			__asm volatile ("pause" ::: "memory");
+#	endif
 #elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	while (rwticket->pgm_rwtkt_read != user)
@@ -603,7 +592,11 @@ static inline void pgm_rwticket_writer_lock (pgm_rwticket_t* rwticket) {
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 			SwitchToThread();
 		else
+#	ifdef _MSC_VER
 			YieldProcessor();			/* hyper-threading pause */
+#	else
+			__asm volatile ("pause" ::: "memory");
+#	endif
 #elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	while (rwticket->pgm_rwtkt_write != user)

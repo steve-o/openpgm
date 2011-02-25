@@ -61,7 +61,12 @@ static inline void pgm_rwspinlock_reader_lock (pgm_rwspinlock_t* rwspinlock) {
 			if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 				SwitchToThread();
 			else
-				YieldProcessor();
+#	ifdef _MSC_VER
+/* not implemented in Mingw */
+				YieldProcessor();	/* hyper-threading pause */
+#	else
+				__asm volatile ("pause" ::: "memory");
+#	endif
 #elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 		unsigned spins = 0;
 		while (!pgm_ticket_is_unlocked (&rwspinlock->lock))
@@ -101,7 +106,11 @@ static inline void pgm_rwspinlock_writer_lock (pgm_rwspinlock_t* rwspinlock) {
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 			SwitchToThread();
 		else
-			YieldProcessor();			/* hyper-threading pause */
+#	ifdef _MSC_VER
+			YieldProcessor();
+#	else
+			__asm volatile ("pause" ::: "memory");
+#	endif
 #elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	pgm_ticket_lock (&rwspinlock->lock);
@@ -109,7 +118,7 @@ static inline void pgm_rwspinlock_writer_lock (pgm_rwspinlock_t* rwspinlock) {
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
 			sched_yield();
 		else
-			__asm volatile ("pause" ::: "memory");	/* hyper-threading pause */
+			__asm volatile ("pause" ::: "memory");
 #else
 	pgm_ticket_lock (&rwspinlock->lock);
 	while (rwspinlock->readers)
