@@ -47,15 +47,15 @@ pgm_transport_pkt_offset2 (
         return 0;
 }
 
+#define MD5_DEBUG
+#include "md5.c"
+
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
 	return 1;
 }
-
-#define MD5_DEBUG
-#include "md5.c"
-
 
 /* target:
  *	void

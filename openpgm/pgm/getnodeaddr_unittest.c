@@ -70,8 +70,6 @@ static char* mock_hostname =	NULL;
 struct pgm_ifaddrs_t;
 struct pgm_error_t;
 
-static bool mock_pgm_getifaddrs (struct pgm_ifaddrs_t**, struct pgm_error_t**);
-static void mock_pgm_freeifaddrs (struct pgm_ifaddrs_t*);
 static int mock_getaddrinfo (const char*, const char*, const struct addrinfo*, struct addrinfo**);
 static void mock_freeaddrinfo (struct addrinfo*);
 static int mock_gethostname (char*, size_t);
@@ -275,13 +273,13 @@ pgm_pkt_offset (
         return 0;
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
 	return 1;
 }
 
-static 
 bool
 mock_pgm_getifaddrs (
 	struct pgm_ifaddrs_t**	ifap,
@@ -316,7 +314,6 @@ mock_pgm_getifaddrs (
 	return TRUE;
 }
 
-static
 void
 mock_pgm_freeifaddrs (
 	struct pgm_ifaddrs_t*		ifa

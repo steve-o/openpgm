@@ -85,15 +85,15 @@ pgm_transport_pkt_offset2 (
 	return 0;
 }
 
+#define CHECKSUM_DEBUG
+#include "checksum.c"
+
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
 	return 1;
 }
-
-#define CHECKSUM_DEBUG
-#include "checksum.c"
-
 
 static
 void
@@ -108,7 +108,6 @@ mock_teardown (void)
 {
 	g_assert (pgm_time_shutdown ());
 }
-
 
 /* target:
  *	guint16

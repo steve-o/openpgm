@@ -46,15 +46,15 @@ pgm_transport_pkt_offset2 (
         return 0;
 }
 
+#define REED_SOLOMON_DEBUG
+#include "reed_solomon.c"
+
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
 	return 1;
 }
-
-#define REED_SOLOMON_DEBUG
-#include "reed_solomon.c"
-
 
 /* target:
  *	void

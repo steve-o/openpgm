@@ -521,6 +521,7 @@ pgm_pkt_offset (
 			    : ( sizeof(struct pgm_header) + sizeof(struct pgm_data) );
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {

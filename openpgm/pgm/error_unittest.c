@@ -43,15 +43,15 @@ pgm_transport_pkt_offset2 (
         return 0;
 }
 
+#define ERROR_DEBUG
+#include "error.c"
+
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
 	return 1;
 }
-
-#define ERROR_DEBUG
-#include "error.c"
-
 
 /* target:
  *	void

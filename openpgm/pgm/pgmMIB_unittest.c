@@ -40,12 +40,6 @@ static pgm_slist_t*     mock_pgm_sock_list;
 #define pgm_sock_list_lock      mock_pgm_sock_list_lock
 #define pgm_sock_list           mock_pgm_sock_list
 
-int
-pgm_get_nprocs (void)
-{
-	return 1;
-}
-
 static
 netsnmp_handler_registration*
 mock_netsnmp_create_handler_registration (
@@ -209,6 +203,12 @@ mock_pgm_time_since_epoch (
 #define PGMMIB_DEBUG
 #include "pgmMIB.c"
 
+PGM_GNUC_INTERNAL
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
 
 /* target:
  *	bool

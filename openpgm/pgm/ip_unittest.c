@@ -62,17 +62,17 @@ pgm_transport_pkt_offset2 (
         return 0;
 }
 
-int
-pgm_get_nprocs (void)
-{
-	return 1;
-}
-
 #define PGM_COMPILATION
 #include "impl/sockaddr.h"
 #include "impl/indextoaddr.h"
 #include "impl/ip.h"
 
+PGM_GNUC_INTERNAL
+int
+pgm_get_nprocs (void)
+{
+	return 1;
+}
 
 /* target:
  *   testing platform capability to loop send multicast packets to a listening
