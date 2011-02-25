@@ -216,7 +216,9 @@ pgm_supported (void)
 bool
 pgm_shutdown (void)
 {
-	pgm_return_val_if_fail (pgm_atomic_read32 (&pgm_ref_count) > 0, FALSE);
+/* cannot use pgm_return_val_if_fail() as logging may not be started */
+	if (0 == pgm_atomic_read32 (&pgm_ref_count))
+		return FALSE;
 
 	if (pgm_atomic_exchange_and_add32 (&pgm_ref_count, (uint32_t)-1) != 1)
 		return TRUE;
