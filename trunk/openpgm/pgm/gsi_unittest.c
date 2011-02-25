@@ -367,6 +367,7 @@ main (void)
 #endif
 /* GSI depends upond PRNG which depends upon time */
 	g_assert (pgm_time_init(NULL));
+	pgm_messages_init();
 	pgm_rand_init();
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
@@ -374,6 +375,7 @@ main (void)
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
 	pgm_rand_shutdown();
+	pgm_messages_shutdown();
 	g_assert (pgm_time_shutdown());
 #ifdef _WIN32
 	WSACleanup();
