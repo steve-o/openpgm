@@ -38,16 +38,15 @@ static pgm_slist_t*	mock_pgm_sock_list;
 #define pgm_sock_list_lock	mock_pgm_sock_list_lock
 #define pgm_sock_list		mock_pgm_sock_list
 
+#define HTTP_DEBUG
+#include "http.c"
+
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
 	return 1;
 }
-
-
-#define HTTP_DEBUG
-#include "http.c"
-
 
 /* target:
  *	bool

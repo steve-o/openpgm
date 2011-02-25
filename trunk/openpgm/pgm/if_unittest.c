@@ -343,6 +343,7 @@ pgm_transport_pkt_offset2 (
         return 0;
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {

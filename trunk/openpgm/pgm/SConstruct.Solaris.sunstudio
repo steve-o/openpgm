@@ -157,6 +157,8 @@ env = Environment(
 # ticket based spinlocks
 #			'-DCONFIG_TICKET_SPINLOCK',
 #			'-DCONFIG_TICKET_RWSPINLOCK',
+# dumb read-write spinlock
+#			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
 # Wine limited API support

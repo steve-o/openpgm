@@ -39,6 +39,7 @@
 #define GETNETBYNAME_DEBUG
 #include "getnetbyname.c"
 
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
