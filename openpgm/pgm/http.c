@@ -395,6 +395,7 @@ pgm_http_shutdown (void)
 #ifndef _WIN32
 	pthread_join (http_thread, NULL);
 #else
+	WaitForSingleObject (http_thread, INFINITE);
 	CloseHandle (http_thread);
 #endif
 	if (INVALID_SOCKET != http_sock) {
