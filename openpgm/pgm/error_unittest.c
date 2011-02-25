@@ -286,11 +286,13 @@ make_master_suite (void)
 int
 main (void)
 {
+	pgm_messages_init();
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+	pgm_messages_shutdown();
 	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
