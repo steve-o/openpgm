@@ -51,15 +51,15 @@ pgm_transport_pkt_offset2 (
         return 0;
 }
 
+#define INET_NETWORK_DEBUG
+#include "inet_network.c"
+
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {
 	return 1;
 }
-
-#define INET_NETWORK_DEBUG
-#include "inet_network.c"
-
 
 /* target:
  *	int
