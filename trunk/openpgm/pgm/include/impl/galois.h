@@ -120,7 +120,7 @@ pgm_gfmul (
 #ifdef CONFIG_GALOIS_MUL_LUT
 	return pgm_gftable[ (uint16_t)a << 8 | (uint16_t)b ];
 #else
-	unsigned sum = pgm_gflog[ a ] + pgm_gflog[ b ];
+	const unsigned sum = pgm_gflog[ a ] + pgm_gflog[ b ];
 	return sum >= PGM_GF_MAX ? pgm_gfantilog[ sum - PGM_GF_MAX ] : pgm_gfantilog[ sum ];
 #endif
 }

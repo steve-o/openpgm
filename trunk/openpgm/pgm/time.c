@@ -2,6 +2,8 @@
  *
  * high resolution timers.
  *
+ * NB: RDTSC requires P5 microarchitecture.
+ *
  * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
