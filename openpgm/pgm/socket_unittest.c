@@ -370,19 +370,16 @@ START_TEST (test_create_pass_001)
 	const int pgm_sock_type = SOCK_SEQPACKET;
 /* PGM/IPv4 */
 	sock = NULL;
-printf ("sock1\n");
-	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_PGM, &err), "create/1 failed");
 /* PGM/UDP over IPv4 */
 	sock = NULL;
-printf ("sock2\n");
-	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_UDP, &err), "create failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET, pgm_sock_type, IPPROTO_UDP, &err), "create/2 failed");
 /* PGM/IPv6 */
 	sock = NULL;
-printf ("sock3\n");
-	fail_unless (TRUE == pgm_socket (&sock, AF_INET6, pgm_sock_type, IPPROTO_PGM, &err), "create failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET6, pgm_sock_type, IPPROTO_PGM, &err), "create6/1 failed");
 /* PGM/UDP over IPv6 */
 	sock = NULL;
-	fail_unless (TRUE == pgm_socket (&sock, AF_INET6, pgm_sock_type, IPPROTO_UDP, &err), "create failed");
+	fail_unless (TRUE == pgm_socket (&sock, AF_INET6, pgm_sock_type, IPPROTO_UDP, &err), "create6/2 failed");
 	fail_unless (NULL == err, "error raised");
 }
 END_TEST
@@ -1169,7 +1166,6 @@ make_test_suite (void)
 	suite_add_tcase (s, tc_create);
 	tcase_add_checked_fixture (tc_create, mock_setup, mock_teardown);
 	tcase_add_test (tc_create, test_create_pass_001);
-#if 1
 	tcase_add_test (tc_create, test_create_fail_002);
 	tcase_add_test (tc_create, test_create_fail_003);
 	tcase_add_test (tc_create, test_create_fail_004);
@@ -1278,7 +1274,6 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_set_udp_multicast, mock_setup, mock_teardown);
 	tcase_add_test (tc_set_udp_multicast, test_set_udp_multicast_pass_001);
 	tcase_add_test (tc_set_udp_multicast, test_set_udp_multicast_fail_001);
-#endif
 
 	return s;
 }
@@ -1307,6 +1302,7 @@ main (void)
 #endif
 	g_assert (pgm_time_init (NULL));
 	pgm_messages_init();
+	pgm_rand_init();
 	pgm_thread_init();
 	pgm_rwlock_init (&pgm_sock_list_lock);
 	SRunner* sr = srunner_create (make_master_suite ());
@@ -1316,6 +1312,7 @@ main (void)
 	srunner_free (sr);
 	pgm_rwlock_free (&pgm_sock_list_lock);
 	pgm_thread_shutdown();
+	pgm_rand_shutdown();
 	pgm_messages_shutdown();
 	g_assert (pgm_time_shutdown());
 #ifdef _WIN32
