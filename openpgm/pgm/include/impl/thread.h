@@ -143,6 +143,7 @@ static inline bool pgm_mutex_trylock (pgm_mutex_t* mutex) {
 		return FALSE;
 	return TRUE;
 #else
+/* WARNING: returns TRUE if in same thread as lock */
 	return TryEnterCriticalSection (&mutex->win32_crit);
 #endif /* !_WIN32 */
 }
