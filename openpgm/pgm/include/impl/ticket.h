@@ -4,6 +4,8 @@
  * Bakery algorithm.  Read-write version per David Howell on LKML derived
  * from Joseph Seigh at IBM.
  *
+ * NB: CMPXCHG requires 80486 microprocessor.
+ *
  * Copyright (c) 2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
