@@ -1491,9 +1491,25 @@ make_test_suite (void)
 	tcase_add_checked_fixture (tc_is_in_net6, mock_setup_unspec, NULL);
 	tcase_add_loop_test (tc_is_in_net6, test_is_in_net6_pass_001, 0, G_N_ELEMENTS(cases_005));
 
+	TCase* tc_print_all = tcase_create ("print-all");
+	tcase_add_checked_fixture (tc_print_all, mock_setup_net, mock_teardown_net);
+	suite_add_tcase (s, tc_print_all);
+	tcase_add_test (tc_print_all, test_print_all_pass_001);
+
+	return s;
+}
+
 /* three variations of all parse-transport tests, one for each valid
  * address family value: AF_UNSPEC, AF_INET, AF_INET6. 
  */
+
+static
+Suite*
+make_unspec_suite (void)
+{
+	Suite* s;
+
+	s = suite_create ("AF_UNSPEC");
 
 /* unspecified address family, ai_family == AF_UNSPEC */
 	TCase* tc_parse_transport_unspec = tcase_create ("parse_transport/unspec");
@@ -1519,6 +1535,17 @@ make_test_suite (void)
 #endif
 	tcase_add_test (tc_parse_transport_unspec, test_parse_transport_fail_011);
 
+	return s;
+}
+
+static
+Suite*
+make_af_inet_suite (void)
+{
+	Suite* s;
+
+	s = suite_create ("AF_INET");
+
 /* IP version 4, ai_family = AF_INET */
 	TCase* tc_parse_transport_ip4 = tcase_create ("parse_transport/af_inet");
 	suite_add_tcase (s, tc_parse_transport_ip4);
@@ -1529,6 +1556,17 @@ make_test_suite (void)
 	tcase_add_loop_test (tc_parse_transport_ip4, test_parse_transport_pass_003, 0, G_N_ELEMENTS(cases_003));
 	tcase_add_test (tc_parse_transport_ip4, test_parse_transport_pass_004);
 	tcase_add_test (tc_parse_transport_ip4, test_parse_transport_pass_005);
+
+	return s;
+}
+
+static
+Suite*
+make_af_inet6_suite (void)
+{
+	Suite* s;
+
+	s = suite_create ("AF_INET6");
 
 /* IP version 6, ai_family = AF_INET6 */
 	TCase* tc_parse_transport_ip6 = tcase_create ("parse_transport/af_inet6");
@@ -1566,11 +1604,16 @@ main (void)
 	g_assert (0 == WSAStartup (wVersionRequested, &wsaData));
 	g_assert (LOBYTE (wsaData.wVersion) == 2 && HIBYTE (wsaData.wVersion) == 2);
 #endif
+	pgm_messages_init();
 	SRunner* sr = srunner_create (make_master_suite ());
 	srunner_add_suite (sr, make_test_suite ());
+	srunner_add_suite (sr, make_unspec_suite ());
+	srunner_add_suite (sr, make_af_inet_suite ());
+	srunner_add_suite (sr, make_af_inet6_suite ());
 	srunner_run_all (sr, CK_ENV);
 	int number_failed = srunner_ntests_failed (sr);
 	srunner_free (sr);
+	pgm_messages_shutdown();
 #ifdef _WIN32
 	WSACleanup();
 #endif

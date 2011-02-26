@@ -87,6 +87,8 @@ unsigned mock_pgm_loss_rate = 0;
 
 #ifndef _WIN32
 static ssize_t mock_recvmsg (int, struct msghdr*, int);
+#else
+static int mock_recvfrom (SOCKET, char*, int, int, struct sockaddr*, int*);
 #endif
 
 #define pgm_parse_raw			mock_pgm_parse_raw
@@ -121,6 +123,7 @@ static ssize_t mock_recvmsg (int, struct msghdr*, int);
 #define pgm_time_now			mock_pgm_time_now
 #define pgm_time_update_now		mock_pgm_time_update_now
 #define recvmsg				mock_recvmsg
+#define recvfrom			mock_recvfrom
 #define pgm_WSARecvMsg			mock_pgm_WSARecvMsg
 #define pgm_loss_rate			mock_pgm_loss_rate
 
@@ -178,6 +181,7 @@ generate_sock (void)
 	sock->nak_bo_ivl = 100*1000;
 	pgm_notify_init (&sock->pending_notify);
 	pgm_notify_init (&sock->rdata_notify);
+	pgm_mutex_init (&sock->receiver_mutex);
 	pgm_rwlock_init (&sock->lock);
 	pgm_rwlock_init (&sock->peers_lock);
 	return sock;
@@ -1054,6 +1058,52 @@ mock_WSARecvMsg (
 }
 
 LPFN_WSARECVMSG mock_pgm_WSARecvMsg = mock_WSARecvMsg;
+
+static
+int
+mock_recvfrom (
+	SOCKET			s,
+	char*			buf,
+	int			len,
+	int			flags,
+	struct sockaddr*	from,
+	int*			fromlen
+	)
+{
+	g_assert (NULL != buf);
+	g_assert (NULL != mock_recvmsg_list);
+
+	g_debug ("mock_recvfrom (s:%d buf:%p len:%d flags:%d from:%p fromlen:%p)",
+		s, (gpointer)buf, len, flags, (gpointer)from, (gpointer)fromlen);
+
+	struct mock_recvmsg_t* mr = mock_recvmsg_list->data;
+	WSAMSG* mock_msg	= mr->mr_msg;
+/* only return 0 on success, not bytes received */
+	int mock_retval		= mr->mr_retval < 0 ? mr->mr_retval : 0;
+	int mock_errno		= mr->mr_errno;
+	mock_recvmsg_list = g_list_delete_link (mock_recvmsg_list, mock_recvmsg_list);
+	if (mock_msg) {
+		if (NULL != fromlen) {
+			g_assert_cmpuint (mock_msg->namelen, <=, *fromlen);
+			*fromlen = mock_msg->namelen;
+		}
+		if (NULL != from && mock_msg->namelen) {
+			memcpy (from, mock_msg->name, mock_msg->namelen);
+		}
+		if (mock_msg->dwBufferCount) {
+			for (unsigned i = 0; i < mock_msg->dwBufferCount; i++) {
+				const size_t count = MIN(len, mock_msg->lpBuffers[i].len);
+				memcpy (buf, mock_msg->lpBuffers[i].buf, count);
+				buf += count;
+				len -= count;
+				mock_retval += count;
+			}
+		}
+	}
+	g_debug ("returning %d (errno:%d)", mock_retval, mock_errno);
+	WSASetLastError (mock_errno);
+	return mock_retval;
+}
 #endif /* _WIN32 */
 
 
