@@ -1,8 +1,8 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * HTTP administrative interface
+ * Redo data types.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,24 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1200)
-#	pragma once
+#if defined( PGM_BOOL_DEFINED )
+#	define bool	pgm_bool_t
 #endif
-#ifndef __PGM_HTTP_H__
-#define __PGM_HTTP_H__
 
-#include <pgm/pgm.h>
-#include <pgm/retypes.h>
-
-PGM_BEGIN_DECLS
-
-#define PGM_HTTP_DEFAULT_SERVER_PORT	4968
-
-bool pgm_http_init (uint16_t, pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
-bool pgm_http_shutdown (void);
-
-PGM_END_DECLS
-
-#include <pgm/untypes.h>
-
-#endif /* __PGM_HTTP_H__ */

@@ -49,7 +49,9 @@
 
 #ifdef _MSC_VER
 #	if !defined( PGM_BOOL_DEFINED ) && !defined( __cplusplus )
-#		define bool		BOOL
+/* type BOOL causes linkage errors with C++ applications */
+#		define pgm_bool_t	unsigned char
+#		define bool		pgm_bool_t
 #		define PGM_BOOL_DEFINED
 #	endif
 #	include <pgm/winint.h>
@@ -70,11 +72,16 @@
 /* g++ v4 handles C99 headers without complaints */
 #		include <stdbool.h>
 #	elif !defined( PGM_BOOL_DEFINED ) && !defined( __cplusplus )
-/* g++ v3 and other ancient compilers */
-#		define bool		int
+/* g++ v3 and other ancient compilers, should match target platform C++ bool size */
+#		define pgm_bool_t	int
+#		define bool		pgm_bool_t
 #		define PGM_BOOL_DEFINED
 #	endif
 #	include <stdint.h>
+#endif
+
+#if !defined( PGM_BOOL_DEFINED )
+#	define pgm_bool_t	bool
 #endif
 
 #if !defined( PGM_RESTRICT_DEFINED ) && (!defined( restrict ) || (defined( __STDC_VERSION__ ) && __STDC_VERSION__ < 199901L))
