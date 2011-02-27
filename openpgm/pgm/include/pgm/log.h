@@ -25,7 +25,7 @@
 #ifndef __PGM_LOG_H__
 #define __PGM_LOG_H__
 
-#include <pgm/types.h>
+#include <pgm/pgm.h>
 
 PGM_BEGIN_DECLS
 
