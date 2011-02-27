@@ -25,8 +25,8 @@
 #ifndef __PGM_SNMP_H__
 #define __PGM_SNMP_H__
 
-#include <pgm/types.h>
-#include <pgm/error.h>
+#include <pgm/pgm.h>
+#include <pgm/retypes.h>
 
 PGM_BEGIN_DECLS
 
@@ -34,5 +34,7 @@ bool pgm_snmp_init (pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_snmp_shutdown (void);
 
 PGM_END_DECLS
+
+#include <pgm/untypes.h>
 
 #endif /* __PGM_SNMP_H__ */

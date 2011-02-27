@@ -136,11 +136,17 @@ pgm_log_set_handler (
 	)
 {
 	pgm_log_func_t previous_handler;
-	pgm_mutex_lock (&messages_mutex);
+	const uint32_t count = pgm_atomic_read32 (&messages_ref_count);
+
+/* cannot use mutexes for initialising log handler before pgm_init() for
+ * locking systems that do not accept static initialization, e.g. Windows
+ * critical sections.
+ */
+	if (count > 0) pgm_mutex_lock (&messages_mutex);
 	previous_handler	= log_handler;
 	log_handler		= handler;
 	log_handler_closure	= closure;
-	pgm_mutex_unlock (&messages_mutex);
+	if (count > 0) pgm_mutex_unlock (&messages_mutex);
 	return previous_handler;
 }
 

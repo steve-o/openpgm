@@ -51,4 +51,6 @@
 #include <pgm/types.h>
 #include <pgm/version.h>
 
+#include <pgm/untypes.h>
+
 #endif /* __PGM_H__ */
