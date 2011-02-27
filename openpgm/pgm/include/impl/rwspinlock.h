@@ -55,25 +55,22 @@ static inline void pgm_rwspinlock_free (pgm_rwspinlock_t* rwspinlock) {
 
 static inline void pgm_rwspinlock_reader_lock (pgm_rwspinlock_t* rwspinlock) {
 	for (;;) {
-#ifdef _WIN32
+#if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 		unsigned spins = 0;
 		while (!pgm_ticket_is_unlocked (&rwspinlock->lock))
 			if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
+#	ifdef _WIN32
 				SwitchToThread();
-			else
+#	else
+				sched_yield();
+#	endif
+			else		/* hyper-threading pause */
 #	ifdef _MSC_VER
 /* not implemented in Mingw */
-				YieldProcessor();	/* hyper-threading pause */
+				YieldProcessor();
 #	else
 				__asm volatile ("pause" ::: "memory");
 #	endif
-#elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-		unsigned spins = 0;
-		while (!pgm_ticket_is_unlocked (&rwspinlock->lock))
-			if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
-				sched_yield();
-			else
-				__asm volatile ("pause" ::: "memory");
 #else
 		while (!pgm_ticket_is_unlocked (&rwspinlock->lock))
 			sched_yield();
@@ -99,26 +96,22 @@ static inline void pgm_rwspinlock_reader_unlock (pgm_rwspinlock_t* rwspinlock) {
 }
 
 static inline void pgm_rwspinlock_writer_lock (pgm_rwspinlock_t* rwspinlock) {
-#ifdef _WIN32
+#if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	pgm_ticket_lock (&rwspinlock->lock);
 	while (rwspinlock->readers)
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
+#	ifdef _WIN32
 			SwitchToThread();
-		else
+#	else
+			sched_yield();
+#	endif
+		else		/* hyper-threading pause */
 #	ifdef _MSC_VER
 			YieldProcessor();
 #	else
 			__asm volatile ("pause" ::: "memory");
 #	endif
-#elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-	unsigned spins = 0;
-	pgm_ticket_lock (&rwspinlock->lock);
-	while (rwspinlock->readers)
-		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
-			sched_yield();
-		else
-			__asm volatile ("pause" ::: "memory");
 #else
 	pgm_ticket_lock (&rwspinlock->lock);
 	while (rwspinlock->readers)

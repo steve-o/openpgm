@@ -495,25 +495,21 @@ static inline bool pgm_ticket_trylock (pgm_ticket_t* ticket) {
 
 static inline void pgm_ticket_lock (pgm_ticket_t* ticket) {
 	const uint16_t user = pgm_atomic_fetch_and_inc16 (&ticket->pgm_tkt_user);
-#ifdef _WIN32
+#if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	while (ticket->pgm_tkt_ticket != user)
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
+#	ifdef _WIN32
 			SwitchToThread();
-		else
+#	else
+			sched_yield();
+#	endif
+		else		/* hyper-threading pause */
 #	ifdef _MSC_VER
-			YieldProcessor();			/* hyper-threading pause */
+			YieldProcessor();
 #	else
 			__asm volatile ("pause" ::: "memory");
 #	endif
-#elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-/* GCC atomics */
-	unsigned spins = 0;
-	while (ticket->pgm_tkt_ticket != user)
-		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
-			sched_yield();
-		else
-			__asm volatile ("pause" ::: "memory");	/* hyper-threading pause */
 #else
 	while (ticket->pgm_tkt_ticket != user)
 		sched_yield();
@@ -543,24 +539,21 @@ static inline void pgm_rwticket_free (pgm_rwticket_t* rwticket) {
 
 static inline void pgm_rwticket_reader_lock (pgm_rwticket_t* rwticket) {
 	const uint8_t user = pgm_atomic_fetch_and_inc8 (&rwticket->pgm_rwtkt_user);
-#ifdef _WIN32
+#if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	while (rwticket->pgm_rwtkt_read != user)
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
+#	ifdef _WIN32
 			SwitchToThread();
-		else
+#	else
+			sched_yield();
+#	endif
+		else		/* hyper-threading pause */
 #	ifdef _MSC_VER
 			YieldProcessor();
 #	else
 			__asm volatile ("pause" ::: "memory");
 #	endif
-#elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-	unsigned spins = 0;
-	while (rwticket->pgm_rwtkt_read != user)
-		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
-			sched_yield();
-		else
-			__asm volatile ("pause" ::: "memory");
 #else
 	while (rwticket->pgm_rwtkt_read != user)
 		sched_yield();
@@ -588,24 +581,21 @@ static inline void pgm_rwticket_reader_unlock(pgm_rwticket_t* rwticket) {
 
 static inline void pgm_rwticket_writer_lock (pgm_rwticket_t* rwticket) {
 	const uint8_t user = pgm_atomic_fetch_and_inc8 (&rwticket->pgm_rwtkt_user);
-#ifdef _WIN32
+#if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	while (rwticket->pgm_rwtkt_write != user)
 		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
+#	ifdef _WIN32
 			SwitchToThread();
-		else
+#	else
+			sched_yield();
+#	endif
+		else		/* hyper-threading pause */
 #	ifdef _MSC_VER
-			YieldProcessor();			/* hyper-threading pause */
+			YieldProcessor();
 #	else
 			__asm volatile ("pause" ::: "memory");
 #	endif
-#elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-	unsigned spins = 0;
-	while (rwticket->pgm_rwtkt_write != user)
-		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
-			sched_yield();
-		else
-			__asm volatile ("pause" ::: "memory");	/* hyper-threading pause */
 #else
 	while (rwticket->pgm_rwtkt_write != user)
 		sched_yield();
