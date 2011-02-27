@@ -26,7 +26,6 @@
 #define __PGM_HTTP_H__
 
 #include <pgm/pgm.h>
-#include <pgm/retypes.h>
 
 PGM_BEGIN_DECLS
 
@@ -36,7 +35,5 @@ bool pgm_http_init (uint16_t, pgm_error_t**) PGM_GNUC_WARN_UNUSED_RESULT;
 bool pgm_http_shutdown (void);
 
 PGM_END_DECLS
-
-#include <pgm/untypes.h>
 
 #endif /* __PGM_HTTP_H__ */
