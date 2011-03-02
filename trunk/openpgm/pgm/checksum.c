@@ -874,7 +874,9 @@ pgm_compat_csum_partial (
 	return csum;
 }
 
-/* Calculate & copy a partial PGM checksum
+/* Calculate & copy a partial PGM checksum.
+ *
+ * Optimum performance when src & dst are on same alignment.
  */
 
 uint32_t
@@ -889,19 +891,25 @@ pgm_compat_csum_partial_copy (
 	pgm_assert (NULL != src);
 	pgm_assert (NULL != dst);
 
-#if defined(CONFIG_8BIT_CHECKSUM)
-	return do_csumcpy_8bit (src, dst, len, csum);
-#elif defined(CONFIG_16BIT_CHECKSUM)
-	return do_csumcpy_16bit (src, dst, len, csum);
-#elif defined(CONFIG_32BIT_CHECKSUM)
-	return do_csumcpy_32bit (src, dst, len, csum);
-#elif defined(CONFIG_64BIT_CHECKSUM)
-	return do_csumcpy_64bit (src, dst, len, csum);
-#elif defined(CONFIG_VECTOR_CHECKSUM)
-	return do_csumcpy_vector (src, dst, len, csum);
-#else
+#if defined( __sparc__ ) || defined( __sparc ) || defined( __sparcv9 )
+/* SPARC will not handle destination & source addresses with different alignment */
 	memcpy (dst, src, len);
 	return pgm_csum_partial (dst, len, csum);
+#else
+#	if   defined(CONFIG_8BIT_CHECKSUM)
+	return do_csumcpy_8bit (src, dst, len, csum);
+#	elif defined(CONFIG_16BIT_CHECKSUM)
+	return do_csumcpy_16bit (src, dst, len, csum);
+#	elif defined(CONFIG_32BIT_CHECKSUM)
+	return do_csumcpy_32bit (src, dst, len, csum);
+#	elif defined(CONFIG_64BIT_CHECKSUM)
+	return do_csumcpy_64bit (src, dst, len, csum);
+#	elif defined(CONFIG_VECTOR_CHECKSUM)
+	return do_csumcpy_vector (src, dst, len, csum);
+#	else
+	memcpy (dst, src, len);
+	return pgm_csum_partial (dst, len, csum);
+#	endif
 #endif
 }
 

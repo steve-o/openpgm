@@ -168,6 +168,15 @@ on_startup (
 		return FALSE;
 	}
 
+	int _t = 1;
+	e = setsockopt (sock, IPPROTO_IP, IP_HDRINCL, (const char*)&_t, sizeof(_t));
+	if (e < 0) {
+		perror ("on_startup() failed");
+		close (sock);
+		g_main_loop_quit (g_loop);
+		return FALSE;
+	}
+
 #ifdef G_OS_UNIX
 /* drop out of setuid 0 */
 	if (0 == getuid ()) {
@@ -176,15 +185,6 @@ on_startup (
 		setgid ((uid_t)65534);
 	}
 #endif
-
-	char _t = 1;
-	e = setsockopt (sock, IPPROTO_IP, IP_HDRINCL, &_t, sizeof(_t));
-	if (e < 0) {
-		perror ("on_startup() failed");
-		close (sock);
-		g_main_loop_quit (g_loop);
-		return FALSE;
-	}
 
 /* buffers */
 	int buffer_size = 0;

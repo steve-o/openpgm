@@ -46,6 +46,9 @@ extern bool pgm_smp_system;
 #ifndef _WIN32
 #	include <pthread.h>
 #	include <unistd.h>
+#	if defined( __sun )
+#		include <thread.h>
+#	endif
 #else
 #	define VC_EXTRALEAN
 #	define WIN32_LEAN_AND_MEAN
@@ -337,7 +340,9 @@ static inline
 void
 pgm_thread_yield (void)
 {
-#ifndef _WIN32
+#if defined( __sun )
+	thr_yield();
+#elif !defined( _WIN32 )
 	sched_yield();
 #else
 	SwitchToThread();	/* yields only current processor */
