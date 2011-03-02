@@ -89,6 +89,7 @@ union pgm_rwticket_t {
 			} pgm_un3;
 		} pgm_un2;
 		volatile uint8_t	pgm_un_user;
+		uint8_t			pgm_un_reserved;
 	} pgm_un;
 };
 
