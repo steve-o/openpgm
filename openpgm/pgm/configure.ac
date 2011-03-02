@@ -240,7 +240,7 @@ AC_RUN_IFELSE(
 		pgm_unaligned_pointers=yes],
 	[AC_MSG_RESULT([no])
 		pgm_unaligned_pointers=no])
-AC_MSG_CHECKING([for extended atomic ops])
+AC_MSG_CHECKING([for intrinsic atomic ops])
 # AC_PREPROC_IFELSE not always portable
 AC_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([[#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
@@ -259,6 +259,8 @@ AC_COMPILE_IFELSE(
 	[AC_MSG_RESULT([yes])
 		if test "$pgm_unaligned_pointers" = yes; then
 			CFLAGS="$CFLAGS -DCONFIG_TICKET_SPINLOCK -DCONFIG_DUMB_RWSPINLOCK"
+		else
+			CFLAGS="$CFLAGS -DCONFIG_TICKET_SPINLOCK"
 		fi],
 	[AC_MSG_RESULT([no])])
 
