@@ -1,0 +1,16 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+e = env.Clone();
+e.Prepend(LIBS = ['libpgm', 'libpgmex']);
+e.MergeFlags(env['GLIB_FLAGS']);
+e.MergeFlags(env.get('REGEX_FLAGS',''));
+e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
+
+e.Program(['monitor.c', 'dump-json.c'])
+e.Program(['app.c', 'async.c'])
+e.Program(['sim.c', 'dump-json.c', 'async.c'])
+
+# end of file
