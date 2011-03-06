@@ -34,7 +34,7 @@
 #include <impl/socket.h>
 
 
-#define NET_DEBUG
+//#define NET_DEBUG
 
 
 /* locked and rate regulated sendto
