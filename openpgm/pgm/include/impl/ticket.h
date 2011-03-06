@@ -175,12 +175,12 @@ pgm_atomic_add8 (
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; addb %1, %0"
 			: "=m" (*atomic)
-			: "ir" (val), "m" (*atomic)
+			: "iq" (val), "m" (*atomic)
 			: "memory", "cc"  );
 #elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; addb %0, %1"
 			:
-			: "r" (val), "m" (*atomic)
+			: "q" (val), "m" (*atomic)
 			: "memory", "cc"  );
 #elif defined( __sun )
 	atomic_add_8 (atomic, (int8_t)val);
@@ -219,14 +219,14 @@ pgm_atomic_fetch_and_add8 (
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint8_t result;
 	__asm__ volatile ("lock; xaddb %0, %1"
-			: "=r" (result), "=m" (*atomic)
+			: "=q" (result), "=m" (*atomic)
 			: "0" (val), "m" (*atomic)
 			: "memory", "cc"  );
 	return result;
 #elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint8_t result = val;
 	__asm__ volatile ("lock; xaddb %0, %1"
-			: "+r" (result)
+			: "+q" (result)
 			: "m" (*atomic)
 			: "memory", "cc"  );
 	return result;
