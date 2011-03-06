@@ -40,17 +40,20 @@
 #endif
 
 #ifdef _MSC_VER
+#	if !defined( __cplusplus )
+#		define bool		unsigned char
+#	endif
 #	include <pgm/winint.h>
-#	define bool		BOOL
 #	define ssize_t		SSIZE_T
 #	define inline		__inline
-#elif !defined(__cplusplus) || (__GNUC__ >= 4)
-/* g++ v4 handles C99 headers without complaints */
-#	include <stdbool.h>
-#	include <stdint.h>
 #else
+#	if (defined( __GNUC__ ) && ( __GNUC__ >= 4 )) || defined( __SUNPRO_C )
+/* g++ v4 handles C99 headers without complaints */
+#		include <stdbool.h>
+#	elif !defined( __cplusplus )
 /* g++ v3 and other ancient compilers */
-#	define bool		int
+#		define bool		int
+#	endif
 #	include <stdint.h>
 #endif
 
