@@ -32,6 +32,9 @@ linux*)
 	;;
 solaris*)
 	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D__EXTENSIONS__"
+	AC_SEARCH_LIBS([socket], [socket])
+	AC_SEARCH_LIBS([gethostname], [nsl])
+	AC_SEARCH_LIBS([inet_aton], [resolv])
 	;;
 *)
 	;;
