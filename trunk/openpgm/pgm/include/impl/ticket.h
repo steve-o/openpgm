@@ -47,6 +47,10 @@ typedef union pgm_rwticket_t pgm_rwticket_t;
 #	if defined( _MSC_VER )
 /* not implemented in MinGW */
 #		include <intrin.h>
+#		if defined( _WIN64 )
+/* MASM API */
+#			include <pgm/intrin.h>
+#		endif
 #	endif
 #else
 #	include <pthread.h>
@@ -190,6 +194,9 @@ pgm_atomic_add8 (
 #elif defined( __APPLE__ )
 /* order to pickup GCC assembler or intrinsic as preferred implementation */
 #	error "There is no OSAtomicAdd8Barrier() in Darwin."
+#elif defined( _WIN64 )
+/* inline assembler not supported by MSVC x64 */
+	__InterlockedExchangeAdd8 ((volatile BYTE*)atomic, (BYTE)val);
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd8() */
 	_ReadWriteBarrier();
@@ -237,6 +244,9 @@ pgm_atomic_fetch_and_add8 (
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( __APPLE__ )
 #	error "There is no OSAtomicAdd8Barrier() in Darwin."
+#elif defined( _WIN64 )
+	const uint8_t nv = __InterlockedExchangeAdd8 ((volatile BYTE*)atomic, (BYTE)val);
+	return nv - val;
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd8() */
 	uint8_t result;
@@ -275,6 +285,8 @@ pgm_atomic_inc8 (
 			: "memory", "cc"  );
 #elif defined( __sun )
 	atomic_inc_8 (atomic);
+#elif defined( _WIN64 )
+	__InterlockedIncrement8 ((volatile BYTE*)atomic);
 #elif defined( _WIN32 )
 /* there is no _InterlockedIncrement8() */
 	_ReadWriteBarrier();
@@ -304,6 +316,8 @@ pgm_atomic_fetch_and_inc8 (
 #if defined( __sun )
 	const uint8_t nv = atomic_inc_8_nv (atomic);
 	return nv - 1;
+#elif defined( _WIN64 )
+	return __InterlockedIncrement8 ((volatile BYTE*)atomic);
 #else
 /* there is no _InterlockedIncrement8() and it would be 32-bit aligned anyway.
  * there is no OSAtomicIncrement8Barrier() on Darwin.
@@ -340,6 +354,8 @@ pgm_atomic_add16 (
 	__sync_add_and_fetch (atomic, val);
 #elif defined( __APPLE__ )
 #	error "There is no OSAtomicAdd16Barrier() on Darwin."
+#elif defined( _WIN64 )
+	__InterlockedExchangeAdd16 ((volatile SHORT*)atomic, (SHORT)val);
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
 	_ReadWriteBarrier();
@@ -383,6 +399,9 @@ pgm_atomic_fetch_and_add16 (
 	return __sync_fetch_and_add (atomic, val);
 #elif defined( __APPLE__ )
 #	error "There is no OSAtomicAdd16Barrier() on Darwin."
+#elif defined( _WIN64 )
+	const uint16_t nv = __InterlockedExchangeAdd16 ((volatile SHORT*)atomic, (SHORT)val);
+	return nv - val;
 #elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
 	uint16_t result;
@@ -419,6 +438,8 @@ pgm_atomic_inc16 (
 			: "memory", "cc"  );
 #elif defined( __sun )
 	atomic_inc_16 (atomic);
+#elif defined( _WIN64 )
+	__InterlockedIncrement16 ((volatile SHORT*)atomic);
 #elif defined( _WIN32 )
 /* _InterlockedIncrement16() operates on 32-bit boundaries */
 	_ReadWriteBarrier();
@@ -442,11 +463,15 @@ pgm_atomic_fetch_and_inc16 (
 	volatile uint16_t*	atomic
 	)
 {
+#if defined( _WIN64 )
+	return __InterlockedIncrement16 ((volatile SHORT*)atomic);
+#else
 /* _InterlockedIncrement16() operates on 32-bit boundaries.
  * there is no OSAtomicIncrement16Barrier() on Darwin.
  * there is no xincw instruction on x86.
  */
 	return pgm_atomic_fetch_and_add16 (atomic, 1);
+#endif
 }
 
 /* 16-bit word load.
