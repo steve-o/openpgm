@@ -130,7 +130,7 @@ pgm_atomic_compare_and_exchange32 (
 	uint8_t result;
 	__asm__ volatile ("lock; cmpxchgl %2, %0\n\t"
 			  "setz %1\n\t"
-			: "+m" (*atomic), "=r" (result)
+			: "+m" (*atomic), "=q" (result)
 			: "ir" (newval),  "a" (oldval)
 			: "memory", "cc"  );
 	return (bool)result;
@@ -139,7 +139,7 @@ pgm_atomic_compare_and_exchange32 (
 	uint8_t result;
 	__asm__ volatile ("lock; cmpxchgl %2, %0\n\t"
 			  "setz %1\n\t"
-			: "+m" (*atomic), "=r" (result)
+			: "+m" (*atomic), "=q" (result)
 			: "r" (newval),  "a" (oldval)
 			: "memory", "cc"  );
 	return (bool)result;
