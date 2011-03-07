@@ -49,7 +49,7 @@ typedef union pgm_rwticket_t pgm_rwticket_t;
 #		include <intrin.h>
 #		if defined( _WIN64 )
 /* MASM API */
-#			include <pgm/intrin.h>
+#			include <impl/intrin.h>
 #		endif
 #	endif
 #else

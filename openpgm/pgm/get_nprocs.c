@@ -79,7 +79,7 @@ int
 _pgm_win32_get_nprocs (void)
 {
 	int available = 0, online = 0, configured = 0;
-	DWORD process_mask, system_mask;
+	DWORD_PTR process_mask, system_mask;
 	DWORD_PTR mask;
 	SYSTEM_INFO si;
 

@@ -195,7 +195,7 @@ set(sources
 # AMD64 assembler
 
 if(CMAKE_CL_64)
-	list(APPEND sources ${CMAKE_CURRENT_SOURCE_DIR}/intrin.asm
+	list(APPEND sources ${CMAKE_CURRENT_SOURCE_DIR}/intrin.asm)
 endif(CMAKE_CL_64)
 
 #-----------------------------------------------------------------------------
