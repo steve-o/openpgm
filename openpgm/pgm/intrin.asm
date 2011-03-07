@@ -12,8 +12,9 @@ INCLUDE intrin.inc
 ;	__in	BYTE Value			/rdx/
 ; );
 __InterlockedExchangeAdd8 PROC
-	mov rax, rdx
+	mov eax, edx
 	lock xadd byte ptr [rcx], al
+	add eax, edx
 	ret
 __InterlockedExchangeAdd8 ENDPROC
 
@@ -21,7 +22,9 @@ __InterlockedExchangeAdd8 ENDPROC
 ;	__inout BYTE volatile *Addend		/rcx/
 ; );
 __InterlockedIncrement8 PROC
-	lock inc byte ptr [rcx]
+	mov eax, 1
+	lock xadd byte ptr [rcx], al
+	add eax, edx
 	ret
 __InterlockedIncrement8 ENDPROC
 
@@ -30,8 +33,9 @@ __InterlockedIncrement8 ENDPROC
 ;	__in	SHORT Value			/rdx/
 ; );
 __InterlockedExchangeAdd16 PROC
-	mov rax, rdx
+	mov ax, dx
 	lock xadd word ptr [rcx], ax
+	add ax, dx
 	ret
 __InterlockedExchangeAdd16 ENDPROC
 
@@ -39,7 +43,9 @@ __InterlockedExchangeAdd16 ENDPROC
 ;	__inout SHORT volatile *Addend		/rcx/
 ; );
 __InterlockedIncrement16 PROC
-	lock inc word ptr [rcx]
+	mov ax, 1
+	lock xadd word ptr [rcx], ax
+	add ax, dx
 	ret
 __InterlockedIncrement16 ENDPROC
 

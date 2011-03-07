@@ -317,7 +317,8 @@ pgm_atomic_fetch_and_inc8 (
 	const uint8_t nv = atomic_inc_8_nv (atomic);
 	return nv - 1;
 #elif defined( _WIN64 )
-	return __InterlockedIncrement8 ((volatile BYTE*)atomic);
+	const uint8_t nv = __InterlockedIncrement8 ((volatile BYTE*)atomic);
+	return nv - 1;
 #else
 /* there is no _InterlockedIncrement8() and it would be 32-bit aligned anyway.
  * there is no OSAtomicIncrement8Barrier() on Darwin.
@@ -464,7 +465,8 @@ pgm_atomic_fetch_and_inc16 (
 	)
 {
 #if defined( _WIN64 )
-	return __InterlockedIncrement16 ((volatile SHORT*)atomic);
+	const uint16_t nv = __InterlockedIncrement16 ((volatile SHORT*)atomic);
+	return nv - 1;
 #else
 /* _InterlockedIncrement16() operates on 32-bit boundaries.
  * there is no OSAtomicIncrement16Barrier() on Darwin.
