@@ -1,6 +1,6 @@
 # CMake build script for OpenPGM on Windows
 
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.4)
 
 project (OpenPGM)
 
@@ -195,6 +195,7 @@ set(sources
 # AMD64 assembler
 
 if(CMAKE_CL_64)
+	ENABLE_LANGUAGE(ASM_MASM)
 	list(APPEND sources ${CMAKE_CURRENT_SOURCE_DIR}/intrin.asm)
 endif(CMAKE_CL_64)
 
