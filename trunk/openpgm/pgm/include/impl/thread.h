@@ -58,11 +58,11 @@ extern bool pgm_smp_system;
 #	include <libkern/OSAtomic.h>
 #endif
 #include <pgm/types.h>
-#if defined( CONFIG_TICKET_SPINLOCK ) || defined( CONFIG_TICKET_RWSPINLOCK ) || defined( CONFIG_DUMB_RWSPINLOCK )
+#if defined( CONFIG_TICKET_SPINLOCK )
 #	include <impl/ticket.h>
-#	if defined( CONFIG_DUMB_RWSPINLOCK )
-#		include <impl/rwspinlock.h>
-#	endif
+#endif
+#if defined( CONFIG_DUMB_RWSPINLOCK )
+#	include <impl/rwspinlock.h>
 #endif
 
 PGM_BEGIN_DECLS
@@ -115,9 +115,6 @@ struct pgm_cond_t {
 struct pgm_rwlock_t {
 #if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_t	rwspinlock;
-#elif defined( CONFIG_TICKET_RWSPINLOCK )
-/* ticket based read-write spinlock */
-	pgm_rwticket_t		rwticket_lock;
 #elif !defined( _WIN32 )
 /* POSIX read-write lock */
 	pthread_rwlock_t	pthread_rwlock;
@@ -254,12 +251,10 @@ PGM_GNUC_INTERNAL void pgm_cond_wait (pgm_cond_t*, CRITICAL_SECTION*);
 #endif
 PGM_GNUC_INTERNAL void pgm_cond_free (pgm_cond_t*);
 
-#if defined( CONFIG_HAVE_WIN_SRW_LOCK ) || defined( CONFIG_TICKET_RWSPINLOCK ) || defined( CONFIG_DUMB_RWSPINLOCK ) || !defined( _WIN32 )
+#if defined( CONFIG_HAVE_WIN_SRW_LOCK ) || defined( CONFIG_DUMB_RWSPINLOCK ) || !defined( _WIN32 )
 static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
 #	if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_reader_lock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_TICKET_RWSPINLOCK )
-	pgm_rwticket_reader_lock (&rwlock->rwticket_lock);
 #	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	AcquireSRWLockShared (&rwlock->win32_rwlock);
 #	else
@@ -269,8 +264,6 @@ static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
 static inline bool pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
 #	if defined( CONFIG_DUMB_RWSPINLOCK )
 	return pgm_rwspinlock_reader_trylock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_TICKET_RWSPINLOCK )
-	return pgm_rwticket_reader_trylock (&rwlock->rwticket_lock);
 #	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	return TryAcquireSRWLockShared (&rwlock->win32_rwlock);
 #	else
@@ -280,8 +273,6 @@ static inline bool pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
 static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
 #	if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_reader_unlock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_TICKET_RWSPINLOCK )
-	pgm_rwticket_reader_unlock (&rwlock->rwticket_lock);
 #	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	ReleaseSRWLockShared (&rwlock->win32_rwlock);
 #	else
@@ -291,8 +282,6 @@ static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
 static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
 #	if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_writer_lock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_TICKET_RWSPINLOCK )
-	pgm_rwticket_writer_lock (&rwlock->rwticket_lock);
 #	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	AcquireSRWLockExclusive (&rwlock->win32_rwlock);
 #	else
@@ -302,8 +291,6 @@ static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
 static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
 #	if defined( CONFIG_DUMB_RWSPINLOCK )
 	return pgm_rwspinlock_writer_trylock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_TICKET_RWSPINLOCK )
-	return pgm_rwticket_writer_trylock (&rwlock->rwticket_lock);
 #	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	return TryAcquireSRWLockExclusive (&rwlock->win32_rwlock);
 #	else
@@ -313,8 +300,6 @@ static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
 static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
 #	if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_writer_unlock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_TICKET_RWSPINLOCK )
-	pgm_rwticket_writer_unlock (&rwlock->rwticket_lock);
 #	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	ReleaseSRWLockExclusive (&rwlock->win32_rwlock);
 #	else

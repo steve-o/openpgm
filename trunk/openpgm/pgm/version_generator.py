@@ -38,7 +38,7 @@ print """
 
 const unsigned pgm_major_version = 5;
 const unsigned pgm_minor_version = 1;
-const unsigned pgm_micro_version = 111;
+const unsigned pgm_micro_version = 112;
 const char* pgm_build_date = "%s";
 const char* pgm_build_time = "%s";
 const char* pgm_build_system = "%s";

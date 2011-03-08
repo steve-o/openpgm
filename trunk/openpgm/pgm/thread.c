@@ -368,8 +368,6 @@ pgm_rwlock_init (
 
 #if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_init (&rwlock->rwspinlock);
-#elif defined( CONFIG_TICKET_RWSPINLOCK )
-	pgm_rwticket_init (&rwlock->rwticket_lock);
 #elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 /* requires Vista+ */
 	InitializeSRWLock (&rwlock->win32_rwlock);
@@ -401,8 +399,6 @@ pgm_rwlock_free (
 
 #if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_free (&rwlock->rwspinlock);
-#elif defined( CONFIG_TICKET_RWSPINLOCK )
-	pgm_rwticket_free (&rwlock->rwticket_lock);
 #elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
 	/* nop */
 #elif !defined(_WIN32)
@@ -414,7 +410,7 @@ pgm_rwlock_free (
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
 
-#if !defined(CONFIG_DUMB_RWSPINLOCK) && !defined(CONFIG_TICKET_RWSPINLOCK) && !defined(CONFIG_HAVE_WIN_SRW_LOCK) && defined(_WIN32)
+#if !defined(CONFIG_DUMB_RWSPINLOCK) && !defined(CONFIG_HAVE_WIN_SRW_LOCK) && defined(_WIN32)
 static inline
 void
 _pgm_rwlock_signal (
