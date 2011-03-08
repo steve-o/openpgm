@@ -1396,7 +1396,7 @@ ack_rb_state (
 	const pgm_time_t	now
 	)
 {
-	pgm_queue_t*restrict	ack_backoff_queue;
+	pgm_queue_t*		ack_backoff_queue;
 
 /* pre-conditions */
 	pgm_assert (NULL != sock);
@@ -1486,7 +1486,7 @@ nak_rb_state (
 	const pgm_time_t	now
 	)
 {
-	pgm_queue_t*restrict	nak_backoff_queue;
+	pgm_queue_t*		nak_backoff_queue;
 	unsigned		dropped_invalid = 0;
 
 /* pre-conditions */
