@@ -1,8 +1,7 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  * 
  * Ticket spinlocks per Jonathan Corbet on LKML and Leslie Lamport's
- * Bakery algorithm.  Read-write version per David Howell on LKML derived
- * from Joseph Seigh at IBM.
+ * Bakery algorithm.
  *
  * NB: CMPXCHG requires 80486 microprocessor.
  *
@@ -34,7 +33,6 @@
 #define __PGM_IMPL_TICKET_H__
 
 typedef union pgm_ticket_t pgm_ticket_t;
-typedef union pgm_rwticket_t pgm_rwticket_t;
 
 #if defined( __sun )
 #	include <atomic.h>
@@ -47,10 +45,6 @@ typedef union pgm_rwticket_t pgm_rwticket_t;
 #	if defined( _MSC_VER )
 /* not implemented in MinGW */
 #		include <intrin.h>
-#		if defined( _WIN64 )
-/* MASM API */
-#			include <impl/intrin.h>
-#		endif
 #	endif
 #else
 #	include <pthread.h>
@@ -71,36 +65,23 @@ PGM_BEGIN_DECLS
 #pragma pack(1)
 
 union pgm_ticket_t {
+#if defined( _WIN64 )
+	volatile uint64_t	pgm_tkt_data64;
+	struct {
+		volatile uint32_t	pgm_un_ticket;
+		volatile uint32_t	pgm_un_user;
+	} pgm_un;
+#else
 	volatile uint32_t	pgm_tkt_data32;
 	struct {
 		volatile uint16_t	pgm_un_ticket;
 		volatile uint16_t	pgm_un_user;
 	} pgm_un;
+#endif
 };
 
 #define pgm_tkt_ticket	pgm_un.pgm_un_ticket
 #define pgm_tkt_user	pgm_un.pgm_un_user
-
-
-union pgm_rwticket_t {
-	volatile uint32_t	pgm_rwtkt_data32;
-	struct {
-		union {
-			volatile uint16_t	pgm_un2_data16;
-			struct {
-				volatile uint8_t	pgm_un3_write;
-				volatile uint8_t	pgm_un3_read;
-			} pgm_un3;
-		} pgm_un2;
-		volatile uint8_t	pgm_un_user;
-		uint8_t			pgm_un_reserved;
-	} pgm_un;
-};
-
-#define pgm_rwtkt_data16	pgm_un.pgm_un2.pgm_un2_data16
-#define pgm_rwtkt_write		pgm_un.pgm_un2.pgm_un3.pgm_un3_write
-#define pgm_rwtkt_read		pgm_un.pgm_un2.pgm_un3.pgm_un3_read
-#define pgm_rwtkt_user		pgm_un.pgm_un_user
 
 #if defined( __GNUC__ ) && !defined( __sun )
 #	pragma pack(pop)
@@ -159,175 +140,54 @@ pgm_atomic_compare_and_exchange32 (
 	return __sync_bool_compare_and_swap (atomic, oldval, newval);
 #elif defined( _WIN32 )
 /* Windows intrinsic */
-	const LONG original = _InterlockedCompareExchange ((volatile LONG*)atomic, newval, oldval);
+	const uint32_t original = _InterlockedCompareExchange ((volatile LONG*)atomic, newval, oldval);
 	return (oldval == original);
 #endif
 }
 
-/* byte addition.
- *
- *	*atomic += val;
+#if defined( _WIN64 )
+/* returns TRUE if swap occurred
  */
 
 static inline
-void
-pgm_atomic_add8 (
-	volatile uint8_t*	atomic,
-	const uint8_t		val
+bool
+pgm_atomic_compare_and_exchange64 (
+	volatile uint64_t*	atomic,
+	const uint64_t		newval,
+	const uint64_t		oldval
 	)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	__asm__ volatile ("lock; addb %1, %0"
-			: "=m" (*atomic)
-			: "iq" (val), "m" (*atomic)
-			: "memory", "cc"  );
-#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	__asm__ volatile ("lock; addb %0, %1"
-			:
-			: "q" (val), "m" (*atomic)
-			: "memory", "cc"  );
-#elif defined( __sun )
-	atomic_add_8 (atomic, (int8_t)val);
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-/* interchangable with __sync_fetch_and_add () */
-	__sync_add_and_fetch (atomic, val);
-#elif defined( __APPLE__ )
-/* order to pickup GCC assembler or intrinsic as preferred implementation */
-#	error "There is no OSAtomicAdd8Barrier() in Darwin."
-#elif defined( _WIN64 )
-/* inline assembler not supported by MSVC x64 */
-	__InterlockedExchangeAdd8 ((volatile BYTE*)atomic, (BYTE)val);
-#elif defined( _WIN32 )
-/* there is no _InterlockedExchangeAdd8() */
-	_ReadWriteBarrier();
-	__asm {
-		mov ecx, atomic
-		mov al, val
-		lock add al, byte ptr [ecx]
-	}
-	_ReadWriteBarrier();
-#endif
+/* Windows intrinsic */
+	const uint64_t original = _InterlockedCompareExchange64 ((volatile LONGLONG*)atomic, newval, oldval);
+	return (oldval == original);
 }
 
-/* byte addition returning original atomic value.
- *
- *	uint8_t oldval = *atomic;
- *	*atomic += val;
- *	return oldval;
+/* returns original atomic value
  */
 
 static inline
-uint8_t
-pgm_atomic_fetch_and_add8 (
-	volatile uint8_t*	atomic,
-	const uint8_t		val
+uint32_t
+pgm_atomic_fetch_and_inc32 (
+	volatile uint32_t*	atomic
 	)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	uint8_t result;
-	__asm__ volatile ("lock; xaddb %0, %1"
-			: "=q" (result), "=m" (*atomic)
-			: "0" (val), "m" (*atomic)
-			: "memory", "cc"  );
-	return result;
-#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	uint8_t result = val;
-	__asm__ volatile ("lock; xaddb %0, %1"
-			: "+q" (result)
-			: "m" (*atomic)
-			: "memory", "cc"  );
-	return result;
-#elif defined( __sun )
-	const uint8_t nv = atomic_add_8_nv (atomic, (int8_t)val);
-	return nv - val;
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
-	return __sync_fetch_and_add (atomic, val);
-#elif defined( __APPLE__ )
-#	error "There is no OSAtomicAdd8Barrier() in Darwin."
-#elif defined( _WIN64 )
-	const uint8_t nv = __InterlockedExchangeAdd8 ((volatile BYTE*)atomic, (BYTE)val);
-	return nv - val;
-#elif defined( _WIN32 )
-/* there is no _InterlockedExchangeAdd8() */
-	uint8_t result;
-	_ReadWriteBarrier();
-	__asm {
-		mov ecx, atomic
-		mov al, val
-		lock xadd byte ptr [ecx], al
-		mov result, al
-	}
-	_ReadWriteBarrier();
-	return result;
-#endif
-}
-
-/* byte increment.
- *
- *	*atomic++;
- */
-
-static inline
-void
-pgm_atomic_inc8 (
-	volatile uint8_t*	atomic
-	)
-{
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	__asm__ volatile ("lock; incb %0"
-			: "+m" (*atomic)
-			:
-			: "memory", "cc"  );
-#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
-	__asm__ volatile ("lock; incb %0"
-			: "+m" (*atomic)
-			:
-			: "memory", "cc"  );
-#elif defined( __sun )
-	atomic_inc_8 (atomic);
-#elif defined( _WIN64 )
-	__InterlockedIncrement8 ((volatile BYTE*)atomic);
-#elif defined( _WIN32 )
-/* there is no _InterlockedIncrement8() */
-	_ReadWriteBarrier();
-	__asm {
-		mov ecx, atomic
-		lock inc byte ptr [ecx]
-	}
-	_ReadWriteBarrier();
-#else
-/* there is no OSAtomicIncrement8Barrier() in Darwin. */
-	pgm_atomic_add8 (atomic, 1);
-#endif
-}
-
-/* byte increment returning original atomic value.
- *
- *	uint8_t tmp = *atomic++;
- *	return tmp;
- */
-
-static inline
-uint8_t
-pgm_atomic_fetch_and_inc8 (
-	volatile uint8_t*	atomic
-	)
-{
-#if defined( __sun )
-	const uint8_t nv = atomic_inc_8_nv (atomic);
+	const uint32_t nv = _InterlockedIncrement ((volatile LONG*)atomic);
 	return nv - 1;
-#elif defined( _WIN64 )
-	const uint8_t nv = __InterlockedIncrement8 ((volatile BYTE*)atomic);
-	return nv - 1;
-#else
-/* there is no _InterlockedIncrement8() and it would be 32-bit aligned anyway.
- * there is no OSAtomicIncrement8Barrier() on Darwin.
- * there is no xincb instruction on x86.
- */
-	return pgm_atomic_fetch_and_add8 (atomic, 1);
-#endif
 }
 
+/* 64-bit word load
+ */
+
+static inline
+uint64_t
+pgm_atomic_read64 (
+	const volatile uint64_t* atomic
+	)
+{
+	return *atomic;
+}
+
+#else
 /* 16-bit word addition.
  */
 
@@ -338,26 +198,24 @@ pgm_atomic_add16 (
 	const uint16_t		val
 	)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#	if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; addw %1, %0"
 			: "=m" (*atomic)
 			: "ir" (val), "m" (*atomic)
 			: "memory", "cc"  );
-#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#	elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; addw %0, %1"
 			:
 			: "r" (val), "m" (*atomic)
 			: "memory", "cc"  );
-#elif defined( __sun )
+#	elif defined( __sun )
 	atomic_add_16 (atomic, val);
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+#	elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 /* interchangable with __sync_fetch_and_add () */
 	__sync_add_and_fetch (atomic, val);
-#elif defined( __APPLE__ )
-#	error "There is no OSAtomicAdd16Barrier() on Darwin."
-#elif defined( _WIN64 )
-	__InterlockedExchangeAdd16 ((volatile SHORT*)atomic, (SHORT)val);
-#elif defined( _WIN32 )
+#	elif defined( __APPLE__ )
+#		error "There is no OSAtomicAdd16Barrier() on Darwin."
+#	elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
 	_ReadWriteBarrier();
 	__asm {
@@ -366,7 +224,7 @@ pgm_atomic_add16 (
 		lock add ax, word ptr [ecx]
 	}
 	_ReadWriteBarrier();
-#endif
+#	endif
 }
 
 /* 16-bit word addition returning original atomic value.
@@ -379,31 +237,28 @@ pgm_atomic_fetch_and_add16 (
 	const uint16_t		val
 	)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#	if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint16_t result;
 	__asm__ volatile ("lock; xaddw %0, %1"
 			: "=r" (result), "=m" (*atomic)
 			: "0" (val), "m" (*atomic)
 			: "memory", "cc"  );
 	return result;
-#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#	elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	uint16_t result = val;
 	__asm__ volatile ("lock; xaddw %0, %1"
 			: "+r" (result)
 			: "m" (*atomic)
 			: "memory", "cc"  );
 	return result;
-#elif defined( __sun )
+#	elif defined( __sun )
 	const uint16_t nv = atomic_add_16_nv (atomic, val);
 	return nv - val;
-#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+#	elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	return __sync_fetch_and_add (atomic, val);
-#elif defined( __APPLE__ )
-#	error "There is no OSAtomicAdd16Barrier() on Darwin."
-#elif defined( _WIN64 )
-	const uint16_t nv = __InterlockedExchangeAdd16 ((volatile SHORT*)atomic, (SHORT)val);
-	return nv - val;
-#elif defined( _WIN32 )
+#	elif defined( __APPLE__ )
+#		error "There is no OSAtomicAdd16Barrier() on Darwin."
+#	elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
 	uint16_t result;
 	_ReadWriteBarrier();
@@ -415,7 +270,7 @@ pgm_atomic_fetch_and_add16 (
 	}
 	_ReadWriteBarrier();
 	return result;
-#endif
+#	endif
 }
 
 /* 16-bit word increment.
@@ -427,21 +282,19 @@ pgm_atomic_inc16 (
 	volatile uint16_t*	atomic
 	)
 {
-#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#	if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; incw %0"
 			: "+m" (*atomic)
 			:
 			: "memory", "cc"  );
-#elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+#	elif defined( __SUNPRO_C ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
 	__asm__ volatile ("lock; incw %0"
 			: "+m" (*atomic)
 			:
 			: "memory", "cc"  );
-#elif defined( __sun )
+#	elif defined( __sun )
 	atomic_inc_16 (atomic);
-#elif defined( _WIN64 )
-	__InterlockedIncrement16 ((volatile SHORT*)atomic);
-#elif defined( _WIN32 )
+#	elif defined( _WIN32 )
 /* _InterlockedIncrement16() operates on 32-bit boundaries */
 	_ReadWriteBarrier();
 	__asm {
@@ -449,10 +302,10 @@ pgm_atomic_inc16 (
 		lock inc word ptr [ecx]
 	}
 	_ReadWriteBarrier();
-#else
+#	else
 /* there is no OSAtomicIncrement16Barrier() on Darwin. */
 	pgm_atomic_add16 (atomic, 1);
-#endif
+#	endif
 }
 
 /* 16-bit word increment returning original atomic value.
@@ -464,48 +317,23 @@ pgm_atomic_fetch_and_inc16 (
 	volatile uint16_t*	atomic
 	)
 {
-#if defined( _WIN64 )
-	const uint16_t nv = __InterlockedIncrement16 ((volatile SHORT*)atomic);
-	return nv - 1;
-#else
 /* _InterlockedIncrement16() operates on 32-bit boundaries.
  * there is no OSAtomicIncrement16Barrier() on Darwin.
  * there is no xincw instruction on x86.
  */
 	return pgm_atomic_fetch_and_add16 (atomic, 1);
-#endif
 }
-
-/* 16-bit word load.
- */
-
-static inline
-uint16_t
-pgm_atomic_read16 (
-	const volatile uint16_t* atomic
-	)
-{
-	return *atomic;
-}
-
-/* 16-bit word store.
- */
-
-static inline
-void
-pgm_atomic_write16 (
-	volatile uint16_t*	atomic,
-	const uint16_t		val
-	)
-{
-	*atomic = val;
-}
+#endif /* !_WIN64 */
 
 
 /* ticket spinlocks */
 
 static inline void pgm_ticket_init (pgm_ticket_t* ticket) {
+#ifdef _WIN64
+	ticket->pgm_tkt_data64 = 0;
+#else
 	ticket->pgm_tkt_data32 = 0;
+#endif
 }
 
 static inline void pgm_ticket_free (pgm_ticket_t* ticket) {
@@ -514,15 +342,27 @@ static inline void pgm_ticket_free (pgm_ticket_t* ticket) {
 }
 
 static inline bool pgm_ticket_trylock (pgm_ticket_t* ticket) {
+#ifdef _WIN64
+	const uint32_t user = ticket->pgm_tkt_user;
+#else
 	const uint16_t user = ticket->pgm_tkt_user;
+#endif
 	pgm_ticket_t exchange, comparand;
 	comparand.pgm_tkt_user = comparand.pgm_tkt_ticket = exchange.pgm_tkt_ticket = user;
 	exchange.pgm_tkt_user = user + 1;
+#ifdef _WIN64
+	return pgm_atomic_compare_and_exchange64 (&ticket->pgm_tkt_data64, exchange.pgm_tkt_data64, comparand.pgm_tkt_data64);
+#else
 	return pgm_atomic_compare_and_exchange32 (&ticket->pgm_tkt_data32, exchange.pgm_tkt_data32, comparand.pgm_tkt_data32);
+#endif
 }
 
 static inline void pgm_ticket_lock (pgm_ticket_t* ticket) {
+#ifdef _WIN64
+	const uint32_t user = pgm_atomic_fetch_and_inc32 (&ticket->pgm_tkt_user);
+#else
 	const uint16_t user = pgm_atomic_fetch_and_inc16 (&ticket->pgm_tkt_user);
+#endif
 #if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
 	unsigned spins = 0;
 	while (ticket->pgm_tkt_ticket != user)
@@ -545,115 +385,21 @@ static inline void pgm_ticket_lock (pgm_ticket_t* ticket) {
 }
 
 static inline void pgm_ticket_unlock (pgm_ticket_t* ticket) {
+#ifdef _WIN64
+	pgm_atomic_inc32 (&ticket->pgm_tkt_ticket);
+#else
 	pgm_atomic_inc16 (&ticket->pgm_tkt_ticket);
+#endif
 }
 
 static inline bool pgm_ticket_is_unlocked (pgm_ticket_t* ticket) {
 	pgm_ticket_t copy;
+#ifdef _WIN64
+	copy.pgm_tkt_data64 = pgm_atomic_read64 (&ticket->pgm_tkt_data64);
+#else
 	copy.pgm_tkt_data32 = pgm_atomic_read32 (&ticket->pgm_tkt_data32);
+#endif
 	return (copy.pgm_tkt_ticket == copy.pgm_tkt_user);
 }
-
-/* read-write ticket spinlocks */
-
-static inline void pgm_rwticket_init (pgm_rwticket_t* rwticket) {
-	rwticket->pgm_rwtkt_data32 = 0;
-}
-
-static inline void pgm_rwticket_free (pgm_rwticket_t* rwticket) {
-/* nop */
-	(void)rwticket;
-}
-
-static inline void pgm_rwticket_reader_lock (pgm_rwticket_t* rwticket) {
-	const uint8_t user = pgm_atomic_fetch_and_inc8 (&rwticket->pgm_rwtkt_user);
-#if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-	unsigned spins = 0;
-	while (rwticket->pgm_rwtkt_read != user)
-		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
-#	ifdef _WIN32
-			SwitchToThread();
-#	else
-			sched_yield();
-#	endif
-		else		/* hyper-threading pause */
-#	ifdef _MSC_VER
-			YieldProcessor();
-#	else
-			__asm volatile ("pause" ::: "memory");
-#	endif
-#else
-	while (rwticket->pgm_rwtkt_read != user)
-		sched_yield();
-#endif
-	pgm_atomic_inc8 (&rwticket->pgm_rwtkt_read);
-}
-
-/* fails if next immediate ticket is not available */
-static inline bool pgm_rwticket_reader_trylock (pgm_rwticket_t* rwticket) {
-	const uint8_t user = rwticket->pgm_rwtkt_user;
-	pgm_rwticket_t exchange, comparand;
-	exchange.pgm_rwtkt_data32 = comparand.pgm_rwtkt_data32 = 0;
-	exchange.pgm_rwtkt_write = comparand.pgm_rwtkt_write = rwticket->pgm_rwtkt_write;
-	comparand.pgm_rwtkt_user = comparand.pgm_rwtkt_read = user;
-	exchange.pgm_rwtkt_user = exchange.pgm_rwtkt_read = user + 1;
-	return pgm_atomic_compare_and_exchange32 (&rwticket->pgm_rwtkt_data32, exchange.pgm_rwtkt_data32, comparand.pgm_rwtkt_data32);
-}
-
-static inline void pgm_rwticket_reader_unlock(pgm_rwticket_t* rwticket) {
-	pgm_atomic_inc8 (&rwticket->pgm_rwtkt_write);
-}
-
-/* users++
- */
-
-static inline void pgm_rwticket_writer_lock (pgm_rwticket_t* rwticket) {
-	const uint8_t user = pgm_atomic_fetch_and_inc8 (&rwticket->pgm_rwtkt_user);
-#if defined( _WIN32 ) || defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-	unsigned spins = 0;
-	while (rwticket->pgm_rwtkt_write != user)
-		if (!pgm_smp_system || (++spins > PGM_ADAPTIVE_MUTEX_SPINCOUNT))
-#	ifdef _WIN32
-			SwitchToThread();
-#	else
-			sched_yield();
-#	endif
-		else		/* hyper-threading pause */
-#	ifdef _MSC_VER
-			YieldProcessor();
-#	else
-			__asm volatile ("pause" ::: "memory");
-#	endif
-#else
-	while (rwticket->pgm_rwtkt_write != user)
-		sched_yield();
-#endif
-}
-
-/* users++
- */
-
-static inline bool pgm_rwticket_writer_trylock (pgm_rwticket_t* rwticket) {
-	const uint8_t user = rwticket->pgm_rwtkt_user;
-	pgm_rwticket_t exchange, comparand;
-	exchange.pgm_rwtkt_data32 = comparand.pgm_rwtkt_data32 = 0;
-	exchange.pgm_rwtkt_read = comparand.pgm_rwtkt_read = rwticket->pgm_rwtkt_read;
-	exchange.pgm_rwtkt_write = comparand.pgm_rwtkt_user = comparand.pgm_rwtkt_write = user;
-	exchange.pgm_rwtkt_user = user + 1;
-	return pgm_atomic_compare_and_exchange32 (&rwticket->pgm_rwtkt_data32, exchange.pgm_rwtkt_data32, comparand.pgm_rwtkt_data32);
-}
-
-/* read-ticket++, write-ticket++;
- */
-
-static inline void pgm_rwticket_writer_unlock (pgm_rwticket_t* rwticket) {
-	pgm_rwticket_t t;
-	t.pgm_rwtkt_data16 = pgm_atomic_read16 (&rwticket->pgm_rwtkt_data16);
-	t.pgm_rwtkt_write++;
-	t.pgm_rwtkt_read++;
-	pgm_atomic_write16 (&rwticket->pgm_rwtkt_data16, t.pgm_rwtkt_data16);
-}
-
-PGM_END_DECLS
 
 #endif /* __PGM_IMPL_TICKET_H__ */
