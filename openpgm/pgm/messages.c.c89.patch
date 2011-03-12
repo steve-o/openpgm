@@ -1,6 +1,6 @@
---- messages.c	2011-02-27 09:55:54.000000000 +0800
-+++ messages.c89.c	2011-02-27 10:38:22.000000000 +0800
-@@ -174,14 +174,22 @@
+--- messages.c	2011-03-12 10:34:39.000000000 +0800
++++ messages.c89.c	2011-03-12 10:45:30.000000000 +0800
+@@ -176,14 +176,22 @@
  	char tbuf[1024];
  
  	pgm_mutex_lock (&messages_mutex);
@@ -12,13 +12,15 @@
  		log_handler (log_level, tbuf, log_handler_closure);
  	else {
  /* ignore return value */
+-		(void) write (STDOUT_FILENO, tbuf, strlen (tbuf));
+-		(void) write (STDOUT_FILENO, "\n", 1);
 +#ifdef _MSC_VER
 +		const int stdoutfd = _fileno (stdout);
 +		_write (stdoutfd, tbuf, (unsigned)strlen (tbuf));
 +		_write (stdoutfd, "\n", 1);
 +#else
- 		write (STDOUT_FILENO, tbuf, strlen (tbuf));
- 		write (STDOUT_FILENO, "\n", 1);
++		write (STDOUT_FILENO, tbuf, strlen (tbuf));
++		write (STDOUT_FILENO, "\n", 1);
 +#endif
  	}
  		

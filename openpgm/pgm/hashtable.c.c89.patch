@@ -1,5 +1,5 @@
---- hashtable.c	2010-09-16 13:42:33.000000000 +0800
-+++ hashtable.c89.c	2010-10-09 10:29:28.000000000 +0800
+--- hashtable.c	2011-03-12 10:12:12.000000000 +0800
++++ hashtable.c89.c	2011-03-12 10:39:28.000000000 +0800
 @@ -71,6 +71,7 @@
  	pgm_return_val_if_fail (NULL != hash_func, NULL);
  	pgm_return_val_if_fail (NULL != key_equal_func, NULL);
@@ -15,8 +15,8 @@
 +	}
  }
  
- void
-@@ -90,8 +92,11 @@
+ PGM_GNUC_INTERNAL
+@@ -91,8 +93,11 @@
  {
  	pgm_return_if_fail (hash_table != NULL);
  
@@ -29,7 +29,7 @@
  	pgm_free (hash_table->nodes);
  	pgm_free (hash_table);
  }
-@@ -138,8 +143,10 @@
+@@ -141,8 +146,10 @@
  {
  	pgm_return_val_if_fail (hash_table != NULL, NULL);
    
@@ -39,8 +39,8 @@
 +	}
  }
  
- void*
-@@ -151,8 +158,10 @@
+ PGM_GNUC_INTERNAL
+@@ -155,8 +162,10 @@
  {
  	pgm_return_val_if_fail (hash_table != NULL, NULL);
    
@@ -50,8 +50,8 @@
 +	}
  }
  
- void
-@@ -205,11 +214,14 @@
+ PGM_GNUC_INTERNAL
+@@ -212,11 +221,14 @@
  {
  	pgm_return_if_fail (hash_table != NULL);
  
@@ -67,7 +67,7 @@
  	hash_table->nnodes = 0;
  	PGM_HASHTABLE_RESIZE (hash_table);
  }
-@@ -224,14 +236,22 @@
+@@ -231,14 +243,22 @@
  					 HASHTABLE_MIN_SIZE, HASHTABLE_MAX_SIZE);
  	pgm_hashnode_t** new_nodes = pgm_new0 (pgm_hashnode_t*, new_size);
    

@@ -2,7 +2,7 @@
  *
  * portable hashtable.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -61,7 +61,7 @@ static pgm_hashnode_t* pgm_hash_node_new (const void*restrict, void*restrict, co
 static void pgm_hash_node_destroy (pgm_hashnode_t*);
 static void pgm_hash_nodes_destroy (pgm_hashnode_t*);
 
-
+PGM_GNUC_INTERNAL
 pgm_hashtable_t*
 pgm_hashtable_new (
 	pgm_hashfunc_t	hash_func,
@@ -83,6 +83,7 @@ pgm_hashtable_new (
 	return hash_table;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_hashtable_unref (
 	pgm_hashtable_t*	hash_table
@@ -96,6 +97,7 @@ pgm_hashtable_unref (
 	pgm_free (hash_table);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_hashtable_destroy (
 	pgm_hashtable_t*	hash_table
@@ -130,6 +132,7 @@ pgm_hashtable_lookup_node (
 	return node;
 }
 
+PGM_GNUC_INTERNAL
 void*
 pgm_hashtable_lookup (
 	const pgm_hashtable_t* restrict hash_table,
@@ -142,6 +145,7 @@ pgm_hashtable_lookup (
 	return node ? node->value : NULL;
 }
 
+PGM_GNUC_INTERNAL
 void*
 pgm_hashtable_lookup_extended (
 	const pgm_hashtable_t* restrict hash_table,
@@ -155,6 +159,7 @@ pgm_hashtable_lookup_extended (
 	return node ? node->value : NULL;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_hashtable_insert (
 	pgm_hashtable_t* restrict hash_table,
@@ -175,6 +180,7 @@ pgm_hashtable_insert (
 	PGM_HASHTABLE_RESIZE (hash_table);
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_hashtable_remove (
 	pgm_hashtable_t* restrict hash_table,
@@ -198,6 +204,7 @@ pgm_hashtable_remove (
 	return FALSE;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_hashtable_remove_all (
 	pgm_hashtable_t*	hash_table
@@ -278,6 +285,7 @@ pgm_hash_nodes_destroy (
 
 /* common hash value compare and hash key generation functions */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_str_equal (
 	const void* restrict p1,
@@ -290,6 +298,7 @@ pgm_str_equal (
 
 /* 31 bit hash function */
 
+PGM_GNUC_INTERNAL
 pgm_hash_t
 pgm_str_hash (
 	const void*	p
@@ -304,6 +313,7 @@ pgm_str_hash (
 	return hash_val;
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_int_equal (
 	const void* restrict p1,
@@ -314,6 +324,7 @@ pgm_int_equal (
 	return (i1 == i2);
 }
 
+PGM_GNUC_INTERNAL
 pgm_hash_t
 pgm_int_hash (
 	const void*	p

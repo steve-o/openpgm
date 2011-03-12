@@ -2,7 +2,7 @@
  *
  * PGM packet formats, RFC 3208.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -47,6 +47,7 @@ static bool pgm_print_spmr (const struct pgm_header* const, const void*, const s
 static bool pgm_print_ack (const struct pgm_header* const, const void*, const size_t);
 static ssize_t pgm_print_options (const void*, size_t);
 
+PGM_GNUC_INTERNAL
 bool
 pgm_print_packet (
 	const void*	data,
@@ -780,6 +781,7 @@ pgm_print_nnak (
 /* 8.3.  NCF
  */
 
+static
 bool
 pgm_print_ncf (
 	PGM_GNUC_UNUSED const struct pgm_header* const	header,
@@ -1033,6 +1035,7 @@ pgm_print_options (
 	return ((const uint8_t*)opt_header - (const uint8_t*)data);
 }
 
+PGM_GNUC_INTERNAL
 const char*
 pgm_type_string (
 	uint8_t		type
@@ -1057,6 +1060,7 @@ pgm_type_string (
 	return c;
 }
 
+PGM_GNUC_INTERNAL
 const char*
 pgm_udpport_string (
 	in_port_t		port
@@ -1086,6 +1090,7 @@ pgm_udpport_string (
 	return service_string;
 }
 
+PGM_GNUC_INTERNAL
 const char*
 pgm_gethostbyaddr (
 	const struct in_addr*	ap
@@ -1115,6 +1120,7 @@ pgm_gethostbyaddr (
 	return host_string;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_ipopt_print (
 	const void*		ipopt,

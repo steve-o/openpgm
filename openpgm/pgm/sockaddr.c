@@ -2,7 +2,7 @@
  * 
  * struct sockaddr functions independent of in or in6.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -46,7 +46,7 @@
 #	define IP_MAX_MEMBERSHIPS	20
 #endif
 
-
+PGM_GNUC_INTERNAL
 sa_family_t
 pgm_sockaddr_family (
 	const struct sockaddr*	sa
@@ -55,6 +55,7 @@ pgm_sockaddr_family (
 	return sa->sa_family;
 }
 
+PGM_GNUC_INTERNAL
 in_port_t
 pgm_sockaddr_port (
 	const struct sockaddr*	sa
@@ -83,6 +84,7 @@ pgm_sockaddr_port (
 	return sa_port;
 }
 
+PGM_GNUC_INTERNAL
 socklen_t
 pgm_sockaddr_len (
 	const struct sockaddr*	sa
@@ -97,6 +99,7 @@ pgm_sockaddr_len (
 	return sa_len;
 }
 
+PGM_GNUC_INTERNAL
 socklen_t
 pgm_sockaddr_storage_len (
 	const struct sockaddr_storage*	ss
@@ -111,6 +114,7 @@ pgm_sockaddr_storage_len (
 	return ss_len;
 }
 
+PGM_GNUC_INTERNAL
 uint32_t
 pgm_sockaddr_scope_id (
 	const struct sockaddr*	sa
@@ -126,6 +130,7 @@ pgm_sockaddr_scope_id (
 	return scope_id;
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_ntop (
 	const struct sockaddr* restrict sa,
@@ -139,6 +144,7 @@ pgm_sockaddr_ntop (
 			    NI_NUMERICHOST);
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_pton (
 	const char*	 restrict src,
@@ -163,6 +169,7 @@ pgm_sockaddr_pton (
 /* returns tri-state value: 1 if sa is multicast, 0 if sa is not multicast, -1 on error
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_is_addr_multicast (
 	const struct sockaddr*	sa
@@ -195,6 +202,7 @@ pgm_sockaddr_is_addr_multicast (
 /* returns 1 if sa is unspecified, 0 if specified.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_is_addr_unspecified (
 	const struct sockaddr*	sa
@@ -224,6 +232,7 @@ pgm_sockaddr_is_addr_unspecified (
 	return retval;
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_cmp (
 	const struct sockaddr* restrict sa1,
@@ -270,6 +279,7 @@ pgm_sockaddr_cmp (
  * by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_hdrincl (
 	const SOCKET		s,
@@ -317,6 +327,7 @@ pgm_sockaddr_hdrincl (
  * by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_pktinfo (
 	const SOCKET		s,
@@ -375,6 +386,7 @@ pgm_sockaddr_pktinfo (
  * retrieved by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_router_alert (
 	const SOCKET		s,
@@ -443,6 +455,7 @@ pgm_sockaddr_router_alert (
  * calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_tos (
 	const SOCKET		s,
@@ -491,6 +504,7 @@ pgm_sockaddr_tos (
  * retrieved by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_join_group (
 	const SOCKET		s,
@@ -577,6 +591,7 @@ pgm_sockaddr_join_group (
 /* leave a joined group
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_leave_group (
 	const SOCKET		s,
@@ -632,6 +647,7 @@ pgm_sockaddr_leave_group (
 /* block either at the NIC or kernel, packets from a particular source
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_block_source (
 	const SOCKET			s,
@@ -676,6 +692,7 @@ pgm_sockaddr_block_source (
 /* unblock a blocked multicast source.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_unblock_source (
 	const SOCKET			s,
@@ -725,6 +742,7 @@ pgm_sockaddr_unblock_source (
  * code can be retrieved by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_join_source_group (
 	const SOCKET			s,
@@ -788,6 +806,7 @@ pgm_sockaddr_join_source_group (
 /* drop a SSM source
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_leave_source_group (
 	const SOCKET			s,
@@ -831,6 +850,7 @@ pgm_sockaddr_leave_source_group (
 /* Batch block and unblock sources.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_msfilter (
 	const SOCKET			s,
@@ -884,6 +904,7 @@ pgm_sockaddr_msfilter (
  * retrieved by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_multicast_if (
 	const SOCKET		s,
@@ -944,6 +965,7 @@ pgm_sockaddr_multicast_if (
  * retrieved by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_multicast_loop (
 	const SOCKET		s,
@@ -1005,6 +1027,7 @@ pgm_sockaddr_multicast_loop (
  * retrieved by calling pgm_get_last_sock_error().
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_multicast_hops (
 	const SOCKET		s,
@@ -1057,6 +1080,7 @@ pgm_sockaddr_multicast_hops (
 	return retval;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_sockaddr_nonblocking (
 	const SOCKET	s,
@@ -1078,6 +1102,8 @@ pgm_sockaddr_nonblocking (
  * cannot support IPv6 Zone Indices and hence are rather limited for the
  * link-local scope.
  */
+
+PGM_GNUC_INTERNAL
 const char*
 pgm_inet_ntop (
 	int		     af,
@@ -1126,6 +1152,7 @@ pgm_inet_ntop (
 	return NULL;
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_inet_pton (
 	int		     af,
@@ -1176,6 +1203,7 @@ pgm_inet_pton (
 	return 1;	/* success */
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_nla_to_sockaddr (
 	const void*	 restrict nla,
@@ -1206,6 +1234,7 @@ pgm_nla_to_sockaddr (
 	return retval;
 }
 
+PGM_GNUC_INTERNAL
 int
 pgm_sockaddr_to_nla (
 	const struct sockaddr* restrict sa,

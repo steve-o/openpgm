@@ -82,7 +82,7 @@ static Netsnmp_First_Data_Point pgmReceiverPerformanceTable_get_first_data_point
 static Netsnmp_Next_Data_Point pgmReceiverPerformanceTable_get_next_data_point;
 static Netsnmp_Free_Loop_Context pgmReceiverPerformanceTable_free_loop_context;
 
-
+PGM_GNUC_INTERNAL
 bool
 pgm_mib_init (
 	pgm_error_t**	error
@@ -2816,6 +2816,7 @@ pgmReceiverPerformanceTable_handler (
  * SNMP TRAPS
  */
 
+PGM_GNUC_INTERNAL
 int
 send_pgmStart_trap (void)
 {
@@ -2844,6 +2845,7 @@ send_pgmStart_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmStop_trap (void)
 {
@@ -2874,6 +2876,7 @@ send_pgmStop_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmNewSourceTrap_trap (void)
 {
@@ -2917,6 +2920,7 @@ send_pgmNewSourceTrap_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmClosedSourceTrap_trap (void)
 {
@@ -2960,6 +2964,7 @@ send_pgmClosedSourceTrap_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmNewReceiverTrap_trap (void)
 {
@@ -3009,6 +3014,7 @@ send_pgmNewReceiverTrap_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmClosedReceiverTrap_trap (void)
 {
@@ -3058,6 +3064,7 @@ send_pgmClosedReceiverTrap_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmNakFailuresTrap_trap (void)
 {
@@ -3131,6 +3138,7 @@ send_pgmNakFailuresTrap_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmNewDlrSourceTrap_trap (void)
 {
@@ -3174,6 +3182,7 @@ send_pgmNewDlrSourceTrap_trap (void)
 	return SNMP_ERR_NOERROR;
 }
 
+PGM_GNUC_INTERNAL
 int
 send_pgmClosedDlrSourceTrap_trap (void)
 {

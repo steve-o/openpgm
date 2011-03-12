@@ -2,7 +2,7 @@
  *
  * network send wrapper.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -43,6 +43,7 @@
  * errno set appropriately.
  */
 
+PGM_GNUC_INTERNAL
 ssize_t
 pgm_sendto_hops (
 	pgm_sock_t*	       restrict	sock,
@@ -178,6 +179,7 @@ pgm_sendto_hops (
  * on success, returns 0.  on error, returns -1, and sets errno appropriately.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_set_nonblocking (
 	SOCKET		fd[2]

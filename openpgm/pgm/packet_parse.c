@@ -2,7 +2,7 @@
  *
  * PGM packet formats, RFC 3208.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -44,6 +44,7 @@ static bool pgm_parse (struct pgm_sk_buff_t*const restrict, pgm_error_t**restric
 				sizeof(struct pgm_header) 	/* PGM header */ \
 			)
 
+PGM_GNUC_INTERNAL
 bool
 pgm_parse_raw (
 	struct pgm_sk_buff_t* const restrict skb,	/* data will be modified */
@@ -231,6 +232,7 @@ pgm_parse_raw (
 	return pgm_parse (skb, error);
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_parse_udp_encap (
 	struct pgm_sk_buff_t*const restrict skb,		/* will be modified */
@@ -325,6 +327,7 @@ pgm_parse (
 
 #define PGM_MIN_SPM_SIZE	( sizeof(struct pgm_spm) )
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_spm (
 	const struct pgm_sk_buff_t*const	skb
@@ -379,6 +382,7 @@ pgm_verify_spm (
 
 #define PGM_MIN_POLL_SIZE	( sizeof(struct pgm_poll) )
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_poll (
 	const struct pgm_sk_buff_t*const	skb
@@ -419,6 +423,7 @@ pgm_verify_poll (
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ... -+-+-+-+-+-+-+-+-+-+-+-+-+-+
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_polr (
 	const struct pgm_sk_buff_t*const	skb
@@ -476,6 +481,7 @@ pgm_verify_polr (
 
 #define PGM_MIN_NAK_SIZE	( sizeof(struct pgm_nak) )
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_nak (
 	const struct pgm_sk_buff_t*const	skb
@@ -538,6 +544,7 @@ pgm_verify_nak (
 /* 8.3.  N-NAK
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_nnak (
 	const struct pgm_sk_buff_t*const	skb
@@ -552,6 +559,7 @@ pgm_verify_nnak (
 /* 8.3.  NCF
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_ncf (
 	const struct pgm_sk_buff_t*const	skb
@@ -572,6 +580,7 @@ pgm_verify_ncf (
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+- ...
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_spmr (
 	PGM_GNUC_UNUSED const struct pgm_sk_buff_t*const	skb
@@ -598,6 +607,7 @@ pgm_verify_spmr (
 
 #define PGM_MIN_ACK_SIZE	( sizeof(struct pgm_ack) )
 
+PGM_GNUC_INTERNAL
 bool
 pgm_verify_ack (
 	PGM_GNUC_UNUSED const struct pgm_sk_buff_t*const	skb

@@ -51,6 +51,7 @@ static const unsigned char fillbuf[64] = { 0x80, 0 /* , 0, 0, ...  */ };
 /* Initialize structure containing state of computation.
    (RFC 1321, 3.3: Step 3)  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_md5_init_ctx (
 	struct pgm_md5_t*	ctx
@@ -245,6 +246,7 @@ _pgm_md5_process_block (
 	ctx->D = D;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_md5_process_bytes (
 	struct pgm_md5_t* restrict ctx,
@@ -332,6 +334,7 @@ _pgm_md5_read_ctx (
    IMPORTANT: On some systems it is required that RESBUF is correctly
    aligned for a 32 bits value.  */
 
+PGM_GNUC_INTERNAL
 void*
 pgm_md5_finish_ctx (
 	struct pgm_md5_t* restrict ctx,

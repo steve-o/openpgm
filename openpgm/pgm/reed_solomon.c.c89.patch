@@ -1,5 +1,5 @@
---- reed_solomon.c	2010-05-21 11:35:32.000000000 +0800
-+++ reed_solomon.c89	2010-10-08 11:15:06.000000000 +0800
+--- reed_solomon.c	2011-03-12 10:24:20.000000000 +0800
++++ reed_solomon.c89.c	2011-03-12 10:56:24.000000000 +0800
 @@ -48,6 +48,7 @@
  		return;
  
@@ -265,7 +265,7 @@
  	}
  }
  
-@@ -358,23 +421,31 @@
+@@ -359,23 +422,31 @@
   *
   * Be careful, Harry!
   */
@@ -299,7 +299,7 @@
  	}
  
  /* This generator matrix would create a Maximum Distance Separable (MDS)
-@@ -385,6 +456,7 @@
+@@ -386,6 +457,7 @@
   *
   * 1: matrix V_{k,k} formed by the first k columns of V_{k,n}
   */
@@ -307,7 +307,7 @@
  	pgm_gf8_t* V_kk = V;
  	pgm_gf8_t* V_kn = V + (k * k);
  
-@@ -402,10 +474,16 @@
+@@ -403,10 +475,16 @@
  
  /* 4: set identity matrix for original data
   */
@@ -324,8 +324,8 @@
 +	}
  }
  
- void
-@@ -446,11 +524,14 @@
+ PGM_GNUC_INTERNAL
+@@ -449,11 +527,14 @@
  	pgm_assert (len > 0);
  
  	memset (dst, 0, len);
@@ -341,7 +341,7 @@
  }
  
  /* original data block of packets with missing packet entries replaced
-@@ -472,7 +553,9 @@
+@@ -476,7 +557,9 @@
  
  /* create new recovery matrix from generator
   */
@@ -352,7 +352,7 @@
  	{
  		if (offsets[i] < rs->k) {
  			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
-@@ -481,34 +564,46 @@
+@@ -485,34 +568,46 @@
  		}
  		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
  	}
@@ -403,7 +403,7 @@
  	{
  		if (offsets[ j ] < rs->k)
  			continue;
-@@ -518,6 +613,8 @@
+@@ -522,6 +617,8 @@
  		pgm_free (repairs[ j ]);
  #endif
  	}
@@ -412,7 +412,7 @@
  }
  
  /* entire FEC block of original data and parity packets.
-@@ -539,7 +636,9 @@
+@@ -545,7 +642,9 @@
  
  /* create new recovery matrix from generator
   */
@@ -423,7 +423,7 @@
  	{
  		if (offsets[i] < rs->k) {
  			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
-@@ -548,28 +647,39 @@
+@@ -554,28 +653,39 @@
  		}
  		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
  	}
