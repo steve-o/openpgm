@@ -2,7 +2,7 @@
  *
  * A basic receive window: pointer array implementation.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -167,6 +167,7 @@ _pgm_rxw_incoming_is_empty (
  * returns pointer to window.
  */
 
+PGM_GNUC_INTERNAL
 pgm_rxw_t*
 pgm_rxw_create (
 	const pgm_tsi_t*const	tsi,
@@ -237,6 +238,7 @@ pgm_rxw_create (
 /* destructor for receive window.  must not be called more than once for same window.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rxw_destroy (
 	pgm_rxw_t* const	window
@@ -288,6 +290,7 @@ pgm_rxw_destroy (
  * it is an error to try to free the skb after adding to the window.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_rxw_add (
 	pgm_rxw_t*	      const restrict window,
@@ -451,6 +454,7 @@ _pgm_rxw_define (
  * returns count of placeholders added into window, used to start sending naks.
  */
 
+PGM_GNUC_INTERNAL
 unsigned
 pgm_rxw_update (
 	pgm_rxw_t* const	window,
@@ -576,6 +580,7 @@ _pgm_rxw_update_trail (
 /* update FEC parameters
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rxw_update_fec (
 	pgm_rxw_t* const	window,
@@ -760,6 +765,7 @@ _pgm_rxw_update_lead (
 
 /* checks whether an APDU is unrecoverable due to lost TPDUs.
  */
+
 static inline
 bool
 _pgm_rxw_is_apdu_lost (
@@ -1172,6 +1178,7 @@ _pgm_rxw_append (
  * as the commit-lead
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rxw_remove_commit (
 	pgm_rxw_t* const	window
@@ -1202,6 +1209,7 @@ pgm_rxw_remove_commit (
  * calling application.
  */
 
+PGM_GNUC_INTERNAL
 ssize_t
 pgm_rxw_readv (
 	pgm_rxw_t*    const restrict window,
@@ -1301,6 +1309,7 @@ _pgm_rxw_remove_trail (
 	return 0;
 }
 
+PGM_GNUC_INTERNAL
 unsigned
 pgm_rxw_remove_trail (
 	pgm_rxw_t* const	window
@@ -1830,6 +1839,7 @@ _pgm_rxw_state (
 	state->pkt_state = new_pkt_state;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rxw_state (
 	pgm_rxw_t*	      const restrict window,
@@ -1913,6 +1923,7 @@ unlink_queue:
 /* returns the pointer at the given index of the window.
  */
 
+PGM_GNUC_INTERNAL
 struct pgm_sk_buff_t*
 pgm_rxw_peek (
 	pgm_rxw_t* const	window,
@@ -1926,6 +1937,7 @@ pgm_rxw_peek (
 /* mark an existing sequence lost due to failed recovery.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rxw_lost (
 	pgm_rxw_t* const	window,
@@ -1970,6 +1982,7 @@ pgm_rxw_lost (
  * PGM_RXW_APPENDED - lead is extended with state set waiting for data.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_rxw_confirm (
 	pgm_rxw_t* const	window,
@@ -2114,6 +2127,7 @@ _pgm_rxw_recovery_append (
 /* dumps window state to stdout
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rxw_dump (
 	const pgm_rxw_t* const	window
@@ -2198,6 +2212,7 @@ pgm_rxw_dump (
 /* state string helper
  */
 
+PGM_GNUC_INTERNAL
 const char*
 pgm_pkt_state_string (
 	const int		pkt_state
@@ -2220,6 +2235,7 @@ pgm_pkt_state_string (
 	return c;
 }
 
+PGM_GNUC_INTERNAL
 const char*
 pgm_rxw_returns_string (
 	const int		rxw_returns

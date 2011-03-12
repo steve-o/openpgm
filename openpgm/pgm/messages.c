@@ -2,7 +2,7 @@
  *
  * basic message reporting.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -150,6 +150,7 @@ pgm_log_set_handler (
 	return previous_handler;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm__log (
 	const int		log_level,
@@ -164,6 +165,7 @@ pgm__log (
 	va_end (args);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm__logv (
 	const int		log_level,
@@ -180,8 +182,8 @@ pgm__logv (
 		log_handler (log_level, tbuf, log_handler_closure);
 	else {
 /* ignore return value */
-		write (STDOUT_FILENO, tbuf, strlen (tbuf));
-		write (STDOUT_FILENO, "\n", 1);
+		(void) write (STDOUT_FILENO, tbuf, strlen (tbuf));
+		(void) write (STDOUT_FILENO, "\n", 1);
 	}
 		
 	pgm_mutex_unlock (&messages_mutex);

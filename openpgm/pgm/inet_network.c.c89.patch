@@ -1,6 +1,6 @@
---- inet_network.c	2010-12-13 15:31:32.000000000 +0800
-+++ inet_network.c89.c	2010-12-13 15:31:38.000000000 +0800
-@@ -111,13 +111,16 @@
+--- inet_network.c	2011-03-12 10:13:27.000000000 +0800
++++ inet_network.c89.c	2011-03-12 10:41:57.000000000 +0800
+@@ -112,13 +112,16 @@
  //g_trace ("bit mask %i", val);
  
  /* zero out host bits */
@@ -18,7 +18,7 @@
  			return 0;
  		
  		} else if (*p == 'x' || *p == 'X') {	/* skip number, e.g. 1.x.x.x */
-@@ -221,11 +224,16 @@
+@@ -223,11 +226,16 @@
  	pgm_debug ("subnet size %i", val);
  
  /* zero out host bits */
@@ -36,7 +36,7 @@
  
  	pgm_debug ("effective IPv6 network address after subnet mask: %s",
  		pgm_inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
-@@ -249,12 +257,12 @@
+@@ -253,12 +261,12 @@
  	char		 s2[INET6_ADDRSTRLEN];
  	char		*p2 = s2;
  	unsigned	 val = 0;
@@ -55,7 +55,7 @@
  
  	pgm_return_val_if_fail (NULL != s,   -1);
  	pgm_return_val_if_fail (NULL != sa6, -1);
-@@ -314,11 +322,16 @@
+@@ -318,11 +326,16 @@
  	pgm_debug ("subnet size %i", val);
  
  /* zero out host bits */

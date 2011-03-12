@@ -2,7 +2,7 @@
  *
  * portable string manipulation functions.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,6 +34,7 @@
 /* Return copy of string, must be freed with pgm_free().
  */
 
+PGM_GNUC_INTERNAL
 char*
 pgm_strdup (
 	const char*	str
@@ -57,6 +58,7 @@ pgm_strdup (
 /* Calculates the maximum space needed to store the output of the sprintf() function.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_printf_string_upper_bound (
 	const char*	format,
@@ -74,6 +76,7 @@ pgm_printf_string_upper_bound (
 /* memory must be freed with free()
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_vasprintf (
 	char**	    restrict string,
@@ -105,6 +108,7 @@ pgm_vasprintf (
 	return len;
 }
 
+PGM_GNUC_INTERNAL
 char*
 pgm_strdup_vprintf (
 	const char*	format,
@@ -140,6 +144,7 @@ pgm_stpcpy (
 #endif
 }
 
+PGM_GNUC_INTERNAL
 char*
 pgm_strconcat (
 	const char*	src,
@@ -179,6 +184,7 @@ pgm_strconcat (
 /* Split a string with delimiter, result must be freed with pgm_strfreev().
  */
 
+PGM_GNUC_INTERNAL
 char**
 pgm_strsplit (
 	const char* restrict string,
@@ -235,6 +241,7 @@ pgm_strsplit (
 /* Free a NULL-terminated array of strings, such as created by pgm_strsplit
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_strfreev (
 	char**		str_array
@@ -363,6 +370,7 @@ pgm_string_sized_new (
 	return string;
 }
 
+PGM_GNUC_INTERNAL
 pgm_string_t*
 pgm_string_new (
 	const char*	init
@@ -384,6 +392,7 @@ pgm_string_new (
 /* free dynamic string, optionally just the wrapper object
  */
 
+PGM_GNUC_INTERNAL
 char*
 pgm_string_free (
 	pgm_string_t*	string,
@@ -419,6 +428,7 @@ pgm_string_truncate (
 	return string;
 }
 
+PGM_GNUC_INTERNAL
 pgm_string_t*
 pgm_string_append (
 	pgm_string_t* restrict string,
@@ -431,6 +441,7 @@ pgm_string_append (
 	return pgm_string_insert_len (string, -1, val, -1);
 }
 
+PGM_GNUC_INTERNAL
 pgm_string_t*
 pgm_string_append_c (
 	pgm_string_t*	string,
@@ -467,6 +478,7 @@ pgm_string_append_vprintf (
 	}
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_string_printf (
 	pgm_string_t* restrict string,
@@ -483,6 +495,7 @@ pgm_string_printf (
 	va_end (args);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_string_append_printf (
 	pgm_string_t* restrict string,

@@ -2,7 +2,7 @@
  *
  * PGM receiver socket.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -286,6 +286,7 @@ _pgm_peer_ref (
 /* decrease reference count of peer object, destroying on last reference.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_peer_unref (
 	pgm_peer_t*		peer
@@ -367,6 +368,7 @@ get_pgm_options (
  * on success, returns new peer object.
  */
 
+PGM_GNUC_INTERNAL
 pgm_peer_t*
 pgm_new_peer (
 	pgm_sock_t*            const restrict sock,
@@ -433,6 +435,7 @@ pgm_new_peer (
  * data loss is detected, returns 0 when all peers flushed.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_flush_peers_pending (
 	pgm_sock_t* 	 	 const restrict	sock,
@@ -468,7 +471,7 @@ pgm_flush_peers_pending (
 			peer->lost_count = ((pgm_rxw_t*)peer->window)->cumulative_losses - peer->last_cumulative_losses;
 			peer->last_cumulative_losses = ((pgm_rxw_t*)peer->window)->cumulative_losses;
 		}
-	
+
 		if (peer_bytes >= 0)
 		{
 			(*bytes_read) += peer_bytes;
@@ -494,6 +497,7 @@ pgm_flush_peers_pending (
 /* edge trigerred has receiver pending events
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_peer_has_pending (
 	pgm_peer_t* const	peer
@@ -512,6 +516,7 @@ pgm_peer_has_pending (
 /* set receiver in pending event queue
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_peer_set_pending (
 	pgm_sock_t* const restrict sock,
@@ -530,6 +535,7 @@ pgm_peer_set_pending (
 /* Create a new error SKB detailing data loss.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_set_reset_error (
 	pgm_sock_t*	   const restrict sock,
@@ -559,6 +565,7 @@ pgm_set_reset_error (
  * returns TRUE on valid packet, FALSE on invalid packet or duplicate SPM sequence number.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_spm (
 	pgm_sock_t*	      const restrict sock,
@@ -697,6 +704,7 @@ pgm_on_spm (
  * if NAK is valid, returns TRUE.  on error, FALSE is returned.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_peer_nak (
 	pgm_sock_t*           const restrict sock,
@@ -828,6 +836,7 @@ pgm_on_peer_nak (
  * if NCF is valid, returns TRUE.  on error, FALSE is returned.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_ncf (
 	pgm_sock_t*           const restrict sock,
@@ -1706,6 +1715,7 @@ pgm_trace(PGM_LOG_ROLE_NETWORK,_("nak_rpt_expiry in %f seconds."),
  * returns TRUE on complete sweep, returns FALSE if operation would block.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_check_peer_state (
 	pgm_sock_t*const	sock,
@@ -1815,6 +1825,7 @@ pgm_check_peer_state (
  * peer expiration time.
  */
 
+PGM_GNUC_INTERNAL
 pgm_time_t
 pgm_min_receiver_expiry (
 	pgm_sock_t*	sock,
@@ -1837,7 +1848,7 @@ pgm_min_receiver_expiry (
 		pgm_peer_t* peer = it->data;
 
 		next = it->next;
-	
+
 		if (peer->spmr_expiry)
 		{
 			if (pgm_time_after_eq (expiration, peer->spmr_expiry))
@@ -1868,7 +1879,7 @@ pgm_min_receiver_expiry (
 			if (pgm_time_after_eq (expiration, next_nak_rdata_expiry (peer->window)))
 				expiration = next_nak_rdata_expiry (peer->window);
 		}
-	
+
 	}
 
 	return expiration;
@@ -1877,6 +1888,7 @@ pgm_min_receiver_expiry (
 /* check WAIT_NCF_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_NCF_RETRIES
  * cancel the sequence number.
  */
+
 static
 void
 nak_rpt_state (
@@ -2009,6 +2021,7 @@ nak_rpt_state (
 /* check WAIT_DATA_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_DATA_RETRIES
  * canel the sequence number.
  */
+
 static
 void
 nak_rdata_state (
@@ -2123,6 +2136,7 @@ nak_rdata_state (
  * returns TRUE is skb has been replaced, FALSE is remains unchanged and can be recycled.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_data (
 	pgm_sock_t*	      const restrict sock,
@@ -2247,6 +2261,7 @@ discarded:
  * returns TRUE on valid packet, FALSE on invalid packet.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_poll (
 	pgm_sock_t*	      const restrict sock,

@@ -7,7 +7,7 @@
  * draft-ietf-rmt-bb-fec-rs-05.txt
  * + rfc5052
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -335,6 +335,7 @@ _pgm_matinv_vandermonde (
  * e = s × GM
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rs_create (
 	pgm_rs_t*		rs,
@@ -408,6 +409,7 @@ pgm_rs_create (
 	}
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rs_destroy (
 	pgm_rs_t*		rs
@@ -430,6 +432,7 @@ pgm_rs_destroy (
  * FEC block packet offset.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rs_encode (
 	pgm_rs_t*	  restrict rs,
@@ -457,6 +460,7 @@ pgm_rs_encode (
  * with on-demand parity packets.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rs_decode_parity_inline (
 	pgm_rs_t*      restrict rs,
@@ -524,6 +528,8 @@ pgm_rs_decode_parity_inline (
  *
  * erased packet buffers must be zeroed.
  */
+
+PGM_GNUC_INTERNAL
 void
 pgm_rs_decode_parity_appended (
 	pgm_rs_t*      restrict rs,

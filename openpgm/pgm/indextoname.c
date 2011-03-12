@@ -2,7 +2,7 @@
  *
  * Windows interface index to interface name function.
  *
- * Copyright (c) 2006-2009 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,7 +28,7 @@
 
 //#define INDEXTONAME_DEBUG
 
-
+PGM_GNUC_INTERNAL
 char*
 pgm_if_indextoname (
 	unsigned int		ifindex,

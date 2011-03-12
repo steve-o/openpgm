@@ -2,7 +2,7 @@
  *
  * portable singly-linked list.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,6 +24,7 @@
 
 //#define SLIST_DEBUG
 
+PGM_GNUC_INTERNAL
 pgm_slist_t*
 pgm_slist_append (
 	pgm_slist_t* restrict list,
@@ -47,6 +48,7 @@ pgm_slist_append (
 		return new_list;
 }
 
+PGM_GNUC_INTERNAL
 pgm_slist_t*
 pgm_slist_prepend (
 	pgm_slist_t* restrict list,
@@ -62,6 +64,7 @@ pgm_slist_prepend (
 	return new_list;
 }
 
+PGM_GNUC_INTERNAL
 pgm_slist_t*
 pgm_slist_prepend_link (
 	pgm_slist_t* restrict list,
@@ -76,6 +79,7 @@ pgm_slist_prepend_link (
 	return new_list;
 }
 
+PGM_GNUC_INTERNAL
 pgm_slist_t*
 pgm_slist_remove (
 	pgm_slist_t* restrict list,
@@ -102,6 +106,7 @@ pgm_slist_remove (
 	return list;
 }
 
+PGM_GNUC_INTERNAL
 pgm_slist_t* 
 pgm_slist_remove_first (
 	pgm_slist_t*	list
@@ -120,6 +125,7 @@ pgm_slist_remove_first (
 		return NULL;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_slist_free (
 	pgm_slist_t*	list
@@ -133,6 +139,7 @@ pgm_slist_free (
 	}
 }
 
+PGM_GNUC_INTERNAL
 pgm_slist_t*
 pgm_slist_last (
 	pgm_slist_t*	list
@@ -147,6 +154,7 @@ pgm_slist_last (
 	return list;
 }
 
+PGM_GNUC_INTERNAL
 unsigned
 pgm_slist_length (
 	pgm_slist_t*	list

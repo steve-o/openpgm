@@ -196,6 +196,7 @@ _pgm_sysconf_get_nprocs (void)
 /* returns number of processors
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_get_nprocs (void)
 {

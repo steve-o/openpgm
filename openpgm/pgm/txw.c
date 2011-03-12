@@ -2,7 +2,7 @@
  *
  * A basic transmit window: pointer array implementation.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -104,6 +104,7 @@ pgm_txw_retransmit_can_peek (
 /* sequence state must be smaller than PGM skbuff control buffer */
 PGM_STATIC_ASSERT(sizeof(struct pgm_txw_state_t) <= sizeof(((struct pgm_sk_buff_t*)0)->cb));
 
+PGM_GNUC_INTERNAL
 uint32_t
 pgm_txw_get_unfolded_checksum (
 	const struct pgm_sk_buff_t*const skb
@@ -113,6 +114,7 @@ pgm_txw_get_unfolded_checksum (
 	return state->unfolded_checksum;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_txw_set_unfolded_checksum (
 	struct pgm_sk_buff_t*const skb,
@@ -123,6 +125,7 @@ pgm_txw_set_unfolded_checksum (
 	state->unfolded_checksum = csum;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_txw_inc_retransmit_count (
 	struct pgm_sk_buff_t*const skb
@@ -132,6 +135,7 @@ pgm_txw_inc_retransmit_count (
 	state->retransmit_count++;
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_txw_retransmit_is_empty (
 	const pgm_txw_t*const	window
@@ -154,6 +158,7 @@ static bool pgm_txw_retransmit_push_selective (pgm_txw_t*const, const uint32_t);
  * returns pointer to window.
  */
 
+PGM_GNUC_INTERNAL
 pgm_txw_t*
 pgm_txw_create (
 	const pgm_tsi_t*const	tsi,
@@ -230,6 +235,7 @@ pgm_txw_create (
 /* destructor for transmit window.  must not be called more than once for same window.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_txw_shutdown (
 	pgm_txw_t*const		window
@@ -280,6 +286,7 @@ pgm_txw_shutdown (
  * it is an error to try to free the skb after adding to the window.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_txw_add (
 	pgm_txw_t*	      const restrict window,
@@ -326,6 +333,7 @@ pgm_txw_add (
  * returns pointer to skbuff on success, returns NULL on invalid parameters.
  */
 
+PGM_GNUC_INTERNAL
 struct pgm_sk_buff_t*
 pgm_txw_peek (
 	const pgm_txw_t*const	window,
@@ -402,6 +410,7 @@ pgm_txw_remove_tail (
  * added to queue.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_txw_retransmit_push (
 	pgm_txw_t* const	window,
@@ -531,6 +540,7 @@ pgm_txw_retransmit_push_selective (
  * return pointer of first skb in queue, or return NULL if the queue is empty.
  */
 
+PGM_GNUC_INTERNAL
 struct pgm_sk_buff_t*
 pgm_txw_retransmit_try_peek (
 	pgm_txw_t* const	window
@@ -721,6 +731,7 @@ pgm_txw_retransmit_try_peek (
 /* remove head entry from retransmit queue, will fail on assertion if queue is empty.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_txw_retransmit_remove_head (
 	pgm_txw_t* const	window

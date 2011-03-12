@@ -4,7 +4,7 @@
  *
  * NB: RDTSC requires P5 microarchitecture.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -221,6 +221,7 @@ static pgm_time_t		pgm_tsc_update (void);
  * the RTC device, an unstable TSC, or system already initialized.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_time_init (
 #ifndef _WIN32
@@ -448,6 +449,7 @@ err_cleanup:
 /* returns TRUE if shutdown succeeded, returns FALSE on error.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_time_shutdown (void)
 {
