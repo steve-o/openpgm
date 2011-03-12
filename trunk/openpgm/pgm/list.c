@@ -2,7 +2,7 @@
  *
  * portable doubly-linked list.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,6 +24,7 @@
 
 //#define LIST_DEBUG
 
+PGM_GNUC_INTERNAL
 pgm_list_t*
 pgm_list_append (
 	pgm_list_t* restrict list,
@@ -51,6 +52,7 @@ pgm_list_append (
 	}
 }
 
+PGM_GNUC_INTERNAL
 pgm_list_t*
 pgm_list_prepend_link (
 	pgm_list_t* restrict list,
@@ -91,6 +93,7 @@ _pgm_list_remove_link (
 	return list;
 }
 
+PGM_GNUC_INTERNAL
 pgm_list_t*
 pgm_list_remove_link (
 	pgm_list_t*	list,		/* list and link_ may be the same */
@@ -100,6 +103,7 @@ pgm_list_remove_link (
 	return _pgm_list_remove_link (list, link_);
 }
 
+PGM_GNUC_INTERNAL
 pgm_list_t*
 pgm_list_delete_link (
 	pgm_list_t*	list,		/* list and link_ may be the same */
@@ -115,6 +119,7 @@ pgm_list_delete_link (
 /* Has pure attribute as NULL is a valid list
  */
 
+PGM_GNUC_INTERNAL
 pgm_list_t*
 pgm_list_last (
 	pgm_list_t*	list
@@ -127,6 +132,7 @@ pgm_list_last (
 	return list;
 }
 
+PGM_GNUC_INTERNAL
 unsigned
 pgm_list_length (
 	pgm_list_t*	list

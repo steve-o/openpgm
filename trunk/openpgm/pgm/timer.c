@@ -2,7 +2,7 @@
  *
  * PGM timer thread.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,6 +35,7 @@
  * called in sock creation so locks unrequired.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_timer_prepare (
 	pgm_sock_t* const	sock
@@ -68,6 +69,7 @@ pgm_timer_prepare (
 	return (msec == 0);
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_timer_check (
 	pgm_sock_t* const	sock
@@ -88,6 +90,7 @@ pgm_timer_check (
 /* return next timer expiration in microseconds (μs)
  */
 
+PGM_GNUC_INTERNAL
 pgm_time_t
 pgm_timer_expiration (
 	pgm_sock_t* const	sock
@@ -111,6 +114,7 @@ pgm_timer_expiration (
  * returns TRUE on success, returns FALSE on blocked send-in-receive operation.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_timer_dispatch (
 	pgm_sock_t* const	sock

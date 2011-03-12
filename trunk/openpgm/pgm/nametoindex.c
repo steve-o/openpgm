@@ -2,7 +2,7 @@
  *
  * Windows interface name to interface index function.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -227,6 +227,7 @@ _pgm_getadaptersaddresses_nametoindex (
  * On error returns zero, no errors are defined.
  */
 
+PGM_GNUC_INTERNAL
 unsigned					/* type matching if_nametoindex() */
 pgm_if_nametoindex (
 #ifndef _WIN32

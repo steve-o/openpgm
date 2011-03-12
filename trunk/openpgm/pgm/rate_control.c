@@ -2,7 +2,7 @@
  *
  * Rate regulation.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,7 @@
  * NB: bucket MUST be memset 0 before calling.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_rate_create (
 	pgm_rate_t*		bucket,
@@ -53,6 +54,7 @@ pgm_rate_create (
 	pgm_spinlock_init (&bucket->spinlock);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rate_destroy (
 	pgm_rate_t*		bucket
@@ -70,6 +72,7 @@ pgm_rate_destroy (
  * returns FALSE if operation should block and non-blocking flag is set.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_rate_check2 (
 	pgm_rate_t*		major_bucket,
@@ -198,6 +201,7 @@ pgm_rate_check2 (
 	return TRUE;
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_rate_check (
 	pgm_rate_t*		bucket,
@@ -262,6 +266,7 @@ pgm_rate_check (
 	return TRUE;
 }
 
+PGM_GNUC_INTERNAL
 pgm_time_t
 pgm_rate_remaining2 (
 	pgm_rate_t*		major_bucket,
@@ -316,6 +321,7 @@ pgm_rate_remaining2 (
 	return remaining;
 }
 
+PGM_GNUC_INTERNAL
 pgm_time_t
 pgm_rate_remaining (
 	pgm_rate_t*		bucket,

@@ -2,7 +2,7 @@
  *
  * PGM source socket.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -106,6 +106,7 @@ source_max_tsdu (
 
 /* prototype of function to send pro-active parity NAKs.
  */
+
 static
 bool
 pgm_schedule_proactive_nak (
@@ -128,6 +129,7 @@ pgm_schedule_proactive_nak (
  * returns TRUE on success, returns FALSE if operation would block.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_deferred_nak (
 	pgm_sock_t* const	sock
@@ -175,6 +177,7 @@ pgm_on_deferred_nak (
  * if SPMR was valid, returns TRUE, if invalid returns FALSE.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_spmr (
 	pgm_sock_t*           const restrict sock,
@@ -270,6 +273,7 @@ on_opt_pgmcc_feedback (
  * if NAK is valid, returns TRUE.  on error, FALSE is returned.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_nak (
 	pgm_sock_t*           const restrict sock,
@@ -405,6 +409,7 @@ pgm_on_nak (
  * if NNAK is valid, returns TRUE.  on error, FALSE is returned.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_nnak (
 	pgm_sock_t*           const restrict sock,
@@ -484,6 +489,7 @@ pgm_on_nnak (
  * if ACK is valid, returns TRUE.  on error, FALSE is returned.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_on_ack (
 	pgm_sock_t*           const restrict sock,
@@ -654,6 +660,7 @@ notify_tx:
  * on success, TRUE is returned, if operation would block, FALSE is returned.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_send_spm (
 	pgm_sock_t* const	sock,
@@ -666,7 +673,7 @@ pgm_send_spm (
 	struct pgm_spm	  *spm;
 	struct pgm_spm6	  *spm6;
 	ssize_t		   sent;
-	
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != sock->window);
@@ -844,7 +851,7 @@ send_ncf (
 	struct pgm_nak	  *ncf;
 	struct pgm_nak6	  *ncf6;
 	ssize_t		   sent;
-	
+
 /* pre-conditions */
 	pgm_assert (NULL != sock);
 	pgm_assert (NULL != nak_src_nla);
@@ -1018,7 +1025,7 @@ send_ncf_list (
 	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
 		return FALSE;
 /* fall through silently on other errors */
-	
+
 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)tpdu_length);
 	return TRUE;
 }
@@ -1778,6 +1785,8 @@ blocked:
  * returns PGM_IO_STATUS_WOULD_BLOCK, returns PGM_IO_STATUS_RATE_LIMITED if
  * packet size exceeds the current rate limit.
  */
+
+PGM_GNUC_INTERNAL
 int
 pgm_send (
 	pgm_sock_t* 	 const restrict sock,
@@ -1846,6 +1855,7 @@ pgm_send (
  * packet size exceeds the current rate limit.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_sendv (
 	pgm_sock_t*		const restrict sock,
@@ -2196,6 +2206,7 @@ blocked:
  * packet size exceeds the current rate limit.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_send_skbv (
 	pgm_sock_t*            const restrict sock,

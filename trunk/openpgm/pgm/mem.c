@@ -2,7 +2,7 @@
  *
  * portable fail fast memory allocation.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -108,6 +108,7 @@ pgm_parse_debug_string (
 	return result;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_mem_init (void)
 {
@@ -131,6 +132,7 @@ pgm_mem_init (void)
 		pgm_mem_gc_friendly = TRUE;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_mem_shutdown (void)
 {

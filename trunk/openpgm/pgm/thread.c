@@ -2,7 +2,7 @@
  *
  * mutexes and locks.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -92,6 +92,8 @@ static volatile uint32_t thread_ref_count = 0;
 
 /* only needed for Win32 pre-Vista read-write locks
  */
+
+PGM_GNUC_INTERNAL
 void
 pgm_thread_init (void)
 {
@@ -106,6 +108,7 @@ pgm_thread_init (void)
 		pgm_smp_system = FALSE;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_thread_shutdown (void)
 {
@@ -127,6 +130,7 @@ pgm_thread_shutdown (void)
  * multiple calls to pgm_mutex_init is undefined.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_mutex_init (
 	pgm_mutex_t*	mutex
@@ -157,6 +161,7 @@ pgm_mutex_init (
  * call to pgm_mutex_free on locked mutex or non-init pointer is undefined.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_mutex_free (
 	pgm_mutex_t*	mutex
@@ -174,6 +179,7 @@ pgm_mutex_free (
 /* contention on spin-locks is limited to two threads, a receiving thread and a sending thread.
  */
 
+PGM_GNUC_INTERNAL
 void
 pgm_spinlock_init (
 	pgm_spinlock_t*	spinlock
@@ -192,6 +198,7 @@ pgm_spinlock_init (
 #endif
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_spinlock_free (
 	pgm_spinlock_t*	spinlock
@@ -211,6 +218,7 @@ pgm_spinlock_free (
 #endif
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_cond_init (
 	pgm_cond_t*	cond
@@ -237,6 +245,7 @@ pgm_cond_init (
 #endif /* !_WIN32 */
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_cond_signal (
 	pgm_cond_t*	cond
@@ -259,6 +268,7 @@ pgm_cond_signal (
 #endif /* !_WIN32 */
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_cond_broadcast (
 	pgm_cond_t*	cond
@@ -280,6 +290,7 @@ pgm_cond_broadcast (
 }
 
 #ifndef _WIN32
+PGM_GNUC_INTERNAL
 void
 pgm_cond_wait (
 	pgm_cond_t*		cond,
@@ -292,6 +303,7 @@ pgm_cond_wait (
 	pthread_cond_wait (&cond->pthread_cond, mutex);
 }
 #else
+PGM_GNUC_INTERNAL
 void
 pgm_cond_wait (
 	pgm_cond_t*		cond,
@@ -342,6 +354,7 @@ pgm_cond_wait (
 }
 #endif /* !_WIN32 */
 
+PGM_GNUC_INTERNAL
 void
 pgm_cond_free (
 	pgm_cond_t*	cond
@@ -359,6 +372,7 @@ pgm_cond_free (
 #endif /* !_WIN32 */
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rwlock_init (
 	pgm_rwlock_t*	rwlock
@@ -390,6 +404,7 @@ pgm_rwlock_init (
 #endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rwlock_free (
 	pgm_rwlock_t*	rwlock
@@ -425,6 +440,7 @@ _pgm_rwlock_signal (
 		pgm_cond_broadcast (&rwlock->read_cond);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rwlock_reader_lock (
 	pgm_rwlock_t*	rwlock
@@ -441,6 +457,7 @@ pgm_rwlock_reader_lock (
 	LeaveCriticalSection (&rwlock->win32_crit);
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_rwlock_reader_trylock (
 	pgm_rwlock_t*	rwlock
@@ -459,6 +476,7 @@ pgm_rwlock_reader_trylock (
 	return status;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rwlock_reader_unlock(
 	pgm_rwlock_t*	rwlock
@@ -473,6 +491,7 @@ pgm_rwlock_reader_unlock(
 	LeaveCriticalSection (&rwlock->win32_crit);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rwlock_writer_lock (
 	pgm_rwlock_t*	rwlock
@@ -489,6 +508,7 @@ pgm_rwlock_writer_lock (
 	LeaveCriticalSection (&rwlock->win32_crit);
 }
 
+PGM_GNUC_INTERNAL
 bool
 pgm_rwlock_writer_trylock (
 	pgm_rwlock_t*	rwlock
@@ -507,6 +527,7 @@ pgm_rwlock_writer_trylock (
 	return status;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rwlock_writer_unlock (
 	pgm_rwlock_t*	rwlock

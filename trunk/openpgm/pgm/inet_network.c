@@ -2,7 +2,7 @@
  *
  * portable implementations of inet_network and inet_network6.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -58,6 +58,7 @@ cidr_to_netmask (
  * returns 0 on success, returns -1 on invalid address.
  */
 
+PGM_GNUC_INTERNAL
 int					/* return type to match inet_network() */
 pgm_inet_network (
 	const char*	restrict s,
@@ -147,6 +148,7 @@ default_none:
  * returns 0 on success, returns -1 on invalid address.
  */
 
+PGM_GNUC_INTERNAL
 int
 pgm_inet6_network (
 	const char*	 restrict s,		/* NULL terminated */
@@ -239,6 +241,8 @@ default_none:
 /* sockaddr_in6 version of pgm_inet6_network, we use sockaddr in order to
  * resolve and keep the scope identifier.
  */
+
+PGM_GNUC_INTERNAL
 int
 pgm_sa6_network (
 	const char*	     restrict s,		/* NULL terminated */
@@ -338,6 +342,7 @@ default_none:
  * expect compiler warnings on return type due to compatibility with inet_makeaddr.
  */
 
+PGM_GNUC_INTERNAL
 struct in_addr
 pgm_inet_makeaddr (
 	uint32_t	net,

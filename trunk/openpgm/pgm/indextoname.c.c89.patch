@@ -1,5 +1,5 @@
---- indextoname.c	2010-05-21 11:35:23.000000000 +0800
-+++ indextoname.c89.c	2010-11-05 06:11:17.000000000 +0800
+--- indextoname.c	2011-03-12 10:12:42.000000000 +0800
++++ indextoname.c89.c	2011-03-12 10:40:35.000000000 +0800
 @@ -40,12 +40,20 @@
  #else
  	pgm_return_val_if_fail (NULL != ifname, NULL);

@@ -2,7 +2,7 @@
  *
  * portable interface index to socket address function.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,6 +31,7 @@
  * we can just pick the first scope and let IP routing handle the rest.
  */
 
+PGM_GNUC_INTERNAL
 bool
 pgm_if_indextoaddr (
 	const unsigned		  ifindex,

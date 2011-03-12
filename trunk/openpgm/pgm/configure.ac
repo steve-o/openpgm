@@ -85,7 +85,7 @@ AC_COMPILE_IFELSE(
 	[AC_MSG_RESULT([no])])
 # NSS protocol lookup
 AC_CHECK_FUNC([getprotobyname_r])
-if test "$ac_cv_func_getprotobyname_r" == yes; then
+if test "x$ac_cv_func_getprotobyname_r" = "xyes"; then
 AC_MSG_CHECKING([for 4- or 5-param getprotobyname_r])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <netdb.h>]],

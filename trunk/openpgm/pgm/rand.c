@@ -2,7 +2,7 @@
  *
  * portable weak pseudo-random generator.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,7 +35,7 @@ static pgm_rand_t		global_rand = { .seed = 0 };
 static volatile uint32_t	rand_ref_count = 0;
 static pgm_mutex_t		rand_mutex;
 
-
+PGM_GNUC_INTERNAL
 void
 pgm_rand_init (void)
 {
@@ -45,6 +45,7 @@ pgm_rand_init (void)
 	pgm_mutex_init (&rand_mutex);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rand_shutdown (void)
 {
@@ -56,6 +57,7 @@ pgm_rand_shutdown (void)
 	pgm_mutex_free (&rand_mutex);
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_rand_create (
 	pgm_rand_t*	new_rand
@@ -88,6 +90,7 @@ pgm_rand_create (
 /* derived from POSIX.1-2001 example implementation of rand()
  */
 
+PGM_GNUC_INTERNAL
 uint32_t
 pgm_rand_int (
 	pgm_rand_t*	r
@@ -100,6 +103,7 @@ pgm_rand_int (
 	return r->seed;
 }
 
+PGM_GNUC_INTERNAL
 int32_t
 pgm_rand_int_range (
 	pgm_rand_t*	r,
@@ -113,6 +117,7 @@ pgm_rand_int_range (
 	return begin + pgm_rand_int (r) % (end - begin);
 }
 
+PGM_GNUC_INTERNAL
 uint32_t
 pgm_random_int (void)
 {
@@ -124,6 +129,7 @@ pgm_random_int (void)
 	return rand_value;
 }
 
+PGM_GNUC_INTERNAL
 int32_t
 pgm_random_int_range (
 	int32_t		begin,

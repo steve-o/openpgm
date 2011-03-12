@@ -2,7 +2,7 @@
  *
  * portable double-ended queue.
  *
- * Copyright (c) 2010 Miru Limited.
+ * Copyright (c) 2010-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,6 +24,7 @@
 
 //#define QUEUE_DEBUG
 
+PGM_GNUC_INTERNAL
 bool
 pgm_queue_is_empty (
 	const pgm_queue_t*const queue
@@ -34,6 +35,7 @@ pgm_queue_is_empty (
 	return queue->head == NULL;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_queue_push_head_link (
 	pgm_queue_t* restrict queue,
@@ -54,6 +56,7 @@ pgm_queue_push_head_link (
 	queue->length++;
 }
 
+PGM_GNUC_INTERNAL
 pgm_list_t*
 pgm_queue_pop_tail_link (
 	pgm_queue_t*	queue
@@ -81,6 +84,7 @@ pgm_queue_pop_tail_link (
 	return NULL;
 }
 
+PGM_GNUC_INTERNAL
 pgm_list_t*
 pgm_queue_peek_tail_link (
 	pgm_queue_t*	queue
@@ -91,6 +95,7 @@ pgm_queue_peek_tail_link (
 	return queue->tail;
 }
 
+PGM_GNUC_INTERNAL
 void
 pgm_queue_unlink (
 	pgm_queue_t* restrict queue,
