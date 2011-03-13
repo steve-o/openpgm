@@ -205,6 +205,10 @@ AC_COMPILE_IFELSE(
 AC_CHECK_FUNC([vasprintf],
 		CFLAGS="$CFLAGS -DCONFIG_HAVE_VASPRINTF",)
 # symbol linking scope
+# nb: sun x86 ld doesn't support DSO visibility but the compiler raises
+# warnings and these are easier to detect in autoconf.
+save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
 AC_MSG_CHECKING([for hidden visibility attribute])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#ifdef __SUNPRO_C
@@ -215,8 +219,9 @@ __attribute__((visibility("hidden")))
 void moo (void) {};]],
 		[[moo();]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_DSO_VISIBILITY"],
-	[AC_MSG_RESULT([no])])
+		CFLAGS="$save_CFLAGS -DCONFIG_HAVE_DSO_VISIBILITY"],
+	[AC_MSG_RESULT([no])
+		CFLAGS="$save_CFLAGS"])
 
 # socket binding
 CFLAGS="$CFLAGS -DCONFIG_BIND_INADDR_ANY"
