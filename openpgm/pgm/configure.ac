@@ -35,6 +35,7 @@ solaris*)
 	AC_SEARCH_LIBS([socket], [socket])
 	AC_SEARCH_LIBS([gethostname], [nsl])
 	AC_SEARCH_LIBS([inet_aton], [resolv])
+	AC_SEARCH_LIBS([kstat_open], [kstat])
 	;;
 *)
 	;;
