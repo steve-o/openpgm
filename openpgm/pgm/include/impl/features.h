@@ -47,6 +47,7 @@
 #endif
 #if defined(__FreeBSD__)
 /* ftime is via compatibility library, so skip */
+#	undef  CONFIG_HAVE_FTIME
 #	define CONFIG_HAVE_GETTIMEOFDAY		1
 #endif
 #if defined(__sun) || defined(__SUNPRO_C)
