@@ -142,6 +142,10 @@ env = Environment(ENV = os.environ,
 # IP header order as per IP(4) on FreeBSD
 #			'-DCONFIG_HOST_ORDER_IP_LEN',
 #			'-DCONFIG_HOST_ORDER_IP_OFF',
+# ticket based spinlocks
+			'-DCONFIG_TICKET_SPINLOCK',
+# dumb read-write spinlock
+			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
 # Wine limited API support
