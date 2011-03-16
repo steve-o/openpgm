@@ -1,5 +1,7 @@
 # -*- Makefile -*-
 
+ACLOCAL_AMFLAGS = -I m4
+
 noinst_LTLIBRARIES = libpgm_noinst.la
 
 libpgm_noinst_la_SOURCES = \

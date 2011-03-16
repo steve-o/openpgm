@@ -7,6 +7,7 @@
 AC_PREREQ([2.61])
 AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
+AC_CONFIG_MACRO_DIR([m4])
 
 #  Ubuntu 10 : v1.11
 #   OSX 10.6 : v1.10
