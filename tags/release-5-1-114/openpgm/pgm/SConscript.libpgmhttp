@@ -1,0 +1,87 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+e = env.Clone()
+e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm-http"\'');
+
+# add binary tree to include path to find embedded htdocs
+e.Append(CPPPATH = ['.']);
+
+src = Split("""
+		http.c
+""")
+
+htdocs = Split("""
+		htdocs/404.html
+		htdocs/base.css
+		htdocs/robots.txt
+		htdocs/xhtml10_strict.doctype
+""")
+
+pgmhttp = e.StaticLibrary('libpgmhttp', src);
+pgmhttppic = e.StaticSharedLibrary('libpgmhttp-pic', src);
+
+# embed htdocs into C headers
+embed_htdoc = Builder(action = './htdocs/convert_to_macro.pl $SOURCE > $TARGET')
+e.Append(BUILDERS = {'EmbedHtdoc' : embed_htdoc})
+
+for htdoc in htdocs:
+	embedded = htdoc + '.h'
+	e.EmbedHtdoc(embedded, htdoc)
+
+#-----------------------------------------------------------------------------
+# unit testing
+
+if env['WITH_CHECK'] == 'true':
+	te = e.Clone();
+# add new suffix so we can re-use libpgm objects
+ 	te['SHOBJSUFFIX'] = '.http' + te['SHOBJSUFFIX'];
+	te['OBJSUFFIX']   = '.http' + te['OBJSUFFIX'];
+
+	te.MergeFlags(env['GLIB_FLAGS']);
+	te.MergeFlags(env['CHECK_FLAGS']);
+	newCCFLAGS = [];
+	for flag in te['CCFLAGS']:
+		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):
+			newCCFLAGS.append(flag);
+	te['CCFLAGS'] = newCCFLAGS;
+	te.Program (['http_unittest.c',
+# framework
+			te.Object('checksum.c'),
+			te.Object('error.c'),
+			te.Object('galois_tables.c'),
+			te.Object('getifaddrs.c'),
+			te.Object('getnodeaddr.c'),
+			te.Object('hashtable.c'),
+			te.Object('histogram.c'),
+			te.Object('indextoaddr.c'),
+			te.Object('indextoname.c'),
+			te.Object('inet_network.c'),
+			te.Object('list.c'),
+			te.Object('math.c'),
+			te.Object('md5.c'),
+			te.Object('mem.c'),
+			te.Object('messages.c'),
+			te.Object('nametoindex.c'),
+			te.Object('queue.c'),
+			te.Object('rand.c'),
+			te.Object('rate_control.c'),
+			te.Object('reed_solomon.c'),
+			te.Object('slist.c'),
+			te.Object('sockaddr.c'),
+			te.Object('string.c'),
+			te.Object('thread.c'),
+			te.Object('time.c'),
+			te.Object('wsastrerror.c'),
+# sockets
+			te.Object('tsi.c'),
+			te.Object('gsi.c'),
+			te.Object('version.c'),
+# sunpro linking
+			te.Object('skbuff.c')
+		]);
+
+# end of file

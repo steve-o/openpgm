@@ -1,0 +1,55 @@
+--- string.c	2011-03-12 10:31:22.000000000 +0800
++++ string.c89.c	2011-03-12 11:05:37.000000000 +0800
+@@ -93,17 +93,20 @@
+ 	if (len < 0)
+ 		*string = NULL;
+ #else
++	{
+ #	ifdef _MSC_VER
+ /* can only copy on assignment, pointer to stack frame */
+ 	va_list args2 = args;
+ #	else
++/* C99 va_copy macro */
+ 	va_list args2;
+ 	va_copy (args2, args);
+ #	endif
+-	*string = malloc (pgm_printf_string_upper_bound (format, args));
+-/* NB: must be able to handle NULL args, fails on GCC */
+-	len = vsprintf (*string, format, args2);
++	len = pgm_printf_string_upper_bound (format, args);
++	*string = malloc (len);
++	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
+ 	va_end (args2);
++	}
+ #endif
+ 	return len;
+ }
+@@ -134,13 +137,14 @@
+ #ifdef CONFIG_HAVE_STPCPY
+ 	return stpcpy (dest, src);
+ #else
++	{
+ 	char		*d = dest;
+ 	const char	*s = src;
+-
+ 	do {
+ 		*d++ = *s;
+ 	} while (*s++ != '\0');
+ 	return d - 1;
++	}
+ #endif
+ }
+ 
+@@ -249,8 +253,11 @@
+ {
+ 	if (PGM_LIKELY (NULL != str_array))
+ 	{
+-		for (unsigned i = 0; str_array[i] != NULL; i++)
++		{
++		unsigned i;
++		for (i = 0; str_array[i] != NULL; i++)
+ 			free (str_array[i]);
++		}
+ 
+ 		pgm_free (str_array);
+ 	}

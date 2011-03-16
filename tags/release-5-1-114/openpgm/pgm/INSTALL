@@ -1,0 +1,13 @@
+For building instructions, see:
+
+  http://code.google.com/p/openpgm/wiki/OpenPgm5CReferenceBuildLibrary
+
+
+Note this package includes three build systems each with different targets:
+
+ * SCons is used for development, there is minimal auto-configuration, one
+   SConstruct script per target compiler and platform.
+
+ * Autoconf is used for Unix-only library release.
+
+ * CMake is used for Windows-only library release and installer packaging.
