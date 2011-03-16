@@ -6,7 +6,7 @@ import time
 
 build_date = time.strftime ("%Y-%m-%d")
 build_time = time.strftime ("%H:%M:%S")
-build_rev = os.popen('svnversion -n .').read();
+build_rev = filter (str.isdigit, "$Revision$")
 
 print """
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
