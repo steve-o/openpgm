@@ -74,11 +74,12 @@ libinclude_HEADERS = \
 	include/pgm/wininttypes.h \
 	include/pgm/zinttypes.h
 
+# nb: Solaris make does not understand $<
 version.c: version_generator.py
-	$(AM_V_GEN)$(PYTHON) $< > $@
+	$(AM_V_GEN)$(PYTHON) version_generator.py > $@
 
 galois_tables.c: galois_generator.pl
-	$(AM_V_GEN)$(PERL) $< > $@
+	$(AM_V_GEN)$(PERL) galois_generator.pl > $@
 
 libpgm_noinst_la_CFLAGS = \
 	-I$(top_srcdir)/include \
