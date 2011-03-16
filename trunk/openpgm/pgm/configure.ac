@@ -1,9 +1,16 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
+#  Ubuntu 10 : v2.65
+#   OSX 10.6 : v2.61
+# Solaris 10 : v2.59
 AC_PREREQ([2.61])
 AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
+
+#  Ubuntu 10 : v1.11
+#   OSX 10.6 : v1.10
+# Solaris 10 : v1.8
 AM_INIT_AUTOMAKE([1.10 no-define foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
@@ -17,6 +24,7 @@ AC_PROG_LIBTOOL
 AC_PATH_PROG(PERL, perl)
 AC_PATH_PROG(PYTHON, python)
 
+# nb: earliest verifiable version is 2.2.
 m4_ifdef([LT_PREREQ], [LT_PREREQ([2.2])])
 m4_ifdef([LT_INIT], [LT_INIT])
 AC_SUBST([LIBTOOL_DEPS])
@@ -238,6 +246,24 @@ case "$host_os" in
 	;;
 *)
 	AC_MSG_RESULT([no])
+	;;
+esac
+# extended assembler on SPARC
+case "$host" in
+sparc-sun-solaris*)
+	AC_MSG_CHECKING([for SPARC extended assembler])
+	AC_COMPILE_IFELSE(
+		[AC_LANG_PROGRAM([[#include <stdint.h>
+uint32_t add32_with_carry (uint32_t a, uint32_t b) {
+        __asm__ ( "addcc %2, %0, %0\n\taddx %0, %%g0, %0" : "=r" (a) : "0" (a), "r" (b) : "cc");
+        return a;
+}]],
+			[[uint32_t c = add32_with_carry (1, 2);]])],
+		[AC_MSG_RESULT([yes])],
+		[AC_MSG_RESULT([optimization required])
+			CFLAGS="$CFLAGS -xO1"])
+	;;
+*)
 	;;
 esac
 # ticket spinlock friendly: unaligned pointers & atomic ops (excl. Sun Pro)
