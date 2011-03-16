@@ -137,7 +137,6 @@ env = Environment(ENV = os.environ,
 #			'-DCONFIG_HOST_ORDER_IP_OFF',
 # ticket based spinlocks
 			'-DCONFIG_TICKET_SPINLOCK',
-#			'-DCONFIG_TICKET_RWSPINLOCK',
 # dumb read-write spinlock
 			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication

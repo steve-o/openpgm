@@ -117,8 +117,6 @@ env = Environment(
 			'-std=gnu99',
 			'-D_XOPEN_SOURCE=600',
 			'-D__EXTENSIONS__',
-			'-DBSD_COMP',
-			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
 # POSIX spinlocks
@@ -163,7 +161,7 @@ env = Environment(
 #			'-DCONFIG_HAVE_SPRINTF_GROUPING',
 #			'-DCONFIG_HAVE_VASPRINTF',
 # symbol linking scope
-			'-DCONFIG_HAVE_DSO_VISIBILITY',
+#			'-DCONFIG_HAVE_DSO_VISIBILITY',
 # socket binding
 			'-DCONFIG_BIND_INADDR_ANY',
 # IP header order as per IP(4) on FreeBSD
@@ -171,9 +169,8 @@ env = Environment(
 #			'-DCONFIG_HOST_ORDER_IP_OFF',
 # ticket based spinlocks
 			'-DCONFIG_TICKET_SPINLOCK',
-#			'-DCONFIG_TICKET_RWSPINLOCK',
 # dumb read-write spinlock
-#			'-DCONFIG_DUMB_RWSPINLOCK',
+			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
 # Wine limited API support
