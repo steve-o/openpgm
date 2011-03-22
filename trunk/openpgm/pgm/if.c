@@ -314,8 +314,8 @@ parse_interface (
 	struct in_addr in_addr;
 	struct sockaddr_in6 sa6_addr;
 	struct pgm_ifaddrs_t *ifap, *ifa;
-	struct sockaddr_storage addr;
-	unsigned interface_matches = 0;
+	struct sockaddr_storage addr_storage, *addr = &addr_storage;
+	unsigned addr_cnt = 1, interface_matches = 0;
 
 /* pre-conditions */
 	pgm_assert (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family);
@@ -361,7 +361,7 @@ parse_interface (
 		memset (&s4, 0, sizeof(s4));
 		s4.sin_family = AF_INET;
 		s4.sin_addr.s_addr = htonl (in_addr.s_addr);
-		memcpy (&addr, &s4, sizeof(s4));
+		memcpy (addr, &s4, sizeof(s4));
 
 		check_inet_network = TRUE;
 		check_addr = TRUE;
@@ -376,7 +376,7 @@ parse_interface (
 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 			return FALSE;
 		}
-		memcpy (&addr, &sa6_addr, sizeof (sa6_addr));
+		memcpy (addr, &sa6_addr, sizeof (sa6_addr));
 
 		check_inet6_network = TRUE;
 		check_addr = TRUE;
@@ -418,7 +418,7 @@ parse_interface (
 				return FALSE;
 			}
 
-			memcpy (&addr, res->ai_addr, pgm_sockaddr_len (res->ai_addr));
+			memcpy (addr, res->ai_addr, pgm_sockaddr_len (res->ai_addr));
 			freeaddrinfo (res);
 			check_addr = TRUE;
 			break;
@@ -528,14 +528,60 @@ parse_interface (
 			.ai_socktype	= SOCK_STREAM,		/* not really, SOCK_RAW */
 			.ai_protocol	= IPPROTO_TCP,		/* not really, IPPROTO_PGM */
 			.ai_flags	= AI_ADDRCONFIG,	/* AI_V4MAPPED is unhelpful */
-		}, *res;
-		const int eai = getaddrinfo (ifname, NULL, &hints, &res);
+		}, *result, *res;
+		const int eai = getaddrinfo (ifname, NULL, &hints, &result);
 		switch (eai) {
 		case 0:
 /* NB: getaddrinfo may return multiple addresses, one per interface & family.
- * The sorting order of the list defined by RFC 3484 and /etc/gai.conf.  Walk
- * the list for first reasonable address or err with details from first result.
+ * The sorting order of the list defined by RFC 3484 and /etc/gai.conf.
+ *
+ * Ex.  hinano 127.0.1.1        // default Linux DHCP address due to lack of IPv4 link-local addressing
+ *      hinano 10.6.15.88       // IPv4 address provided by DHCP
+ *
+ * Address 127.0.1.1 should be ignored as it is not multicast capable.
  */
+			if (NULL != result->ai_next) /* more than one result */
+			{
+				addr_cnt = 0;
+				for (res = result; NULL != res; res = res->ai_next)
+				{
+					if ((AF_INET == res->ai_family && IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
+					    (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
+						continue;
+					addr_cnt++;
+				}
+				if (addr_cnt > 1) /* copy all valid entries onto the stack */
+				{
+					unsigned i = 0;
+					addr = pgm_newa (struct sockaddr_storage, addr_cnt);
+					for (res = result; NULL != res; res = res->ai_next)
+					{
+						if ((AF_INET == res->ai_family && IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
+						    (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
+							continue;
+						memcpy (&addr[i++], res->ai_addr, pgm_sockaddr_len (res->ai_addr));
+					}
+					freeaddrinfo (result);
+					check_addr = TRUE;
+					break;
+				}
+				else if (1 == addr_cnt) /* find matching entry */
+				{
+					for (res = result; NULL != res; res = res->ai_next)
+					{
+						if ((AF_INET == res->ai_family && IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
+						    (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
+							continue;
+						break;
+					}
+				}
+				else /* addr_cnt == 0 ∴  use last entry */
+				{
+					for (res = result; NULL != res->ai_next; res = res->ai_next);
+					addr_cnt++;
+				}
+			}
+
 			if (AF_INET == res->ai_family &&
 			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
@@ -544,7 +590,7 @@ parse_interface (
 					     PGM_ERROR_XDEV,
 					     _("Expecting interface address, found IPv4 multicast name %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
-				freeaddrinfo (res);
+				freeaddrinfo (result);
 				return FALSE;
 			}
 			else if (AF_INET6 == res->ai_family &&
@@ -555,11 +601,11 @@ parse_interface (
 					     PGM_ERROR_XDEV,
 					     _("Expecting interface address, found IPv6 multicast name %s%s%s"),
 					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
-				freeaddrinfo (res);
+				freeaddrinfo (result);
 				return FALSE;
 			}
-			memcpy (&addr, res->ai_addr, pgm_sockaddr_len (res->ai_addr));
-			freeaddrinfo (res);
+			memcpy (addr, res->ai_addr, pgm_sockaddr_len (res->ai_addr));
+			freeaddrinfo (result);
 			check_addr = TRUE;
 			break;
 
@@ -615,19 +661,24 @@ parse_interface (
 		pgm_assert (0 != ifindex);
 
 /* check numeric host */
-		if (check_addr &&
-		    (0 == pgm_sockaddr_cmp (ifa->ifa_addr, (const struct sockaddr*)&addr)))
+		if (check_addr)
 		{
-			pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
-			ir->ir_flags = ifa->ifa_flags;
-			if (ir->ir_flags & IFF_LOOPBACK)
-				pgm_warn (_("Interface %s reports as a loopback device."), ir->ir_name);
-			if (!(ir->ir_flags & IFF_MULTICAST))
-				pgm_warn (_("Interface %s reports as a non-multicast capable device."), ir->ir_name);
-			ir->ir_interface = ifindex;
-			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
-			pgm_freeifaddrs (ifap);
-			return TRUE;
+			for (unsigned i = 0; i < addr_cnt; i++)
+			{
+				if (0 == pgm_sockaddr_cmp (ifa->ifa_addr, (const struct sockaddr*)&addr[i]))
+				{
+					pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
+					ir->ir_flags = ifa->ifa_flags;
+					if (ir->ir_flags & IFF_LOOPBACK)
+						pgm_warn (_("Interface %s reports as a loopback device."), ir->ir_name);
+					if (!(ir->ir_flags & IFF_MULTICAST))
+						pgm_warn (_("Interface %s reports as a non-multicast capable device."), ir->ir_name);
+					ir->ir_interface = ifindex;
+					memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
+					pgm_freeifaddrs (ifap);
+					return TRUE;
+				}
+			}
 		}
 
 /* check network address */
@@ -741,7 +792,6 @@ skip_inet_network:
 			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 			continue;
 		}
-
 	}
 
 	if (0 == interface_matches) {
@@ -911,9 +961,9 @@ parse_group (
 		.ai_socktype	= SOCK_STREAM,		/* not really, SOCK_RAW */
 		.ai_protocol	= IPPROTO_TCP,		/* not really, IPPROTO_PGM */
 		.ai_flags	= AI_ADDRCONFIG,	/* AI_V4MAPPED is unhelpful */
-	}, *res;
+	}, *result, *res;
 
-	const int eai = getaddrinfo (group, NULL, &hints, &res);
+	const int eai = getaddrinfo (group, NULL, &hints, &result);
 	if (0 != eai) {
 		char errbuf[1024];
 		pgm_set_error (error,
@@ -928,12 +978,16 @@ parse_group (
 /* NB: getaddrinfo may return multiple addresses, one per interface & family, only the first
  * return result is used.  The sorting order of the list defined by RFC 3484 and /etc/gai.conf
  */
-	if ((AF_INET6 != family && IN_MULTICAST(ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
-	    (AF_INET  != family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
+	for (res = result; NULL != res; res = res->ai_next)
 	{
-		memcpy (addr, res->ai_addr, res->ai_addrlen);
-		freeaddrinfo (res);
-		return TRUE;
+		if ((AF_INET6 != family && IN_MULTICAST(ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
+		    (AF_INET  != family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
+		{
+/* return first multicast result */
+			memcpy (addr, res->ai_addr, res->ai_addrlen);
+			freeaddrinfo (result);
+			return TRUE;
+		}
 	}
 
 	pgm_set_error (error,
@@ -941,7 +995,7 @@ parse_group (
 		     PGM_ERROR_INVAL,
 		     _("Unresolvable receive group %s%s%s"),
 		     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
-	freeaddrinfo (res);
+	freeaddrinfo (result);
 	return FALSE;
 }
 

@@ -258,6 +258,11 @@ found:
  *
  * ::getnetbyname(loopback)   = 0.0.0.127
  * pgm_getnetbyname(loopback) = 127.0.0.0
+ *
+ * returns first matching entry, whilst networks file could potentially contain
+ * multiple matching entries the native APIs do not support such functionality.
+ *
+ * cf. networks vs. hosts which getaddrinfo may return a list of results.
  */
 
 struct pgm_netent_t*
