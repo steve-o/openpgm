@@ -818,7 +818,7 @@ pgm_send_spm (
 		const int save_errno = pgm_get_last_sock_error();
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 		{
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			return FALSE;
 		}
 /* fall through silently on other errors */
@@ -1189,7 +1189,7 @@ retry_send:
 	{
 //		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
 		sock->is_apdu_eagain = TRUE;
-		sock->blocklen = tpdu_length;
+		sock->blocklen = tpdu_length + sock->iphdr_len;
 		return PGM_IO_STATUS_CONGESTION;	/* peer expiration to re-elect ACKer */
 	}
 
@@ -1206,7 +1206,7 @@ retry_send:
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 		{
 			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			if (PGM_SOCK_ENOBUFS == save_errno)
 				return PGM_IO_STATUS_RATE_LIMITED;
 			if (sock->use_pgmcc)
@@ -1367,7 +1367,7 @@ retry_send:
 	{
 //		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
 		sock->is_apdu_eagain = TRUE;
-		sock->blocklen = tpdu_length;
+		sock->blocklen = tpdu_length + sock->iphdr_len;
 		return PGM_IO_STATUS_CONGESTION;
 	}
 
@@ -1384,7 +1384,7 @@ retry_send:
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 		{
 			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			if (PGM_SOCK_ENOBUFS == save_errno)
 				return PGM_IO_STATUS_RATE_LIMITED;
 			if (sock->use_pgmcc)
@@ -1556,7 +1556,7 @@ retry_send:
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 		{
 			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			if (PGM_SOCK_ENOBUFS == save_errno)
 				return PGM_IO_STATUS_RATE_LIMITED;
 			if (sock->use_pgmcc)
@@ -1726,7 +1726,7 @@ retry_send:
 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 			{
 				sock->is_apdu_eagain = TRUE;
-				sock->blocklen = tpdu_length;
+				sock->blocklen = tpdu_length + sock->iphdr_len;
 				goto blocked;
 			}
 /* fall through silently on other errors */
@@ -2137,7 +2137,7 @@ retry_one_apdu_send:
 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 			{
 				sock->is_apdu_eagain = TRUE;
-				sock->blocklen = tpdu_length;
+				sock->blocklen = tpdu_length + sock->iphdr_len;
 				goto blocked;
 			}
 /* fall through silently on other errors */
@@ -2385,7 +2385,7 @@ retry_send:
 			if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 			{
 				sock->is_apdu_eagain = TRUE;
-				sock->blocklen = tpdu_length;
+				sock->blocklen = tpdu_length + sock->iphdr_len;
 				goto blocked;
 			}
 /* fall through silently on other errors */
@@ -2504,7 +2504,7 @@ send_rdata (
 	    sock->tokens < pgm_fp8 (1))
 	{
 //		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("Token limit reached."));
-		sock->blocklen = tpdu_length;
+		sock->blocklen = tpdu_length + sock->iphdr_len;
 		return FALSE;
 	}
 
@@ -2520,7 +2520,7 @@ send_rdata (
 		const int save_errno = pgm_get_last_sock_error();
 		if (PGM_LIKELY(PGM_SOCK_EAGAIN == save_errno || PGM_SOCK_ENOBUFS == save_errno))
 		{
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			return FALSE;
 		}
 /* fall through silently on other errors */
