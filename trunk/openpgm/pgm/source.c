@@ -1168,11 +1168,11 @@ send_odata (
 	{
 		if (!pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
 				      &sock->odata_rate_control,	/* original data limit */
-				      tpdu_length - sock->iphdr_len,
+				      tpdu_length,			/* excludes IP header len */
 				      sock->is_nonblocking))
 		{
 			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
@@ -1350,11 +1350,11 @@ send_odata_copy (
 	{
 		if (!pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
 				      &sock->odata_rate_control,	/* original data limit */
-				      tpdu_length - sock->iphdr_len,
+				      tpdu_length,			/* excludes IP header len */
 				      sock->is_nonblocking))
 		{
 			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
@@ -1532,11 +1532,11 @@ send_odatav (
 	{
 		if (!pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
 				      &sock->odata_rate_control,	/* original data limit */
-				      tpdu_length - sock->iphdr_len,
+				      tpdu_length,			/* excludes IP header len */
 				      sock->is_nonblocking))
 		{
 			sock->is_apdu_eagain = TRUE;
-			sock->blocklen = tpdu_length;
+			sock->blocklen = tpdu_length + sock->iphdr_len;
 			return PGM_IO_STATUS_RATE_LIMITED;
 		}
 		STATE(is_rate_limited) = TRUE;
@@ -1637,10 +1637,9 @@ send_apdu (
 			offset_ += tsdu_length;
 		} while (offset_ < apdu_length);
 
-/* calculation includes one iphdr length already */
 		if (!pgm_rate_check2 (&sock->rate_control,
 				      &sock->odata_rate_control,
-				      tpdu_length - sock->iphdr_len,
+				      tpdu_length - sock->iphdr_len,	/* includes 1 × IP header len */
 				      sock->is_nonblocking))
 		{
 			sock->blocklen = tpdu_length;
@@ -2005,10 +2004,9 @@ retry_send:
 			offset_     += tsdu_length;
 		} while (offset_ < STATE(apdu_length));
 
-/* calculation includes one iphdr length already */
                 if (!pgm_rate_check2 (&sock->rate_control,
 				      &sock->odata_rate_control,
-				      tpdu_length - sock->iphdr_len,
+				      tpdu_length - sock->iphdr_len,	/* includes 1 × IP header len */
 				      sock->is_nonblocking))
 		{
 			sock->blocklen = tpdu_length;
@@ -2272,10 +2270,9 @@ pgm_send_skbv (
 		for (unsigned i = 0; i < count; i++)
 			total_tpdu_length += sock->iphdr_len + pgm_pkt_offset (is_one_apdu, pgmcc_family) + vector[i]->len;
 
-/* calculation includes one iphdr length already */
 		if (!pgm_rate_check2 (&sock->rate_control,
 				      &sock->odata_rate_control,
-				      total_tpdu_length - sock->iphdr_len,
+				      total_tpdu_length - sock->iphdr_len,	/* includes 1 × IP header len */
 				      sock->is_nonblocking))
 		{
 			sock->blocklen = total_tpdu_length;
@@ -2482,10 +2479,10 @@ send_rdata (
 	if (sock->is_controlled_rdata &&
 	    !pgm_rate_check2 (&sock->rate_control,		/* total rate limit */
 			      &sock->rdata_rate_control,	/* repair data limit */
-			      tpdu_length - sock->iphdr_len,
+			      tpdu_length,			/* excludes IP header len */
 			      sock->is_nonblocking))
 	{
-		sock->blocklen = tpdu_length;
+		sock->blocklen = tpdu_length + sock->iphdr_len;
 		return FALSE;
 	}
 
