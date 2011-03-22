@@ -1,14 +1,6 @@
---- time.c	2011-03-12 10:33:06.000000000 +0800
-+++ time.c89.c	2011-03-12 11:12:54.000000000 +0800
-@@ -323,6 +323,7 @@
- /* attempt to parse clock ticks from kernel
-  */
- 		FILE	*fp = fopen ("/proc/cpuinfo", "r");
-+
- 		if (fp)
- 		{
- 			char buffer[1024];
-@@ -342,6 +343,7 @@
+--- time.c	2011-03-14 14:58:46.000000000 +0800
++++ time.c89.c	2011-03-22 16:23:41.000000000 +0800
+@@ -347,6 +347,7 @@
   * MSDN statement: The frequency cannot change while the system is running.
   * http://msdn.microsoft.com/en-us/library/ms644905(v=vs.85).aspx
   */
@@ -16,15 +8,15 @@
  		LARGE_INTEGER frequency;
  		if (QueryPerformanceFrequency (&frequency))
  		{
-@@ -357,6 +359,7 @@
+@@ -362,6 +363,7 @@
  				       _("No supported high-resolution performance counter: %s"),
  				       pgm_win_strerror (winstr, sizeof (winstr), save_errno));
  		}
 +		}
- #endif /* !_WIN32 */
- 
- /* e.g. export RDTSC_FREQUENCY=3200.000000
-@@ -421,6 +424,7 @@
+ #elif defined(__APPLE__)
+ /* nb: RDTSC is non-functional on Darwin */
+ 		uint64_t cpufrequency;
+@@ -457,6 +459,7 @@
  
  /* update Windows timer resolution to 1ms */
  #ifdef _WIN32
@@ -32,7 +24,7 @@
  	TIMECAPS tc;
  	if (TIMERR_NOERROR == timeGetDevCaps (&tc, sizeof (TIMECAPS)))
  	{
-@@ -432,6 +436,7 @@
+@@ -468,6 +471,7 @@
  	{
  		pgm_warn (_("Unable to determine timer device resolution."));
  	}
@@ -40,7 +32,7 @@
  #endif
  
  	return TRUE;
-@@ -791,11 +796,15 @@
+@@ -827,11 +831,15 @@
  /* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
   * the value must be <= 0x05f5e100 or 100ns.
   */
