@@ -2260,14 +2260,14 @@ pgm_bind3 (
 	if (AF_INET == send_addr.ss.ss_family)
 	{
 		if ((INADDR_ANY == ((struct sockaddr_in*)&send_addr)->sin_addr.s_addr) &&
-		    !pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
+		    !pgm_get_multicast_enabled_node_addr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
 		{
 			pgm_rwlock_writer_unlock (&sock->lock);
 			return FALSE;
 		}
 	}
 	else if ((memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0) &&
-		 !pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
+		 !pgm_get_multicast_enabled_node_addr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
 	{
 		pgm_rwlock_writer_unlock (&sock->lock);
 		return FALSE;
