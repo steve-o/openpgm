@@ -511,7 +511,7 @@ mock_gethostname (
 
 /* target:
  *	bool
- *	pgm_if_getnodeaddr (
+ *	pgm_get_multicast_enabled_node_addr (
  *		const sa_family_t	family,
  *		struct sockaddr*	addr,
  *		const socklen_t		cnt,
@@ -524,7 +524,7 @@ START_TEST (test_getnodeaddr_pass_001)
 	struct sockaddr_storage addr;
 	char saddr[INET6_ADDRSTRLEN];
 	pgm_error_t* err = NULL;
-	gboolean success = pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
+	gboolean success = pgm_get_multicast_enabled_node_addr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), &err);
 	if (!success && err) {
 		g_error ("Resolving node address with AF_UNSPEC: %s", (err && err->message) ? err->message : "(null)");
 	}
@@ -532,11 +532,11 @@ START_TEST (test_getnodeaddr_pass_001)
 	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_UNSPEC:%s", saddr ? saddr : "(null)");
-	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
+	fail_unless (TRUE == pgm_get_multicast_enabled_node_addr (AF_INET, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
 	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_INET:%s", saddr ? saddr : "(null)");
-	fail_unless (TRUE == pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
+	fail_unless (TRUE == pgm_get_multicast_enabled_node_addr (AF_INET6, (struct sockaddr*)&addr, sizeof(addr), &err), "getnodeaddr failed");
 	fail_unless (NULL == err, "error raised");
 	pgm_sockaddr_ntop ((struct sockaddr*)&addr, saddr, sizeof(saddr));
 	g_message ("AF_INET6:%s", saddr ? saddr : "(null)");
@@ -546,7 +546,7 @@ END_TEST
 START_TEST (test_getnodeaddr_fail_001)
 {
 	pgm_error_t* err = NULL;
-	fail_unless (FALSE == pgm_if_getnodeaddr (AF_UNSPEC, NULL, 0, &err), "getnodeaddr failed");
+	fail_unless (FALSE == pgm_get_multicast_enabled_node_addr (AF_UNSPEC, NULL, 0, &err), "getnodeaddr failed");
 }
 END_TEST
 
