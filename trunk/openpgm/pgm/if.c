@@ -150,7 +150,7 @@ pgm_if_print_all (void)
 		char network[INET6_ADDRSTRLEN], group[INET6_ADDRSTRLEN];
 		struct sockaddr_storage ifaddr;
 		struct sockaddr* addr = (struct sockaddr*)&res->ai_recv_addrs[0].gsr_group;
-		pgm_if_getnodeaddr (addr->sa_family, (struct sockaddr*)&ifaddr, sizeof (ifaddr), NULL);
+		pgm_get_multicast_enabled_node_addr (addr->sa_family, (struct sockaddr*)&ifaddr, sizeof (ifaddr), NULL);
 		pgm_sockaddr_ntop ((struct sockaddr*)&ifaddr, network, sizeof (network));
 		if (AF_INET == addr->sa_family) {
 			struct sockaddr_in sin;
@@ -1145,7 +1145,7 @@ parse_receive_entity (
 			if (AF_UNSPEC == primary_interface->ir_addr.ss_family)
 			{
 				struct sockaddr_storage addr;
-				if (!pgm_if_getnodeaddr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
+				if (!pgm_get_multicast_enabled_node_addr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
 				{
 					pgm_prefix_error (error,
 							_("Node primary address family cannot be determined: "));
