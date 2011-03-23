@@ -22,6 +22,8 @@
 #include <errno.h>
 #ifndef _WIN32
 #	include <netdb.h>
+#else
+#	include <ws2tcpip.h>
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
