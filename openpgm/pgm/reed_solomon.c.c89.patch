@@ -1,5 +1,5 @@
---- reed_solomon.c	2011-03-12 10:24:20.000000000 +0800
-+++ reed_solomon.c89.c	2011-03-12 10:56:24.000000000 +0800
+--- reed_solomon.c	2011-03-23 14:18:08.000000000 +0800
++++ reed_solomon.c89.c	2011-03-23 14:18:30.000000000 +0800
 @@ -48,6 +48,7 @@
  		return;
  
@@ -182,7 +182,7 @@
  }
  
  /* Gauss–Jordan elimination optimised for Vandermonde matrices
-@@ -277,49 +316,73 @@
+@@ -278,49 +317,73 @@
   * 1: Work out coefficients.
   */
  
@@ -265,7 +265,7 @@
  	}
  }
  
-@@ -359,23 +422,31 @@
+@@ -360,23 +423,31 @@
   *
   * Be careful, Harry!
   */
@@ -299,7 +299,7 @@
  	}
  
  /* This generator matrix would create a Maximum Distance Separable (MDS)
-@@ -386,6 +457,7 @@
+@@ -387,6 +458,7 @@
   *
   * 1: matrix V_{k,k} formed by the first k columns of V_{k,n}
   */
@@ -307,7 +307,7 @@
  	pgm_gf8_t* V_kk = V;
  	pgm_gf8_t* V_kn = V + (k * k);
  
-@@ -403,10 +475,16 @@
+@@ -404,10 +476,16 @@
  
  /* 4: set identity matrix for original data
   */
@@ -325,7 +325,7 @@
  }
  
  PGM_GNUC_INTERNAL
-@@ -449,11 +527,14 @@
+@@ -450,11 +528,14 @@
  	pgm_assert (len > 0);
  
  	memset (dst, 0, len);
@@ -341,7 +341,7 @@
  }
  
  /* original data block of packets with missing packet entries replaced
-@@ -476,7 +557,9 @@
+@@ -477,7 +558,9 @@
  
  /* create new recovery matrix from generator
   */
@@ -352,7 +352,7 @@
  	{
  		if (offsets[i] < rs->k) {
  			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
-@@ -485,34 +568,46 @@
+@@ -486,34 +569,46 @@
  		}
  		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
  	}
@@ -403,7 +403,7 @@
  	{
  		if (offsets[ j ] < rs->k)
  			continue;
-@@ -522,6 +617,8 @@
+@@ -523,6 +618,8 @@
  		pgm_free (repairs[ j ]);
  #endif
  	}
@@ -412,7 +412,7 @@
  }
  
  /* entire FEC block of original data and parity packets.
-@@ -545,7 +642,9 @@
+@@ -546,7 +643,9 @@
  
  /* create new recovery matrix from generator
   */
@@ -423,7 +423,7 @@
  	{
  		if (offsets[i] < rs->k) {
  			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
-@@ -554,28 +653,39 @@
+@@ -555,28 +654,39 @@
  		}
  		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
  	}
