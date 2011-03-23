@@ -35,29 +35,26 @@
 static const char* pgm_family_string (const sa_family_t);
 
 
-/* return node primary address on multi-address family interfaces.
+/* return node addresses, similar to getaddrinfo('..localmachine") on Win2003.
  *
  * returns TRUE on success, returns FALSE on failure.
  */
 
 PGM_GNUC_INTERNAL
 bool
-pgm_if_getnodeaddr (
+pgm_getnodeaddr (
 	const sa_family_t	   family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
-	struct sockaddr*  restrict addr,
-	const socklen_t		   cnt,	/* size of address pointed to by addr */
+	struct addrinfo** restrict res,		/* return list of addresses */
 	pgm_error_t**	  restrict error
 	)
 {
-	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
-	pgm_return_val_if_fail (NULL != addr, FALSE);
-	if (AF_INET == family || AF_UNSPEC == family)
-		pgm_return_val_if_fail (cnt >= (socklen_t)sizeof(struct sockaddr_in), FALSE);
-	else
-		pgm_return_val_if_fail (cnt >= (socklen_t)sizeof(struct sockaddr_in6), FALSE);
+	struct addrinfo* na;
+	size_t na_len = 0;
 
-	pgm_debug ("pgm_if_getnodeaddr (family:%s addr:%p cnt:%d error:%p)",
-		pgm_family_string (family), (const void*)addr, cnt, (const void*)error);
+	pgm_return_val_if_fail (AF_INET == family || AF_INET6 == family || AF_UNSPEC == family, FALSE);
+	pgm_return_val_if_fail (NULL != res, FALSE);
+	pgm_debug ("pgm_getnodeaddr (family:%s res:%p error:%p)",
+		pgm_family_string (family), (const void*)res, (const void*)error);
 
 	char hostname[NI_MAXHOST + 1];
 	struct hostent* he;
@@ -74,22 +71,49 @@ pgm_if_getnodeaddr (
 		return FALSE;
 	}
 
-	addr->sa_family = family;
 	struct addrinfo hints = {
 		.ai_family	= family,
 		.ai_socktype	= SOCK_STREAM,		/* not really */
 		.ai_protocol	= IPPROTO_TCP,		/* not really */
 		.ai_flags	= AI_ADDRCONFIG,
-	}, *res;
+	}, *result, *ai;
 
-	int e = getaddrinfo (hostname, NULL, &hints, &res);
+	int e = getaddrinfo (hostname, NULL, &hints, &result);
 	if (0 == e) {
-/* NB: getaddrinfo may return multiple addresses, one per interface & family, only the first
- * return result is used.  The sorting order of the list defined by RFC 3484 and /etc/gai.conf
+/* NB: getaddrinfo may return multiple addresses, the sorting order of the
+ * list defined by RFC 3484 and /etc/gai.conf
  */
-		const socklen_t addrlen = (socklen_t)res->ai_addrlen;
-		memcpy (addr, res->ai_addr, addrlen);
-		freeaddrinfo (res);
+		for (ai = result; NULL != ai; ai = ai->ai_next)
+		{
+			if (!(AF_INET == ai->ai_family || AF_INET6 == ai->ai_family))
+				continue;
+			if (NULL == ai->ai_addr || 0 == ai->ai_addrlen)
+				continue;
+			na_len += sizeof (struct addrinfo) + ai->ai_addrlen;
+		}
+
+		na = pgm_malloc0 (na_len);
+		char* p = (char*)na + na_len;	/* point to end of block */
+		struct addrinfo* prev = NULL;
+
+		for (ai = result; NULL != ai; ai = ai->ai_next)
+		{
+			if (!(AF_INET == ai->ai_family || AF_INET6 == ai->ai_family))
+				continue;
+			if (NULL == ai->ai_addr || 0 == ai->ai_addrlen)
+				continue;
+			p -= ai->ai_addrlen;
+			memcpy (p, ai->ai_addr, ai->ai_addrlen);
+			struct addrinfo* t = (struct addrinfo*)(p - sizeof (struct addrinfo));
+			t->ai_family	= ai->ai_family;
+			t->ai_addrlen	= ai->ai_addrlen;
+			t->ai_addr	= (struct sockaddr*)p;
+			t->ai_next	= prev;
+			prev = t;
+			p   -= sizeof (struct addrinfo);
+		}
+		freeaddrinfo (result);
+		*res = na;
 		return TRUE;
 	} else if (EAI_NONAME != e) {
 		char errbuf[1024];
@@ -173,9 +197,89 @@ ipv4_found:
 	return FALSE;
 ipv6_found:
 
-	memcpy (addr, ifa6->ifa_addr, pgm_sockaddr_len (ifa6->ifa_addr));
+	na_len = sizeof (struct addrinfo) + pgm_sockaddr_len (ifa6->ifa_addr);
+	na = pgm_malloc0 (na_len);
+	na->ai_family	= AF_INET6;
+	na->ai_addrlen	= pgm_sockaddr_len (ifa6->ifa_addr);
+	na->ai_addr	= (struct sockaddr*)((char*)na + sizeof (struct addrinfo));
+	memcpy (na->ai_addr, ifa6->ifa_addr, na->ai_addrlen);
 	pgm_freeifaddrs (ifap);
+	*res = na;
 	return TRUE;
+}
+
+PGM_GNUC_INTERNAL
+void
+pgm_freenodeaddr (
+	struct addrinfo*	res
+	)
+{
+	pgm_free (res);
+}
+
+/* pick a node address that supports mulitcast traffic iff more than one
+ * address exists.
+ */
+
+PGM_GNUC_INTERNAL
+bool
+pgm_get_multicast_enabled_node_addr (
+	const sa_family_t	   family,	/* requested address family, AF_INET, AF_INET6, or AF_UNSPEC */
+	struct sockaddr*  restrict addr,
+	const socklen_t		   cnt,		/* size of address pointed to by addr */
+	pgm_error_t**	  restrict error
+	)
+{
+	struct addrinfo *result, *res;
+	struct pgm_ifaddrs_t *ifap, *ifa;
+
+	if (!pgm_getnodeaddr (family, &result, error)) {
+		pgm_prefix_error (error,
+				_("Enumerating node address: "));
+		return FALSE;
+	}
+/* iff one address return that independent of multicast support */
+	if (NULL == result->ai_next) {
+		pgm_return_val_if_fail (cnt >= result->ai_addrlen, FALSE);
+		memcpy (addr, result->ai_addr, result->ai_addrlen);
+		pgm_freenodeaddr (result);
+		return TRUE;
+	}
+	if (!pgm_getifaddrs (&ifap, error)) {
+		pgm_prefix_error (error,
+				_("Enumerating network interfaces: "));
+		return FALSE;
+	}
+
+	for (res = result; NULL != res; res = res->ai_next)
+	{
+/* for each node address find matching interface and test flags */
+		for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+		{
+			if (NULL == ifa->ifa_addr ||
+			    0 != pgm_sockaddr_cmp (ifa->ifa_addr, res->ai_addr))
+				continue;
+			if (ifa->ifa_flags & IFF_MULTICAST) {
+				pgm_return_val_if_fail (cnt >= res->ai_addrlen, FALSE);
+				memcpy (addr, res->ai_addr, res->ai_addrlen);
+				pgm_freenodeaddr (result);
+				return TRUE;
+			} else
+				break;
+		}
+
+/* use last address as fallback */
+		if (NULL == res->ai_next) {
+			pgm_return_val_if_fail (cnt >= res->ai_addrlen, FALSE);
+			memcpy (addr, res->ai_addr, res->ai_addrlen);
+			pgm_freenodeaddr (result);
+			return TRUE;
+		}
+	}
+
+	pgm_freeifaddrs (ifap);
+	pgm_freenodeaddr (result);
+	return FALSE;
 }
 
 static

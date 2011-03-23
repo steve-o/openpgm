@@ -30,14 +30,18 @@
 #define __PGM_IMPL_GETNODEADDR_H__
 
 #ifndef _WIN32
+#	include <sys/types.h>
 #	include <sys/socket.h>
+#	include <netdb.h>
 #endif
 #include <pgm/types.h>
 #include <pgm/error.h>
 
 PGM_BEGIN_DECLS
 
-PGM_GNUC_INTERNAL bool pgm_if_getnodeaddr (const sa_family_t, struct sockaddr*restrict, const socklen_t, pgm_error_t**restrict);
+PGM_GNUC_INTERNAL bool pgm_getnodeaddr (const sa_family_t, struct addrinfo**restrict, pgm_error_t**restrict);
+PGM_GNUC_INTERNAL void pgm_freenodeaddr (struct addrinfo*);
+PGM_GNUC_INTERNAL bool pgm_get_multicast_enabled_node_addr (const sa_family_t, struct sockaddr*restrict, const socklen_t, pgm_error_t**restrict);
 
 PGM_END_DECLS
 
