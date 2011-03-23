@@ -22,8 +22,6 @@
 #include <errno.h>
 #ifndef _WIN32
 #	include <netdb.h>
-#else
-#	include <ws2tcpip.h>
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
@@ -242,7 +240,7 @@ pgm_get_multicast_enabled_node_addr (
 	}
 /* iff one address return that independent of multicast support */
 	if (NULL == result->ai_next) {
-		pgm_return_val_if_fail (cnt >= result->ai_addrlen, FALSE);
+		pgm_return_val_if_fail (cnt >= (socklen_t)result->ai_addrlen, FALSE);
 		memcpy (addr, result->ai_addr, result->ai_addrlen);
 		pgm_freenodeaddr (result);
 		return TRUE;
@@ -262,7 +260,7 @@ pgm_get_multicast_enabled_node_addr (
 			    0 != pgm_sockaddr_cmp (ifa->ifa_addr, res->ai_addr))
 				continue;
 			if (ifa->ifa_flags & IFF_MULTICAST) {
-				pgm_return_val_if_fail (cnt >= res->ai_addrlen, FALSE);
+				pgm_return_val_if_fail (cnt >= (socklen_t)res->ai_addrlen, FALSE);
 				memcpy (addr, res->ai_addr, res->ai_addrlen);
 				pgm_freenodeaddr (result);
 				return TRUE;
@@ -272,7 +270,7 @@ pgm_get_multicast_enabled_node_addr (
 
 /* use last address as fallback */
 		if (NULL == res->ai_next) {
-			pgm_return_val_if_fail (cnt >= res->ai_addrlen, FALSE);
+			pgm_return_val_if_fail (cnt >= (socklen_t)res->ai_addrlen, FALSE);
 			memcpy (addr, res->ai_addr, res->ai_addrlen);
 			pgm_freenodeaddr (result);
 			return TRUE;

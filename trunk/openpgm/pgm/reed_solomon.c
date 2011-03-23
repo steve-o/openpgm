@@ -255,7 +255,8 @@ found:
  *
  * First column is actually α_m⁰, second column is α_m¹.
  *
- * As only the second column is actually unique so optimise from that.
+ * nb: produces a modified Vandermonde matrix optimised for subsequent
+ * multiplication terms.
  */
 
 static
