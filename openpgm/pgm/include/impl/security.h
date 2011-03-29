@@ -215,7 +215,12 @@ pgm_dupenv_s (char **buffer, size_t *count, const char* name)
 	*count = strlen (*buffer) + 1;
 	return 0;
 #else
-	return _dupenv_s (buffer, count, name);
+	char *pValue;
+	const errno_t err = _dupenv_s (&pValue, count, name);
+	if (err) return err;
+	*buffer = pgm_strdup (pValue);
+	free (pValue);
+	return err;
 #endif
 }
 

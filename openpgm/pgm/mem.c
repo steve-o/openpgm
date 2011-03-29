@@ -125,7 +125,7 @@ pgm_mem_init (void)
 	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
 	if (0 == err && envlen > 0) {
 		flags = pgm_parse_debug_string (env, keys, PGM_N_ELEMENTS (keys));
-		free (env);
+		pgm_free (env);
 	}
 
 	if (flags & 1)

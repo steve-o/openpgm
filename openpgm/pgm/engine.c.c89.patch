@@ -1,5 +1,5 @@
---- engine.c	2010-12-09 12:32:06.000000000 +0800
-+++ engine.c89.c	2010-12-09 12:35:45.000000000 +0800
+--- engine.c	2011-03-29 20:32:26.000000000 +0800
++++ engine.c89.c	2011-03-29 20:32:32.000000000 +0800
 @@ -90,6 +90,7 @@
  	pgm_rand_init();
  
@@ -45,9 +45,20 @@
  
 @@ -184,6 +191,7 @@
  		}
- 		free (env);
+ 		pgm_free (env);
  	}
 +	}
  #endif
  
  /* create global sock list lock */
+@@ -216,9 +224,7 @@
+ bool
+ pgm_shutdown (void)
+ {
+-/* cannot use pgm_return_val_if_fail() as logging may not be started */
+-	if (0 == pgm_atomic_read32 (&pgm_ref_count))
+-		return FALSE;
++	pgm_return_val_if_fail (pgm_atomic_read32 (&pgm_ref_count) > 0, FALSE);
+ 
+ 	if (pgm_atomic_exchange_and_add32 (&pgm_ref_count, (uint32_t)-1) != 1)
+ 		return TRUE;

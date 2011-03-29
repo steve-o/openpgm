@@ -638,7 +638,7 @@ _pgm_getadaptersinfo (
 	}
 
 	if (pAdapterInfo)
-		free (pAdapterInfo);
+		_pgm_heap_free (pAdapterInfo);
 	*ifap = (struct pgm_ifaddrs_t*)ifa;
 	return TRUE;
 }
@@ -686,7 +686,7 @@ _pgm_getadaptersaddresses (
 				PGM_ERROR_NOBUFS,
                                 _("GetAdaptersAddresses repeatedly failed with ERROR_BUFFER_OVERFLOW."));
 		if (pAdapterAddresses)
-	                free (pAdapterAddresses);
+	                _pgm_heap_free (pAdapterAddresses);
                 return FALSE;
         default:
                 pgm_set_error (error,
@@ -695,7 +695,7 @@ _pgm_getadaptersaddresses (
                                 _("GetAdaptersAddresses failed: %s"),
                                 pgm_adapter_strerror (dwRet));
 		if (pAdapterAddresses)
-                	free (pAdapterAddresses);
+                	_pgm_heap_free (pAdapterAddresses);
                 return FALSE;
 	}
 
@@ -808,7 +808,7 @@ _pgm_getadaptersaddresses (
 	}
 
 	if (pAdapterAddresses)
-		free (pAdapterAddresses);
+		_pgm_heap_free (pAdapterAddresses);
 	*ifap = (struct pgm_ifaddrs_t*)ifa;
 	return TRUE;
 }

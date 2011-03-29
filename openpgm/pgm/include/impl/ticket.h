@@ -402,4 +402,6 @@ static inline bool pgm_ticket_is_unlocked (pgm_ticket_t* ticket) {
 	return (copy.pgm_tkt_ticket == copy.pgm_tkt_user);
 }
 
+PGM_END_DECLS
+
 #endif /* __PGM_IMPL_TICKET_H__ */
