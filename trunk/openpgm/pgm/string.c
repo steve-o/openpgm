@@ -46,7 +46,7 @@ pgm_strdup (
 	if (PGM_LIKELY (NULL != str))
 	{
 		length = strlen (str) + 1;
-		new_str = malloc (length);
+		new_str = pgm_malloc (length);
 		memcpy (new_str, str, length);
 	}
 	else
@@ -73,7 +73,7 @@ pgm_printf_string_upper_bound (
 #endif
 }
 
-/* memory must be freed with free()
+/* memory must be freed with pgm_free()
  */
 
 PGM_GNUC_INTERNAL
@@ -89,9 +89,14 @@ pgm_vasprintf (
 	pgm_return_val_if_fail (string != NULL, -1);
 
 #ifdef CONFIG_HAVE_VASPRINTF
-	len = vasprintf (string, format, args);
-	if (len < 0)
+	char *strp;
+	len = vasprintf (&strp, format, args);
+	if (len < 0) {
 		*string = NULL;
+	} else {
+		*string = pgm_strdup (strp);
+		free (strp);
+	}
 #else
 #	ifdef _MSC_VER
 /* can only copy on assignment, pointer to stack frame */
@@ -100,7 +105,7 @@ pgm_vasprintf (
 	va_list args2;
 	va_copy (args2, args);
 #	endif
-	*string = malloc (pgm_printf_string_upper_bound (format, args));
+	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
 /* NB: must be able to handle NULL args, fails on GCC */
 	len = vsprintf (*string, format, args2);
 	va_end (args2);
@@ -167,7 +172,7 @@ pgm_strconcat (
 	}
 	va_end (args);
 
-	dest = malloc (len);
+	dest = pgm_malloc (len);
 
 	to = pgm_stpcpy (dest, src);
 	va_start (args, src);
@@ -213,7 +218,7 @@ pgm_strsplit (
 		while (--max_tokens && s)
 		{
 			const size_t len = s - remainder;
-			char* new_string = malloc (len + 1);
+			char* new_string = pgm_malloc (len + 1);
 
 			pgm_strncpy_s (new_string, len + 1, remainder, len);
 			string_list = pgm_slist_prepend (string_list, new_string);
@@ -250,7 +255,7 @@ pgm_strfreev (
 	if (PGM_LIKELY (NULL != str_array))
 	{
 		for (unsigned i = 0; str_array[i] != NULL; i++)
-			free (str_array[i]);
+			pgm_free (str_array[i]);
 
 		pgm_free (str_array);
 	}
@@ -474,7 +479,7 @@ pgm_string_append_vprintf (
 		pgm_string_maybe_expand (string, len);
 		memcpy (string->str + string->len, buf, len + 1);
 		string->len += len;
-		free (buf);
+		pgm_free (buf);
 	}
 }
 

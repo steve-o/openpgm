@@ -1,5 +1,5 @@
---- mem.c	2011-03-12 10:15:08.000000000 +0800
-+++ mem.c89.c	2011-03-12 10:44:52.000000000 +0800
+--- mem.c	2011-03-29 20:36:18.000000000 +0800
++++ mem.c89.c	2011-03-29 20:36:24.000000000 +0800
 @@ -79,16 +79,24 @@
  	if (NULL == string)
  		return result;
@@ -55,7 +55,7 @@
  	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
  	if (0 == err && envlen > 0) {
  		flags = pgm_parse_debug_string (env, keys, PGM_N_ELEMENTS (keys));
- 		free (env);
+ 		pgm_free (env);
  	}
 +	}
  

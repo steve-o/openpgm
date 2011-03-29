@@ -95,7 +95,7 @@ pgm_messages_init (void)
 		unsigned int value = 0;
 		if (1 == pgm_sscanf_s (log_mask, "0x%4x", &value))
 			pgm_log_mask = value;
-		free (log_mask);
+		pgm_free (log_mask);
 	}
 
 	err = pgm_dupenv_s (&min_log_level, &len, "PGM_MIN_LOG_LEVEL");
@@ -110,7 +110,7 @@ pgm_messages_init (void)
 		case 'F':	pgm_min_log_level = PGM_LOG_LEVEL_FATAL; break;
 		default: break;
 		}
-		free (min_log_level);
+		pgm_free (min_log_level);
 	}
 }
 

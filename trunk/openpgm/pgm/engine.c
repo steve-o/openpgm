@@ -182,7 +182,7 @@ pgm_init (
 			pgm_loss_rate = loss_rate;
 			pgm_minor (_("Setting PGM packet loss rate to %i%%."), pgm_loss_rate);
 		}
-		free (env);
+		pgm_free (env);
 	}
 #endif
 
