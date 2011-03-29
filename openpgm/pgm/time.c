@@ -307,7 +307,7 @@ pgm_time_init (
 	}
 
 /* clean environment copy */
-	free (pgm_timer);
+	pgm_free (pgm_timer);
 
 #ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
@@ -401,7 +401,7 @@ pgm_time_init (
 		err = pgm_dupenv_s (&rdtsc_frequency, &envlen, "RDTSC_FREQUENCY");
 		if (0 == err && envlen > 0) {
 			tsc_mhz = atoi (rdtsc_frequency) * 1000;
-			free (rdtsc_frequency);
+			pgm_free (rdtsc_frequency);
 		}
 
 #ifndef _WIN32
