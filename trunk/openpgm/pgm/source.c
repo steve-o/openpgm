@@ -1785,7 +1785,6 @@ blocked:
  * packet size exceeds the current rate limit.
  */
 
-PGM_GNUC_INTERNAL
 int
 pgm_send (
 	pgm_sock_t* 	 const restrict sock,
@@ -1854,7 +1853,6 @@ pgm_send (
  * packet size exceeds the current rate limit.
  */
 
-PGM_GNUC_INTERNAL
 int
 pgm_sendv (
 	pgm_sock_t*		const restrict sock,
@@ -2204,7 +2202,6 @@ blocked:
  * packet size exceeds the current rate limit.
  */
 
-PGM_GNUC_INTERNAL
 int
 pgm_send_skbv (
 	pgm_sock_t*            const restrict sock,
