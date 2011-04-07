@@ -439,6 +439,9 @@ pgm_socket (
 		goto err_destroy;
 	}
 
+/* receive socket must always be non-blocking */
+	pgm_sockaddr_nonblocking (new_sock->recv_sock, TRUE);
+
 	if ((new_sock->send_sock = socket (new_sock->family,
 					   socket_type,
 					   new_sock->protocol)) == INVALID_SOCKET)
@@ -1545,7 +1548,6 @@ pgm_setsockopt (
 		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		sock->is_nonblocking = (0 != *(const int*)optval);
-		pgm_sockaddr_nonblocking (sock->recv_sock, sock->is_nonblocking);
 		pgm_sockaddr_nonblocking (sock->send_sock, sock->is_nonblocking);
 		pgm_sockaddr_nonblocking (sock->send_with_router_alert_sock, sock->is_nonblocking);
 		status = TRUE;
