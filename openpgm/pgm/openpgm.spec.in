@@ -8,7 +8,7 @@ URL:           http://code.google.com/p/openpgm/
 Source:        http://openpgm.googlecode.com/files/%{name}-%{version}.tar.gz
 Prefix:        %{_prefix}
 Buildroot:     %{_tmppath}/%{name}-%{version}-%{release}-root
-BuildRequires: gcc, make, python, perl
+BuildRequires: python, perl
 
 %description
 OpenPGM is an open source implementation of the 
