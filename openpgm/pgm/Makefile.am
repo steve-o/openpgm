@@ -4,6 +4,8 @@ ACLOCAL_AMFLAGS = -I m4
 
 noinst_LTLIBRARIES = libpgm_noinst.la
 
+EXTRA_DIST = galois_generator.pl version_generator.py
+
 libpgm_noinst_la_SOURCES = \
 	thread.c \
 	mem.c \
@@ -101,5 +103,11 @@ pkgconfig_DATA = openpgm-@RELEASE_INFO@.pc
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
+
+dist-hook:
+	-cp $(top_srcdir)/openpgm.spec $(distdir)/openpgm.spec
+	-rm -rf $(distdir)/include
+	-cp -R $(top_srcdir)/include $(distdir)/include
+	-find $(distdir) -type d -name .svn -exec rm -r {} \; >/dev/null 2>&1 || true
 
 # eof
