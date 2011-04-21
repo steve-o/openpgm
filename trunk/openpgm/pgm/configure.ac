@@ -5,7 +5,7 @@
 #   OSX 10.6 : v2.61
 # Solaris 10 : v2.59
 AC_PREREQ([2.61])
-AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
+AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor.%micro])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -17,6 +17,10 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_SUBST([RELEASE_INFO], [m4_esyscmd([perl version.pl %major.%minor])])
 AC_SUBST([VERSION_INFO], [m4_esyscmd([perl version.pl 0:%micro])])
+
+AC_SUBST([VERSION_MAJOR], [m4_esyscmd([perl version.pl %major])])
+AC_SUBST([VERSION_MINOR], [m4_esyscmd([perl version.pl %minor])])
+AC_SUBST([VERSION_MICRO], [m4_esyscmd([perl version.pl %micro])])
 
 # Checks for programs.
 AC_PROG_CC
@@ -300,5 +304,5 @@ AC_COMPILE_IFELSE(
 		fi],
 	[AC_MSG_RESULT([no])])
 
-AC_CONFIG_FILES([Makefile "openpgm-${RELEASE_INFO}.pc"])
+AC_CONFIG_FILES([Makefile openpgm-${RELEASE_INFO}.pc openpgm.spec])
 AC_OUTPUT
