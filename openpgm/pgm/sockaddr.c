@@ -351,6 +351,9 @@ pgm_sockaddr_pktinfo (
  * OS X:IP6(4) "IPV6_PKTINFO int *"
  *
  * Stevens: "IP_RECVDSTADDR has datatype int."
+ *
+ * Win32: DWORD, http://msdn.microsoft.com/en-us/library/ms738586%28VS.85%29.aspx
+ * also note typo that shows only support for getsockopt and not setsockopt.
  */
 	const int optval = v ? 1 : 0;
 #else
@@ -359,7 +362,10 @@ pgm_sockaddr_pktinfo (
 
 	switch (sa_family) {
 	case AF_INET:
-#ifdef IP_RECVDSTADDR
+/* MSVC100 defines IP_RECVDSTADDR but is not supported by Windows XP, Windows 7 is supported.
+ * No reference is available on MSDN.
+ */
+#if !defined(_WIN32) && defined(IP_RECVDSTADDR)
 		retval = setsockopt (s, IPPROTO_IP, IP_RECVDSTADDR, (const char*)&optval, sizeof(optval));
 #else
 		retval = setsockopt (s, IPPROTO_IP, IP_PKTINFO, (const char*)&optval, sizeof(optval));
