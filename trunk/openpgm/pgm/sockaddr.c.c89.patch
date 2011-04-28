@@ -1,5 +1,5 @@
---- sockaddr.c	2011-03-12 10:28:46.000000000 +0800
-+++ sockaddr.c89.c	2011-03-12 11:01:31.000000000 +0800
+--- sockaddr.c	2011-04-28 14:30:32.000000000 +0800
++++ sockaddr.c89.c	2011-04-28 14:36:27.000000000 +0800
 @@ -139,7 +139,7 @@
  	)
  {
@@ -37,7 +37,7 @@
  }
  
  /* returns tri-state value: 1 if sa is multicast, 0 if sa is not multicast, -1 on error
-@@ -1164,13 +1166,14 @@
+@@ -1170,13 +1172,14 @@
  	pgm_assert (NULL != src);
  	pgm_assert (NULL != dst);
  
@@ -59,7 +59,7 @@
  	const int e = getaddrinfo (src, NULL, &hints, &result);
  	if (0 != e) {
  		return 0;	/* error */
-@@ -1201,6 +1204,8 @@
+@@ -1207,6 +1210,8 @@
  
  	freeaddrinfo (result);
  	return 1;	/* success */
