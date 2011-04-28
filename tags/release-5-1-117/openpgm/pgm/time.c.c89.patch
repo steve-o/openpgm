@@ -1,0 +1,50 @@
+--- time.c	2011-03-29 20:34:27.000000000 +0800
++++ time.c89.c	2011-03-29 20:34:35.000000000 +0800
+@@ -347,6 +347,7 @@
+  * MSDN statement: The frequency cannot change while the system is running.
+  * http://msdn.microsoft.com/en-us/library/ms644905(v=vs.85).aspx
+  */
++		{
+ 		LARGE_INTEGER frequency;
+ 		if (QueryPerformanceFrequency (&frequency))
+ 		{
+@@ -362,6 +363,7 @@
+ 				       _("No supported high-resolution performance counter: %s"),
+ 				       pgm_win_strerror (winstr, sizeof (winstr), save_errno));
+ 		}
++		}
+ #elif defined(__APPLE__)
+ /* nb: RDTSC is non-functional on Darwin */
+ 		uint64_t cpufrequency;
+@@ -457,6 +459,7 @@
+ 
+ /* update Windows timer resolution to 1ms */
+ #ifdef _WIN32
++	{
+ 	TIMECAPS tc;
+ 	if (TIMERR_NOERROR == timeGetDevCaps (&tc, sizeof (TIMECAPS)))
+ 	{
+@@ -468,6 +471,7 @@
+ 	{
+ 		pgm_warn (_("Unable to determine timer device resolution."));
+ 	}
++	}
+ #endif
+ 
+ 	return TRUE;
+@@ -827,11 +831,15 @@
+ /* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
+  * the value must be <= 0x05f5e100 or 100ns.
+  */
++	{
+ 	const uint32_t hpet_period = *((uint32_t*)(hpet_ptr + HPET_COUNTER_CLK_PERIOD));
+ 	set_hpet_mul (hpet_period);
++	}
+ #if defined( __x86_64__ ) || defined( __amd64 )
++	{
+ 	const uint32_t hpet_caps = *((uint32_t*)(hpet_ptr + HPET_GENERAL_CAPS_REGISTER));
+ 	hpet_wrap = hpet_caps & HPET_COUNT_SIZE_CAP ? 0 : (1ULL << 32);
++	}
+ #else
+ 	hpet_wrap = 1ULL << 32;
+ #endif

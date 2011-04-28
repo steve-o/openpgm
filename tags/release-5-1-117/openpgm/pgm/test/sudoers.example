@@ -1,0 +1,26 @@
+# /etc/sudoers
+#
+# This file MUST be edited with the 'visudo' command as root.
+#
+# See the man page for details on how to write a sudoers file.
+# Host alias specification
+
+# User alias specification
+User_Alias PGM_USER = steve-o
+
+# Cmnd alias specification
+Cmnd_Alias PGM_CONFORMANCE = /miru/projects/openpgm/pgm/ref/debug/test/*
+
+# Defaults
+
+Defaults	!lecture,tty_tickets,!fqdn
+
+# User privilege specification
+root	ALL=(ALL) ALL
+
+# Members of the admin group may gain root privileges
+%admin ALL=(ALL) ALL
+
+
+# PGM testing
+PGM_USER ALL = NOPASSWD: PGM_CONFORMANCE
