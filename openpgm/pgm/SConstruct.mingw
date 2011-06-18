@@ -112,6 +112,12 @@ env = Environment(
 # C99
 			'-std=gnu99',
 			'-D_BSD_SOURCE',
+# 0x0403 required for SetCriticalSectionSpinCount()
+# 0x0501 required for getaddrinfo() on MinGW and IPv6 enabled getaddrinfo() on XP
+# /Windows 2000/ required for InterlockedExchangeAdd()
+# /Windows XP/ required for CreateWellKnownSid(), WSARecvMsg()
+# NB: MinGW32 defaults to 0x0400, i.e. NT 4.0
+#     MinGW-w64 defaults to 0x502, i.e. Windows XP SP2
 			'-D_WIN32_WINNT=0x0501',
 # re-entrant libc
 			'-D_REENTRANT',
