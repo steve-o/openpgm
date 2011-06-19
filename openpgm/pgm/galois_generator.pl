@@ -2,7 +2,7 @@
 #
 # Galois field table generator.
 #
-# Copyright (c) 2006-2010 Miru Limited.
+# Copyright (c) 2006-2011 Miru Limited.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -51,7 +51,7 @@ print<<MOO;
  *
  * Galois field tables
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -68,6 +68,7 @@ print<<MOO;
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <libpgmconfig.h>
 #include <impl/framework.h>
 
 

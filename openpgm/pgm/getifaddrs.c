@@ -2,7 +2,7 @@
  *
  * portable getifaddrs implementation.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,10 +19,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <libpgmconfig.h>
 #include <errno.h>
 #ifdef CONFIG_HAVE_GETIFADDRS
 #	include <sys/types.h>
 #	include <ifaddrs.h>
+#endif
+#if defined( __CYGWIN__ )
+#	include <sys/ioctl.h>
 #endif
 #if defined( __sun )
 #	include <sys/sockio.h>

@@ -59,7 +59,7 @@ PGM_BEGIN_DECLS
 /* Byte alignment for CAS friendly unions.
  * NB: Solaris and OpenSolaris don't support #pragma pack(push) even on x86.
  */
-#if defined( __GNUC__ ) && !defined( __sun )
+#if defined( __GNUC__ ) && !defined( __sun ) && !defined( __CYGWIN__ )
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -83,7 +83,7 @@ union pgm_ticket_t {
 #define pgm_tkt_ticket	pgm_un.pgm_un_ticket
 #define pgm_tkt_user	pgm_un.pgm_un_user
 
-#if defined( __GNUC__ ) && !defined( __sun )
+#if defined( __GNUC__ ) && !defined( __sun ) && !defined( __CYGWIN__ )
 #	pragma pack(pop)
 #else
 #	pragma pack()
