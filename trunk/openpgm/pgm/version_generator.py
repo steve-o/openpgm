@@ -30,6 +30,7 @@ print """
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#Include <libpgmconfig.h>
 #include <impl/framework.h>
 #include <pgm/version.h>
 
@@ -37,7 +38,7 @@ print """
 /* globals */
 
 const unsigned pgm_major_version = 5;
-const unsigned pgm_minor_version = 1;
+const unsigned pgm_minor_version = 2;
 const unsigned pgm_micro_version = 118;
 const char* pgm_build_date = "%s";
 const char* pgm_build_time = "%s";

@@ -89,6 +89,7 @@ echo "${B}ビルド環境をチェックする${N}..."
 
 CHECK libtoolize glibtoolize; LIBTOOLIZE=$USE_PROG
 CHECK aclocal
+CHECK autoheader
 CHECK automake
 CHECK autoconf
 
@@ -110,6 +111,7 @@ echo "${B}ビルドスクリプトを生成する${N}..."
 
 RUN $LIBTOOLIZE --force --copy
 RUN aclocal
+RUN autoheader
 RUN automake --copy --add-missing
 RUN autoconf
 
