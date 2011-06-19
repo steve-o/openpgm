@@ -1,6 +1,6 @@
---- socket.c	2011-04-07 10:09:44.000000000 +0800
-+++ socket.c89.c	2011-04-07 10:09:49.000000000 +0800
-@@ -377,7 +377,9 @@
+--- socket.c	2011-06-19 07:58:59.000000000 +0800
++++ socket.c89.c	2011-06-19 07:59:16.000000000 +0800
+@@ -378,7 +378,9 @@
  	new_sock->adv_mode	= 0;	/* advance with time */
  
  /* PGMCC */
@@ -10,7 +10,7 @@
  
  /* source-side */
  	pgm_mutex_init (&new_sock->source_mutex);
-@@ -475,6 +477,7 @@
+@@ -476,6 +478,7 @@
  /* Stevens: "SO_REUSEADDR has datatype int."
   */
  		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
@@ -18,7 +18,7 @@
  		const int v = 1;
  #ifndef SO_REUSEPORT
  		if (SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
-@@ -505,10 +508,12 @@
+@@ -506,10 +509,12 @@
  			goto err_destroy;
  		}
  #endif
@@ -31,7 +31,7 @@
  		const sa_family_t recv_family = new_sock->family;
  		if (SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
  		{
-@@ -521,6 +526,7 @@
+@@ -522,6 +527,7 @@
  				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
  			goto err_destroy;
  		}
@@ -39,7 +39,7 @@
  #endif
  	}
  	else
-@@ -777,8 +783,11 @@
+@@ -778,8 +784,11 @@
  		{
  			int*restrict intervals = (int*restrict)optval;
  			*optlen = sock->spm_heartbeat_len;
@@ -52,7 +52,7 @@
  		}
  		status = TRUE;
  		break;
-@@ -1212,8 +1221,11 @@
+@@ -1213,8 +1222,11 @@
  			sock->spm_heartbeat_len = optlen / sizeof (int);
  			sock->spm_heartbeat_interval = pgm_new (unsigned, sock->spm_heartbeat_len + 1);
  			sock->spm_heartbeat_interval[0] = 0;
@@ -65,7 +65,7 @@
  		}
  		status = TRUE;
  		break;
-@@ -1458,6 +1470,7 @@
+@@ -1459,6 +1471,7 @@
  				break;
  			if (PGM_UNLIKELY(fecinfo->group_size > fecinfo->block_size))
  				break;
@@ -73,7 +73,7 @@
  			const uint8_t parity_packets = fecinfo->block_size - fecinfo->group_size;
  /* technically could re-send previous packets */
  			if (PGM_UNLIKELY(fecinfo->proactive_packets > parity_packets))
-@@ -1474,6 +1487,7 @@
+@@ -1475,6 +1488,7 @@
  			sock->rs_n			= fecinfo->block_size;
  			sock->rs_k			= fecinfo->group_size;
  			sock->rs_proactive_h		= fecinfo->proactive_packets;
@@ -81,7 +81,7 @@
  		}
  		status = TRUE;
  		break;
-@@ -1596,7 +1610,9 @@
+@@ -1597,7 +1611,9 @@
  		{
  			const struct group_req* gr = optval;
  /* verify not duplicate group/interface pairing */
@@ -92,7 +92,7 @@
  			{
  				if (pgm_sockaddr_cmp ((const struct sockaddr*)&gr->gr_group, (struct sockaddr*)&sock->recv_gsr[i].gsr_group)  == 0 &&
  				    pgm_sockaddr_cmp ((const struct sockaddr*)&gr->gr_group, (struct sockaddr*)&sock->recv_gsr[i].gsr_source) == 0 &&
-@@ -1615,6 +1631,7 @@
+@@ -1616,6 +1632,7 @@
  					break;
  				}
  			}
@@ -100,7 +100,7 @@
  			if (PGM_UNLIKELY(sock->family != gr->gr_group.ss_family))
  				break;
  			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = gr->gr_interface;
-@@ -1646,7 +1663,9 @@
+@@ -1647,7 +1664,9 @@
  			break;
  		{
  			const struct group_req* gr = optval;
@@ -111,7 +111,7 @@
  			{
  				if ((pgm_sockaddr_cmp ((const struct sockaddr*)&gr->gr_group, (struct sockaddr*)&sock->recv_gsr[i].gsr_group) == 0) &&
  /* drop all matching receiver entries */
-@@ -1663,6 +1682,7 @@
+@@ -1664,6 +1683,7 @@
  				}
  				i++;
  			}
@@ -119,7 +119,7 @@
  			if (PGM_UNLIKELY(sock->family != gr->gr_group.ss_family))
  				break;
  			if (SOCKET_ERROR == pgm_sockaddr_leave_group (sock->recv_sock, sock->family, gr))
-@@ -1721,7 +1741,9 @@
+@@ -1722,7 +1742,9 @@
  		{
  			const struct group_source_req* gsr = optval;
  /* verify if existing group/interface pairing */
@@ -130,7 +130,7 @@
  			{
  				if (pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&sock->recv_gsr[i].gsr_group) == 0 &&
  					(gsr->gsr_interface == sock->recv_gsr[i].gsr_interface ||
-@@ -1746,6 +1768,7 @@
+@@ -1747,6 +1769,7 @@
  					break;
  				}
  			}
@@ -138,7 +138,7 @@
  			if (PGM_UNLIKELY(sock->family != gsr->gsr_group.ss_family))
  				break;
  			if (PGM_UNLIKELY(sock->family != gsr->gsr_source.ss_family))
-@@ -1768,7 +1791,9 @@
+@@ -1769,7 +1792,9 @@
  		{
  			const struct group_source_req* gsr = optval;
  /* verify if existing group/interface pairing */
@@ -149,7 +149,7 @@
  			{
  				if (pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_group, (struct sockaddr*)&sock->recv_gsr[i].gsr_group)   == 0 &&
  				    pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&sock->recv_gsr[i].gsr_source) == 0 &&
-@@ -1782,6 +1807,7 @@
+@@ -1783,6 +1808,7 @@
  					}
  				}
  			}
@@ -157,7 +157,7 @@
  			if (PGM_UNLIKELY(sock->family != gsr->gsr_group.ss_family))
  				break;
  			if (PGM_UNLIKELY(sock->family != gsr->gsr_source.ss_family))
-@@ -2085,17 +2111,19 @@
+@@ -2086,17 +2112,19 @@
  
  /* determine IP header size for rate regulation engine & stats */
  	sock->iphdr_len = (AF_INET == sock->family) ? sizeof(struct pgm_ip) : sizeof(struct pgm_ip6_hdr);
@@ -179,7 +179,7 @@
  	const unsigned max_fragments = sock->txw_sqns ? MIN( PGM_MAX_FRAGMENTS, sock->txw_sqns ) : PGM_MAX_FRAGMENTS;
  	sock->max_apdu = MIN( PGM_MAX_APDU, max_fragments * sock->max_tsdu_fragment );
  
-@@ -2141,6 +2169,7 @@
+@@ -2142,6 +2170,7 @@
   */
  /* TODO: different ports requires a new bound socket */
  
@@ -187,7 +187,7 @@
  	union {
  		struct sockaddr		sa;
  		struct sockaddr_in	s4;
-@@ -2309,6 +2338,7 @@
+@@ -2310,6 +2339,7 @@
  
  /* save send side address for broadcasting as source nla */
  	memcpy (&sock->send_addr, &send_addr, pgm_sockaddr_len ((struct sockaddr*)&send_addr));
@@ -195,7 +195,7 @@
  
  /* rx to nak processor notify channel */
  	if (sock->can_send_data)
-@@ -2316,7 +2346,7 @@
+@@ -2317,7 +2347,7 @@
  /* setup rate control */
  		if (sock->txw_max_rte > 0) {
  			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting rate regulation to %" PRIzd " bytes per second."),
@@ -204,7 +204,7 @@
  			pgm_rate_create (&sock->rate_control, sock->txw_max_rte, sock->iphdr_len, sock->max_tpdu);
  			sock->is_controlled_spm   = TRUE;	/* must always be set */
  		} else
-@@ -2324,13 +2354,13 @@
+@@ -2325,13 +2355,13 @@
  
  		if (sock->odata_max_rte > 0) {
  			pgm_trace (PGM_LOG_ROLE_RATE_CONTROL,_("Setting ODATA rate regulation to %" PRIzd " bytes per second."),
@@ -220,7 +220,7 @@
  			pgm_rate_create (&sock->rdata_rate_control, sock->rdata_max_rte, sock->iphdr_len, sock->max_tpdu);
  			sock->is_controlled_rdata = TRUE;
  		}
-@@ -2346,6 +2376,8 @@
+@@ -2347,6 +2377,8 @@
  	pgm_rwlock_writer_unlock (&sock->lock);
  	pgm_debug ("PGM socket successfully bound.");
  	return TRUE;
@@ -229,7 +229,7 @@
  }
  
  bool
-@@ -2359,11 +2391,14 @@
+@@ -2360,11 +2392,14 @@
  #ifdef CONFIG_TARGET_WINE
  	pgm_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
  #endif
@@ -245,7 +245,7 @@
  	pgm_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
  /* shutdown */
  	if (PGM_UNLIKELY(!pgm_rwlock_writer_trylock (&sock->lock)))
-@@ -2472,6 +2507,7 @@
+@@ -2473,6 +2508,7 @@
  		return SOCKET_ERROR;
  	}
  
@@ -253,7 +253,7 @@
  	const bool is_congested = (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) ? TRUE : FALSE;
  
  	if (readfds)
-@@ -2500,6 +2536,7 @@
+@@ -2501,6 +2537,7 @@
  #endif
  			}
  		}
@@ -261,7 +261,7 @@
  		const SOCKET pending_fd = pgm_notify_get_socket (&sock->pending_notify);
  		FD_SET(pending_fd, readfds);
  #ifndef _WIN32
-@@ -2507,6 +2544,7 @@
+@@ -2508,6 +2545,7 @@
  #else
  		fds++;
  #endif
@@ -269,7 +269,7 @@
  	}
  
  	if (sock->can_send_data && writefds && !is_congested)
-@@ -2524,6 +2562,7 @@
+@@ -2525,6 +2563,7 @@
  #else
  	return *n_fds + fds;
  #endif

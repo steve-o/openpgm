@@ -1,6 +1,6 @@
---- recv.c	2010-11-05 04:58:45.000000000 +0800
-+++ recv.c89.c	2010-11-05 08:08:16.000000000 +0800
-@@ -47,12 +47,21 @@
+--- recv.c	2011-06-19 07:21:48.000000000 +0800
++++ recv.c89.c	2011-06-19 07:22:04.000000000 +0800
+@@ -49,12 +49,21 @@
  #endif
  
  #ifndef _WIN32
@@ -22,7 +22,7 @@
  #	define PGM_CMSG_FIRSTHDR(msg)		WSA_CMSG_FIRSTHDR(msg)
  #	define PGM_CMSG_NXTHDR(msg, cmsg)	WSA_CMSG_NXTHDR(msg, cmsg)
  #	define PGM_CMSG_DATA(cmsg)		WSA_CMSG_DATA(cmsg)
-@@ -65,13 +74,13 @@
+@@ -67,13 +76,13 @@
  /* as listed in MSDN */
  #		define pgm_cmsghdr			wsacmsghdr
  #	else
@@ -37,7 +37,7 @@
  /* read a packet into a PGM skbuff
   * on success returns packet length, on closed socket returns 0,
   * on error returns -1.
-@@ -104,41 +113,41 @@
+@@ -106,41 +115,41 @@
  		return 0;
  
  #ifdef CONFIG_TARGET_WINE
@@ -102,7 +102,7 @@
  		return SOCKET_ERROR;
  	}
  #	endif /* !_WIN32 */
-@@ -149,8 +158,7 @@
+@@ -151,8 +160,7 @@
  		const unsigned percent = pgm_rand_int_range (&sock->rand_, 0, 100);
  		if (percent <= pgm_loss_rate) {
  			pgm_debug ("Simulated packet loss");
@@ -112,7 +112,7 @@
  		}
  	}
  #endif
-@@ -170,9 +178,9 @@
+@@ -172,9 +180,9 @@
  	    AF_INET6 == pgm_sockaddr_family (src_addr))
  	{
  		struct pgm_cmsghdr* cmsg;
@@ -124,7 +124,7 @@
  		{
  /* both IP_PKTINFO and IP_RECVDSTADDR exist on OpenSolaris, so capture
   * each type if defined.
-@@ -185,8 +193,9 @@
+@@ -187,8 +195,9 @@
  /* discard on invalid address */
  				if (PGM_UNLIKELY(NULL == pktinfo)) {
  					pgm_debug ("in_pktinfo is NULL");
@@ -135,7 +135,7 @@
  				const struct in_pktinfo* in	= pktinfo;
  				struct sockaddr_in s4;
  				memset (&s4, 0, sizeof(s4));
-@@ -194,6 +203,7 @@
+@@ -196,6 +205,7 @@
  				s4.sin_addr.s_addr		= in->ipi_addr.s_addr;
  				memcpy (dst_addr, &s4, sizeof(s4));
  				break;
@@ -143,7 +143,7 @@
  			}
  #endif
  #ifdef IP_RECVDSTADDR
-@@ -204,8 +214,9 @@
+@@ -206,8 +216,9 @@
  /* discard on invalid address */
  				if (PGM_UNLIKELY(NULL == recvdstaddr)) {
  					pgm_debug ("in_recvdstaddr is NULL");
@@ -154,7 +154,7 @@
  				const struct in_addr* in	= recvdstaddr;
  				struct sockaddr_in s4;
  				memset (&s4, 0, sizeof(s4));
-@@ -213,6 +224,7 @@
+@@ -215,6 +226,7 @@
  				s4.sin_addr.s_addr		= in->s_addr;
  				memcpy (dst_addr, &s4, sizeof(s4));
  				break;
@@ -162,7 +162,7 @@
  			}
  #endif
  #if !defined(IP_PKTINFO) && !defined(IP_RECVDSTADDR)
-@@ -226,8 +238,9 @@
+@@ -228,8 +240,9 @@
  /* discard on invalid address */
  				if (PGM_UNLIKELY(NULL == pktinfo)) {
  					pgm_debug ("in6_pktinfo is NULL");
@@ -173,7 +173,7 @@
  				const struct in6_pktinfo* in6	= pktinfo;
  				struct sockaddr_in6 s6;
  				memset (&s6, 0, sizeof(s6));
-@@ -237,11 +250,26 @@
+@@ -239,11 +252,26 @@
  				memcpy (dst_addr, &s6, sizeof(s6));
  /* does not set flow id */
  				break;
@@ -200,7 +200,7 @@
  }
  
  /* upstream = receiver to source, peer-to-peer = receive to receiver
-@@ -358,6 +386,7 @@
+@@ -360,6 +388,7 @@
  	}
  
  /* check to see the source this peer-to-peer message is about is in our peer list */
@@ -208,7 +208,7 @@
  	pgm_tsi_t upstream_tsi;
  	memcpy (&upstream_tsi.gsi, &skb->tsi.gsi, sizeof(pgm_gsi_t));
  	upstream_tsi.sport = skb->pgm_header->pgm_dport;
-@@ -400,6 +429,7 @@
+@@ -402,6 +431,7 @@
  	else if (sock->can_send_data)
  		sock->cumulative_stats[PGM_PC_SOURCE_PACKETS_DISCARDED]++;
  	return FALSE;
@@ -216,7 +216,7 @@
  }
  
  /* source to receiver message
-@@ -425,11 +455,13 @@
+@@ -427,11 +457,13 @@
  	pgm_assert (NULL != source);
  
  #ifdef RECV_DEBUG
@@ -230,7 +230,7 @@
  #endif
  
  	if (PGM_UNLIKELY(!sock->can_recv_data)) {
-@@ -594,8 +626,10 @@
+@@ -596,8 +628,10 @@
  		const int status = pgm_poll_info (sock, fds, &n_fds, POLLIN);
  		pgm_assert (-1 != status);
  #else
@@ -241,7 +241,7 @@
  		const int status = pgm_select_info (sock, &readfds, NULL, &n_fds);
  		pgm_assert (-1 != status);
  #endif /* CONFIG_HAVE_POLL */
-@@ -606,6 +640,7 @@
+@@ -608,6 +642,7 @@
  			sock->is_pending_read = FALSE;
  		}
  
@@ -249,7 +249,7 @@
  		int timeout;
  		if (sock->can_send_data && !pgm_txw_retransmit_is_empty (sock->window))
  			timeout = 0;
-@@ -615,10 +650,11 @@
+@@ -617,10 +652,11 @@
  #ifdef CONFIG_HAVE_POLL
  		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
  #else
@@ -265,7 +265,7 @@
  		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
  #endif
  		if (PGM_UNLIKELY(SOCKET_ERROR == ready)) {
-@@ -628,6 +664,11 @@
+@@ -630,6 +666,11 @@
  			pgm_debug ("recv again on empty");
  			return EAGAIN;
  		}
@@ -277,7 +277,7 @@
  	} while (pgm_timer_check (sock));
  	pgm_debug ("state generated event");
  	return EINTR;
-@@ -663,7 +704,7 @@
+@@ -665,7 +706,7 @@
  	int status = PGM_IO_STATUS_WOULD_BLOCK;
  
  	pgm_debug ("pgm_recvmsgv (sock:%p msg-start:%p msg-len:%" PRIzu " flags:%d bytes-read:%p error:%p)",
@@ -286,7 +286,7 @@
  
  /* parameters */
  	pgm_return_val_if_fail (NULL != sock, PGM_IO_STATUS_ERROR);
-@@ -695,6 +736,7 @@
+@@ -697,6 +738,7 @@
  	if (PGM_UNLIKELY(sock->is_reset)) {
  		pgm_assert (NULL != sock->peers_pending);
  		pgm_assert (NULL != sock->peers_pending->data);
@@ -294,7 +294,7 @@
  		pgm_peer_t* peer = sock->peers_pending->data;
  		if (flags & MSG_ERRQUEUE)
  			pgm_set_reset_error (sock, peer, msg_start);
-@@ -712,6 +754,7 @@
+@@ -714,6 +756,7 @@
  		pgm_mutex_unlock (&sock->receiver_mutex);
  		pgm_rwlock_reader_unlock (&sock->lock);
  		return PGM_IO_STATUS_RESET;
@@ -302,7 +302,7 @@
  	}
  
  /* timer status */
-@@ -733,6 +776,7 @@
+@@ -735,6 +778,7 @@
  			pgm_notify_clear (&sock->rdata_notify);
  	}
  
@@ -310,7 +310,7 @@
  	size_t bytes_read = 0;
  	unsigned data_read = 0;
  	struct pgm_msgv_t* pmsg = msg_start;
-@@ -752,6 +796,7 @@
+@@ -754,6 +798,7 @@
   *
   * We cannot actually block here as packets pushed by the timers need to be addressed too.
   */
@@ -318,7 +318,7 @@
  	struct sockaddr_storage src, dst;
  	ssize_t len;
  	size_t bytes_received = 0;
-@@ -791,6 +836,7 @@
+@@ -793,6 +838,7 @@
  		bytes_received += len;
  	}
  
@@ -326,7 +326,7 @@
  	pgm_error_t* err = NULL;
  	const bool is_valid = (sock->udp_encap_ucast_port || AF_INET6 == src.ss_family) ?
  					pgm_parse_udp_encap (sock->rx_buffer, &err) :
-@@ -810,6 +856,7 @@
+@@ -812,6 +858,7 @@
  		goto recv_again;
  	}
  
@@ -334,7 +334,7 @@
  	pgm_peer_t* source = NULL;
  	if (PGM_UNLIKELY(!on_pgm (sock, sock->rx_buffer, (struct sockaddr*)&src, (struct sockaddr*)&dst, &source)))
  		goto recv_again;
-@@ -889,6 +936,7 @@
+@@ -891,6 +938,7 @@
  		if (PGM_UNLIKELY(sock->is_reset)) {
  			pgm_assert (NULL != sock->peers_pending);
  			pgm_assert (NULL != sock->peers_pending->data);
@@ -342,7 +342,7 @@
  			pgm_peer_t* peer = sock->peers_pending->data;
  			if (flags & MSG_ERRQUEUE)
  				pgm_set_reset_error (sock, peer, msg_start);
-@@ -906,6 +954,7 @@
+@@ -908,6 +956,7 @@
  			pgm_mutex_unlock (&sock->receiver_mutex);
  			pgm_rwlock_reader_unlock (&sock->lock);
  			return PGM_IO_STATUS_RESET;
@@ -350,7 +350,7 @@
  		}
  		pgm_mutex_unlock (&sock->receiver_mutex);
  		pgm_rwlock_reader_unlock (&sock->lock);
-@@ -940,6 +989,10 @@
+@@ -942,6 +991,10 @@
  	pgm_mutex_unlock (&sock->receiver_mutex);
  	pgm_rwlock_reader_unlock (&sock->lock);
  	return PGM_IO_STATUS_NORMAL;
@@ -361,7 +361,7 @@
  }
  
  /* read one contiguous apdu and return as a IO scatter/gather array.  msgv is owned by
-@@ -996,12 +1049,14 @@
+@@ -998,12 +1051,14 @@
  	}
  
  	pgm_debug ("pgm_recvfrom (sock:%p buf:%p buflen:%" PRIzu " flags:%d bytes-read:%p from:%p from:%p error:%p)",
@@ -377,7 +377,7 @@
  	size_t bytes_copied = 0;
  	struct pgm_sk_buff_t** skb = msgv.msgv_skb;
  	struct pgm_sk_buff_t* pskb = *skb;
-@@ -1016,7 +1071,7 @@
+@@ -1018,7 +1073,7 @@
  		size_t copy_len = pskb->len;
  		if (bytes_copied + copy_len > buflen) {
  			pgm_warn (_("APDU truncated, original length %" PRIzu " bytes."),
@@ -386,7 +386,7 @@
  			copy_len = buflen - bytes_copied;
  			bytes_read = buflen;
  		}
-@@ -1027,6 +1082,8 @@
+@@ -1029,6 +1084,8 @@
  	if (_bytes_read)
  		*_bytes_read = bytes_copied;
  	return PGM_IO_STATUS_NORMAL;
@@ -395,7 +395,7 @@
  }
  
  /* Basic recv operation, copying data from window to application.
-@@ -1048,7 +1105,7 @@
+@@ -1050,7 +1107,7 @@
  	if (PGM_LIKELY(buflen)) pgm_return_val_if_fail (NULL != buf, PGM_IO_STATUS_ERROR);
  
  	pgm_debug ("pgm_recv (sock:%p buf:%p buflen:%" PRIzu " flags:%d bytes-read:%p error:%p)",

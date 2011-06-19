@@ -1,6 +1,15 @@
---- rate_control.c	2011-03-12 10:21:10.000000000 +0800
-+++ rate_control.c89.c	2011-03-12 10:51:31.000000000 +0800
-@@ -81,7 +81,7 @@
+--- rate_control.c	2011-06-19 07:35:42.000000000 +0800
++++ rate_control.c89.c	2011-06-19 07:35:51.000000000 +0800
+@@ -19,7 +19,7 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ 
+-#include <libpgmconfig.h>
++#Include <libpgmconfig.h>
+ #include <impl/framework.h>
+ 
+ 
+@@ -82,7 +82,7 @@
  	const bool		is_nonblocking
  	)
  {
@@ -9,7 +18,7 @@
  	pgm_time_t now;
  
  /* pre-conditions */
-@@ -103,7 +103,9 @@
+@@ -104,7 +104,9 @@
  			if (time_since_last_rate_check > pgm_msecs(1)) 
  				new_major_limit = major_bucket->rate_per_msec;
  			else {
@@ -19,7 +28,7 @@
  				if (new_major_limit > major_bucket->rate_per_msec)
  					new_major_limit = major_bucket->rate_per_msec;
  			}
-@@ -114,7 +116,9 @@
+@@ -115,7 +117,9 @@
  			if (time_since_last_rate_check > pgm_secs(1)) 
  				new_major_limit = major_bucket->rate_per_sec;
  			else {
@@ -29,7 +38,7 @@
  				if (new_major_limit > major_bucket->rate_per_sec)
  					new_major_limit = major_bucket->rate_per_sec;
  			}
-@@ -151,7 +155,9 @@
+@@ -152,7 +156,9 @@
  			if (time_since_last_rate_check > pgm_msecs(1)) 
  				new_minor_limit = minor_bucket->rate_per_msec;
  			else {
@@ -39,7 +48,7 @@
  				if (new_minor_limit > minor_bucket->rate_per_msec)
  					new_minor_limit = minor_bucket->rate_per_msec;
  			}
-@@ -162,7 +168,9 @@
+@@ -163,7 +169,9 @@
  			if (time_since_last_rate_check > pgm_secs(1)) 
  				new_minor_limit = minor_bucket->rate_per_sec;
  			else {
@@ -49,7 +58,7 @@
  				if (new_minor_limit > minor_bucket->rate_per_sec)
  					new_minor_limit = minor_bucket->rate_per_sec;
  			}
-@@ -209,7 +217,7 @@
+@@ -210,7 +218,7 @@
  	const bool		is_nonblocking
  	)
  {
@@ -58,7 +67,7 @@
  
  /* pre-conditions */
  	pgm_assert (NULL != bucket);
-@@ -219,6 +227,7 @@
+@@ -220,6 +228,7 @@
  		return TRUE;
  
  	pgm_spinlock_lock (&bucket->spinlock);
@@ -66,7 +75,7 @@
  	pgm_time_t now = pgm_time_update_now();
  
  	if (bucket->rate_per_msec)
-@@ -227,7 +236,9 @@
+@@ -228,7 +237,9 @@
  		if (time_since_last_rate_check > pgm_msecs(1)) 
  			new_rate_limit = bucket->rate_per_msec;
  		else {
@@ -76,7 +85,7 @@
  			if (new_rate_limit > bucket->rate_per_msec)
  				new_rate_limit = bucket->rate_per_msec;
  		}
-@@ -238,7 +249,9 @@
+@@ -239,7 +250,9 @@
  		if (time_since_last_rate_check > pgm_secs(1)) 
  			new_rate_limit = bucket->rate_per_sec;
  		else {
@@ -86,7 +95,7 @@
  			if (new_rate_limit > bucket->rate_per_sec)
  				new_rate_limit = bucket->rate_per_sec;
  		}
-@@ -264,6 +277,7 @@
+@@ -265,6 +278,7 @@
  	} 
  	pgm_spinlock_unlock (&bucket->spinlock);
  	return TRUE;
@@ -94,7 +103,7 @@
  }
  
  PGM_GNUC_INTERNAL
-@@ -288,12 +302,14 @@
+@@ -289,12 +303,14 @@
  	{
  		pgm_spinlock_lock (&major_bucket->spinlock);
  		now = pgm_time_update_now();
@@ -110,7 +119,7 @@
  		}
  	}
  	else
-@@ -335,6 +351,7 @@
+@@ -336,6 +352,7 @@
  		return 0;
  
  	pgm_spinlock_lock (&bucket->spinlock);
@@ -118,7 +127,7 @@
  	const pgm_time_t now = pgm_time_update_now();
  	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
  	const int64_t bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - n;
-@@ -343,10 +360,13 @@
+@@ -344,10 +361,13 @@
  	if (bucket_bytes >= 0)
  		return 0;
  

@@ -1,6 +1,6 @@
---- indextoaddr.c	2011-03-12 10:12:29.000000000 +0800
-+++ indextoaddr.c89.c	2011-03-12 10:39:57.000000000 +0800
-@@ -45,7 +45,9 @@
+--- indextoaddr.c	2011-06-19 07:39:30.000000000 +0800
++++ indextoaddr.c89.c	2011-06-19 07:39:40.000000000 +0800
+@@ -46,7 +46,9 @@
  
  	if (0 == ifindex)		/* any interface or address */
  	{
@@ -10,7 +10,7 @@
  		switch (iffamily) {
  		case AF_INET:
  			((struct sockaddr_in*)ifsa)->sin_addr.s_addr = INADDR_ANY;
-@@ -62,6 +64,7 @@
+@@ -63,6 +65,7 @@
  		return TRUE;
  	}
  
@@ -18,7 +18,7 @@
  	struct pgm_ifaddrs_t *ifap, *ifa;
  	if (!pgm_getifaddrs (&ifap, error)) {
  		pgm_prefix_error (error,
-@@ -75,6 +78,7 @@
+@@ -76,6 +79,7 @@
  		    ifa->ifa_addr->sa_family != iffamily)
  			continue;
  
@@ -26,7 +26,7 @@
  		const unsigned i = pgm_if_nametoindex (iffamily, ifa->ifa_name);
  		pgm_assert (0 != i);
  		if (i == ifindex)
-@@ -85,6 +89,7 @@
+@@ -86,6 +90,7 @@
  			pgm_freeifaddrs (ifap);
  			return TRUE;
  		}
@@ -34,7 +34,7 @@
  	}
  
  	pgm_set_error (error,
-@@ -94,6 +99,7 @@
+@@ -95,6 +100,7 @@
  		     ifindex);
  	pgm_freeifaddrs (ifap);
  	return FALSE;

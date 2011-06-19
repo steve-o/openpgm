@@ -1,6 +1,6 @@
---- sockaddr.c	2011-04-28 14:30:32.000000000 +0800
-+++ sockaddr.c89.c	2011-04-28 14:36:27.000000000 +0800
-@@ -139,7 +139,7 @@
+--- sockaddr.c	2011-06-19 07:34:19.000000000 +0800
++++ sockaddr.c89.c	2011-06-19 07:34:30.000000000 +0800
+@@ -140,7 +140,7 @@
  	)
  {
  	return getnameinfo (sa, pgm_sockaddr_len (sa),
@@ -9,7 +9,7 @@
  			    NULL, 0,
  			    NI_NUMERICHOST);
  }
-@@ -151,12 +151,13 @@
+@@ -152,12 +152,13 @@
  	struct sockaddr* restrict dst		/* will error on wrong size */
  	)
  {
@@ -29,7 +29,7 @@
  	const int status = getaddrinfo (src, NULL, &hints, &result);
  	if (PGM_LIKELY(0 == status)) {
  		memcpy (dst, result->ai_addr, result->ai_addrlen);
-@@ -164,6 +165,7 @@
+@@ -165,6 +166,7 @@
  		return 1;
  	}
  	return 0;
@@ -37,7 +37,265 @@
  }
  
  /* returns tri-state value: 1 if sa is multicast, 0 if sa is not multicast, -1 on error
-@@ -1170,13 +1172,14 @@
+@@ -255,8 +257,7 @@
+ 			break;
+ 		}
+ 
+-/* IN6_ARE_ADDR_EQUAL(a,b) only returns true or false, i.e. insufficient for sorting.
+- */
++/* IN6_ARE_ADDR_EQUAL(a,b) only returns true or false */
+ 		case AF_INET6: {
+ 			struct sockaddr_in6 sa1_in6, sa2_in6;
+ 			memcpy (&sa1_in6, sa1, sizeof(sa1_in6));
+@@ -307,17 +308,13 @@
+  */
+ 		const int optval = v ? 1 : 0;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IP Socket Options) "DWORD (boolean)"
+- */
+ 		const DWORD optval = v ? 1 : 0;
+ #endif
+ 		retval = setsockopt (s, IPPROTO_IP, IP_HDRINCL, (const char*)&optval, sizeof(optval));
+ 		break;
+ 	}
+ 
+-	case AF_INET6:
+-/* method only exists with Windows Sockets 2, just ignore.
+- */
++	case AF_INET6:  /* method only exists on Win32, just ignore */
+ 		retval = 0;
+ 		break;
+ 
+@@ -357,20 +354,18 @@
+  * OS X:IP6(4) "IPV6_PKTINFO int *"
+  *
+  * Stevens: "IP_RECVDSTADDR has datatype int."
++ *
++ * Win32: DWORD, http://msdn.microsoft.com/en-us/library/ms738586%28VS.85%29.aspx
++ * also note typo that shows only support for getsockopt and not setsockopt.
+  */
+ 	const int optval = v ? 1 : 0;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IP Socket Options) "DWORD"
+- * Also, typo in article shows only support for getsockopt() and not setsockopt().
+- * Also, Windows 7 introduces IP_ORIGINAL_ARRIVAL_IF for subset of CMSG data, but usage is
+- * designed for IPv4 NAT firewalling and tunneling but not native IPv6.
+- */
+ 	const DWORD optval = v ? 1 : 0;
+ #endif
+ 
+ 	switch (sa_family) {
+ 	case AF_INET:
+-/* MSVC100 defines IP_RECVDSTADDR but is not supported by Windows XP, Windows 7 is functional.
++/* MSVC100 defines IP_RECVDSTADDR but is not supported by Windows XP, Windows 7 is supported.
+  * No reference is available on MSDN.
+  */
+ #if !defined(_WIN32) && defined(IP_RECVDSTADDR)
+@@ -381,8 +376,6 @@
+ 		break;
+ 
+ 	case AF_INET6:
+-/* MSVC does not currently define IPV6_RECVPKTINFO, verify each new SDK release.
+- */
+ #ifdef IPV6_RECVPKTINFO
+ 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const char*)&optval, sizeof(optval));
+ #else
+@@ -422,24 +415,23 @@
+ 
+ 	switch (sa_family) {
+ 	case AF_INET:
+-		retval = setsockopt (s, IPPROTO_IP, IP_ROUTER_ALERT, (const char*)&optval, sizeof (optval));
++		retval = setsockopt (s, IPPROTO_IP, IP_ROUTER_ALERT, (const char*)&optval, sizeof(optval));
+ 		break;
+ 
+ 	case AF_INET6:
+-		retval = setsockopt (s, IPPROTO_IPV6, IPV6_ROUTER_ALERT, (const char*)&optval, sizeof (optval));
++		retval = setsockopt (s, IPPROTO_IPV6, IPV6_ROUTER_ALERT, (const char*)&optval, sizeof(optval));
+ 		break;
+ 
+ 	default: break;
+ 	}
+ #else
+ #	if defined(CONFIG_HAVE_IPOPTION)
+-/* NB: struct ipoption is not very portable and requires a lot of additional headers.
+- */
++/* NB: struct ipoption is not very portable and requires a lot of additional headers */
+ 	const struct ipoption router_alert = {
+ 		.ipopt_dst  = 0,
+ 		.ipopt_list = { PGM_IPOPT_RA, 0x04, 0x00, 0x00 }
+ 	};
+-	const int optlen = v ? sizeof (router_alert) : 0;
++	const int optlen = v ? sizeof(router_alert) : 0;
+ #	else
+ /* manually set the IP option */
+ #		ifndef _WIN32
+@@ -449,14 +441,12 @@
+ 	const DWORD ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
+ 	const DWORD router_alert = htonl (ipopt_ra);
+ #		endif
+-	const int optlen = v ? sizeof (router_alert) : 0;
++	const int optlen = v ? sizeof(router_alert) : 0;
+ #	endif
+ 
+ 	switch (sa_family) {
+ 	case AF_INET:
+ /* Linux:ip(7) "The maximum option size for IPv4 is 40 bytes."
+- *
+- * WinSock2:MSDN(IPPROTO_IP Socket Options) "char []"
+  */
+ 		retval = setsockopt (s, IPPROTO_IP, IP_OPTIONS, (const char*)&router_alert, optlen);
+ 		break;
+@@ -497,10 +487,9 @@
+  */
+ 		const int optval = tos;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IP Socket Options) "DWORD (boolean) Do not use."
+- * IP_TOS only works on WinSock2 with system override, listed support Windows 2000-only:
++/* IP_TOS only works on Win32 with system override:
+  * http://support.microsoft.com/kb/248611
+- * Recommended APIs: GQoS (IPv4 only), qWAVE QOS (Vista+)
++ * TODO: Implement GQoS (IPv4 only), qWAVE QOS is Vista+ only
+  */
+ 		const DWORD optval = tos;
+ #endif
+@@ -539,11 +528,6 @@
+  * Solaris:ip6(7P) "Takes a struct group_req as the parameter."
+  * Different type for each family, however group_req is protocol-independent.
+  *
+- * WinSock2:MSDN(GROUP_REQ Structure) "The GROUP_REQ structure is used with the
+- * MCAST_JOIN_GROUP and MCAST_LEAVE_GROUP socket options."
+- * Minimum supported client: none supported.
+- * Minimum supported server: Windows Server 2008.
+- *
+  * Stevens: "MCAST_JOIN_GROUP has datatype group_req{}."
+  *
+  * RFC3678: Argument type struct group_req
+@@ -561,8 +545,7 @@
+  *
+  * FreeBSD,OS X:IP(4) provided by example "struct ip_mreq mreq;"
+  *
+- * WinSock2:MSDN(IPPROTO_IP Socket Options) "ip_mreq"
+- * Also, can set ip_mreq.imr_interface to be 0.0.0.<imr_ifindex>
++ * Windows can optionally abuse imt_interface to be 0.0.0.<imr_ifindex>
+  *
+  * Stevens: "IP_ADD_MEMBERSHIP has datatype ip_mreq{}."
+  *
+@@ -598,8 +581,6 @@
+  *
+  * OS X:IP6(4) "IPV6_JOIN_GROUP struct ipv6_mreq *"
+  *
+- * WinSock2:MSDN(IPPROTO_IP Socket Options) "ipv6_mreq"
+- *
+  * Stevens: "IPV6_JOIN_GROUP has datatype ipv6_mreq{}."
+  */
+ 		struct ipv6_mreq mreq6;
+@@ -786,10 +767,6 @@
+  * Different type for each family, however group_source_req is protocol-
+  * independent.
+  *
+- * WinSock2:MSDN(GROUP_SOURCE_REQ Structure) "The GROUP_SOURCE_REQ structure is
+- * used with the MCAST_BLOCK_SOURCE, MCAST_JOIN_SOURCE_GROUP,
+- * MCAST_LEAVE_SOURCE_GROUP, and MCAST_UNBLOCK_SOURCE socket options."
+- *
+  * Stevens: "MCAST_JOIN_SOURCE_GROUP has datatype group_source_req{}."
+  *
+  * RFC3678: Argument type struct group_source_req
+@@ -806,8 +783,6 @@
+  *
+  * OS X:IP(4) absent.
+  *
+- * WinSock2:MSDN(IPPROTO_IP Socket Options) "ip_mreq_source"
+- *
+  * Stevens: "IP_ADD_SOURCE_MEMBERSHIP has datatype ip_mreq_source{}."
+  *
+  * RFC3678: Argument type struct ip_mreq_source
+@@ -958,11 +933,6 @@
+  *
+  * OS X:IP(4) provided by example "struct in_addr addr;"
+  *
+- * WinSock2:MSDN(IPPROTO_IP Socket Options) "DWORD; Any IP address in the
+- * 0.x.x.x block (first octet of 0) except IPv4 address 0.0.0.0 is treated
+- * as an interface index."
+- * NB: 24-bit interface index size cf. 8-bit of ip_mreq.
+- *
+  * Stevens: "IP_MULTICAST_IF has datatype struct in_addr{}."
+  */
+ 		struct sockaddr_in s4;
+@@ -985,11 +955,6 @@
+  */
+ 		const unsigned int optval = ifindex;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IPV6 Socket Options) "DWORD; The input value for
+- * setting this option is a 4-byte interface index of the desired outgoing
+- * interface."
+- * NB: 32-bit interface index cf. 24-bit of IPv4 and 8-bit of ip_mreq.
+- */
+ 		const DWORD optval = ifindex;
+ #endif
+ 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_IF, (const char*)&optval, sizeof(optval));
+@@ -1034,8 +999,6 @@
+  */
+ 		const unsigned char optval = v ? 1 : 0;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IP Socket Options) "DWORD (boolean)"
+- */
+ 		const DWORD optval = v ? 1 : 0;
+ #endif
+ 		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
+@@ -1054,8 +1017,6 @@
+  */
+ 		const unsigned int optval = v ? 1 : 0;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IPV6 Socket Options) "DWORD (boolean)"
+- */
+ 		const DWORD optval = v ? 1 : 0;
+ #endif
+ 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (const char*)&optval, sizeof(optval));
+@@ -1099,8 +1060,6 @@
+  */
+ 		const unsigned char optval = hops;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IP Socket Options) "DWORD"
+- */
+ 		const DWORD optval = hops;
+ #endif
+ 		retval = setsockopt (s, IPPROTO_IP, IP_MULTICAST_TTL, (const char*)&optval, sizeof(optval));
+@@ -1119,8 +1078,6 @@
+  */
+ 		const int optval = hops;
+ #else
+-/* WinSock2:MSDN(IPPROTO_IPV6 Socket Options) "DWORD"
+- */
+ 		const DWORD optval = hops;
+ #endif
+ 		retval = setsockopt (s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, (const char*)&optval, sizeof(optval));
+@@ -1173,10 +1130,10 @@
+ 	case AF_INET:
+ 	{
+ 		struct sockaddr_in sin;
+-		memset (&sin, 0, sizeof (sin));
++		memset (&sin, 0, sizeof(sin));
+ 		sin.sin_family = AF_INET;
+ 		sin.sin_addr   = *(const struct in_addr*)src;
+-		getnameinfo ((struct sockaddr*)&sin, sizeof (sin),
++		getnameinfo ((struct sockaddr*)&sin, sizeof(sin),
+ 			     dst, size,
+ 			     NULL, 0,
+ 			     NI_NUMERICHOST);
+@@ -1185,10 +1142,10 @@
+ 	case AF_INET6:
+ 	{
+ 		struct sockaddr_in6 sin6;
+-		memset (&sin6, 0, sizeof (sin6));
++		memset (&sin6, 0, sizeof(sin6));
+ 		sin6.sin6_family = AF_INET6;
+ 		sin6.sin6_addr   = *(const struct in6_addr*)src;
+-		getnameinfo ((struct sockaddr*)&sin6, sizeof (sin6),
++		getnameinfo ((struct sockaddr*)&sin6, sizeof(sin6),
+ 			     dst, size,
+ 			     NULL, 0,
+ 			     NI_NUMERICHOST);
+@@ -1216,13 +1173,14 @@
  	pgm_assert (NULL != src);
  	pgm_assert (NULL != dst);
  
@@ -59,7 +317,7 @@
  	const int e = getaddrinfo (src, NULL, &hints, &result);
  	if (0 != e) {
  		return 0;	/* error */
-@@ -1207,6 +1210,8 @@
+@@ -1253,6 +1211,8 @@
  
  	freeaddrinfo (result);
  	return 1;	/* success */

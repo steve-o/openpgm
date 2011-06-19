@@ -19,12 +19,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <libpgmconfig.h>
+
 #if defined(CONFIG_HAVE_VASPRINTF) && !defined(_GNU_SOURCE)
-#	define _GNU_SOURCE
+#	define _GNU_SOURCE	/* vasprintf */
 #endif
+
 #include <limits.h>
 #include <stdarg.h>
-#include <stdio.h>	/* _GNU_SOURCE for vasprintf */
+#include <stdio.h>
 #include <string.h>
 #include <impl/framework.h>
 

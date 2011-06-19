@@ -2,7 +2,7 @@
  *
  * PGM engine.
  *
- * Copyright (c) 2006-2010 Miru Limited.
+ * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* getprotobyname_r */
+#include <libpgmconfig.h>
+
 #ifndef _BSD_SOURCE
-#	define _BSD_SOURCE	1
+#	define _BSD_SOURCE	1	/* getprotobyname_r */
 #endif
 
 #ifndef _WIN32

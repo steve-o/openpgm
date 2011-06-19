@@ -8,6 +8,7 @@ AC_PREREQ([2.61])
 AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor.%micro])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
 AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_HEADER(lib/pgm/include/libpgmconfig.h)
 
 #  Ubuntu 10 : v1.11
 #   OSX 10.6 : v1.10
@@ -38,7 +39,7 @@ AC_SUBST(PYTHON)
 
 # Apply system specific rules.
 AC_CANONICAL_HOST
-CFLAGS="$CFLAGS -D_REENTRANT"
+CFLAGS="$CFLAGS -D_REENTRANT -llib/pgm/include"
 case "$host_os" in
 linux*)
 	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_BSD_SOURCE"
@@ -65,16 +66,18 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h float.h inttypes.h libintl.h limits.h loca
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
-AC_TYPE_UID_T
 AC_C_INLINE
+AC_C_FLEXIBLE_ARRAY_MEMBER
+AC_C_RESTRICT
+AC_C_VARARRAYS
 AC_TYPE_INT16_T
 AC_TYPE_INT32_T
 AC_TYPE_INT64_T
 AC_TYPE_INT8_T
 AC_TYPE_MODE_T
-AC_C_RESTRICT
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
+AC_TYPE_UID_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
