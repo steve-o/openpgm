@@ -39,7 +39,7 @@ AC_SUBST(PYTHON)
 
 # Apply system specific rules.
 AC_CANONICAL_HOST
-CFLAGS="$CFLAGS -D_REENTRANT -llib/pgm/include"
+CFLAGS="$CFLAGS -D_REENTRANT -Ilib/pgm/include"
 case "$host_os" in
 linux*)
 	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_BSD_SOURCE"

@@ -111,6 +111,8 @@ env = Environment(
 			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
+# config.h
+			'-Ilib/pgm/include',
 # POSIX spinlocks
 			'-DCONFIG_HAVE_POSIX_SPINLOCK',
 # NSS protocol lookup
