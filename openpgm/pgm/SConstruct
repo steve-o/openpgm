@@ -172,7 +172,8 @@ env = Environment(
 # GNU getopt
 			'-DCONFIG_HAVE_GETOPT'
 		],
-	LINKFLAGS = [	'-pipe'
+	LINKFLAGS = [	'-pipe',
+			'-lpthread'
 		],
 	LIBS = [
 # histogram math
@@ -347,6 +348,7 @@ BuildDir(ref_node, '.', duplicate=0)
 env.Append(CPPPATH = os.getcwd() + '/include');
 env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
+SConscript(ref_node + 'SConscript.autoconf');
 if env['WITH_GLIB'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmex');
 SConscript(ref_node + 'SConscript.libpgm');
