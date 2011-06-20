@@ -1,0 +1,57 @@
+# -*- mode: python -*-
+# OpenPGM Autoconf script
+# $Id$
+
+from __future__ import print_function;
+import os;
+
+Import ('env');
+
+# POSIX spinlocks
+def CheckPthreadSpinlock (context):
+	context.Message ('Checking for pthread_spinlock...');
+	source = """
+#include <pthread.h>
+int
+main ()
+{
+	pthread_spinlock_t spinlock; pthread_spin_lock (&spinlock);
+	return 0;
+}
+	""";
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+def AutoConf (env):
+	settings = {};
+	conf = Configure (env, custom_tests = {	'CheckPthreadSpinlock': CheckPthreadSpinlock });
+	# AC_CHECK_FUNCS
+	settings['HAVE_CLOCK_GETTIME'] = conf.CheckFunc ('clock_gettime');
+	settings['HAVE_FTIME'] = conf.CheckFunc ('ftime');
+	settings['HAVE_GETTIMEOFDAY'] = conf.CheckFunc ('gettimeofday');
+	settings['HAVE_PTHREAD_SPINLOCK'] = conf.CheckPthreadSpinlock();
+	env = conf.Finish();
+	env['settings'] = settings;
+	return env;
+
+def GenerateConfig (target, source, env):
+	settings = env['settings'];
+	for t in target:
+		print (t);
+		with open (str (t), 'wt') as f:
+			for key in settings.keys():
+				if isinstance (settings[key], str):
+					print ('#define %s %s' % (key, settings[key]), file = f);
+				else:
+					if settings[key]:
+						print ('#define %s 1' % (key,), file = f);
+					else:
+						print ('/* #undef %s */' % (key,), file = f);
+	return None;
+
+env = AutoConf (env);
+Execute (Mkdir ('lib/pgm/include'));
+GenerateConfig (['lib/pgm/include/libpgmconfig.h'], [], env);
+
+# end of file
