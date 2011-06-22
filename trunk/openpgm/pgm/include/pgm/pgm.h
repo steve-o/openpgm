@@ -34,8 +34,6 @@
 #	pragma comment (lib, "advapi32")
 #endif
 
-#include <libpgmconfig.h>
-
 #include <pgm/atomic.h>
 #include <pgm/engine.h>
 #include <pgm/error.h>

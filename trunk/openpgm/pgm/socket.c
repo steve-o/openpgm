@@ -20,7 +20,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <libpgmconfig.h>
+#include <config.h>
 #include <errno.h>
 #ifdef CONFIG_HAVE_POLL
 #	include <poll.h>

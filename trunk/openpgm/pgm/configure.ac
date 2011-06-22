@@ -8,7 +8,7 @@ AC_PREREQ([2.61])
 AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor.%micro])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
 AC_CONFIG_MACRO_DIR([m4])
-AC_CONFIG_HEADER(lib/pgm/include/libpgmconfig.h)
+AC_CONFIG_HEADER(include/config.h)
 
 #  Ubuntu 10 : v1.11
 #   OSX 10.6 : v1.10
@@ -39,7 +39,7 @@ AC_SUBST(PYTHON)
 
 # Apply system specific rules.
 AC_CANONICAL_HOST
-CFLAGS="$CFLAGS -D_REENTRANT -Ilib/pgm/include"
+CFLAGS="$CFLAGS -D_REENTRANT"
 case "$host_os" in
 linux*)
 	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_BSD_SOURCE"
