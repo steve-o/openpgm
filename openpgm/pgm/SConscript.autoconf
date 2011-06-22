@@ -337,7 +337,7 @@ def GenerateConfig (target, source, env):
 	return None;
 
 env = AutoConf (env);
-Execute (Mkdir ('lib/pgm/include'));
-GenerateConfig (['lib/pgm/include/libpgmconfig.h'], [], env);
+Execute (Mkdir ('include'));
+GenerateConfig (['include/config.h'], [], env);
 
 # end of file
