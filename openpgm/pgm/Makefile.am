@@ -78,10 +78,6 @@ share_include_HEADERS = \
 	include/pgm/wininttypes.h \
 	include/pgm/zinttypes.h
 
-arch_includedir = $(libdir)/pgm-@RELEASE_INFO@/include
-arch_include_HEADERS = \
-	lib/pgm/include/libpgmconfig.h
-
 # nb: Solaris make does not understand $<
 version.c: version_generator.py
 	$(AM_V_GEN)$(PYTHON) $(srcdir)/version_generator.py > $@
