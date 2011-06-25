@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Windows interface index to interface name function.
+ * Interface index to interface name function.  Defined as part of RFC2553
+ * for IPv6 basic socket extensions, but also available for IPv4 addresses
+ * on many platforms.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *
@@ -36,9 +38,14 @@ pgm_if_indextoname (
 	char*			ifname
         )
 {
-#ifndef _WIN32
+#if !defined( _WIN32 )
+/* Vista+ implements if_indextoname for IPv6 */
 	return if_indextoname (ifindex, ifname);
 #else
+/* Windows maintains a few different numbers for each interface, the
+ * number returned by GetIfEntry has shown to be the same as that 
+ * determined by GetAdaptersAddresses and GetAdaptersInfo.
+ */
 	pgm_return_val_if_fail (NULL != ifname, NULL);
 
 	MIB_IFROW ifRow = { .dwIndex = ifindex };

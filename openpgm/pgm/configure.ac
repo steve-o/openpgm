@@ -103,14 +103,13 @@ AC_COMPILE_IFELSE(
 # NSS protocol lookup
 AC_CHECK_FUNC([getprotobyname_r])
 if test "x$ac_cv_func_getprotobyname_r" = "xyes"; then
-AC_MSG_CHECKING([for 4- or 5-param getprotobyname_r])
+AC_MSG_CHECKING([whether getprotobyname_r returns struct protoent *])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <netdb.h>]],
-		[[getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (size_t)0, (struct protoent**)0);]])],
-	[AC_MSG_RESULT([5-param])
-		CFLAGS="$CFLAGS -DHAVE_GETPROTOBYNAME_R2"],
-	[AC_MSG_RESULT([4-param])
-		CFLAGS="$CFLAGS -DHAVE_GETPROTOBYNAME_R"])
+		[[struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (size_t)0, (struct protoent**)0);]])],
+	[AC_MSG_RESULT([yes])
+		CFLAGS="$CFLAGS -DGETPROTOBYNAME_R_STRUCT_PROTOENT_P"],
+	[AC_MSG_RESULT([no])])
 fi
 # NSS networks lookup, IPv4 only
 AC_CHECK_FUNC([getnetent])

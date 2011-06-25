@@ -1,6 +1,7 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable implementation of getprotobyname
+ * Portable implementation of getprotobyname.  Returns the IP protocol
+ * number for the provided protocol name.
  *
  * Copyright (c) 2010-2011 Miru Limited.
  *
@@ -34,6 +35,10 @@ static char line[BUFSIZ+1];
 static char *proto_aliases[MAXALIASES];
 static struct pgm_protoent_t proto;
 
+/* re-entrant system APIs are preferred, unfortunately two different decls
+ * are often available.
+ */
+
 static
 struct pgm_protoent_t*
 _pgm_native_getprotobyname (
@@ -47,12 +52,12 @@ _pgm_native_getprotobyname (
 	if (NULL == name)
 		return NULL;
 
-#if defined( HAVE_GETPROTOBYNAME_R )
+#if defined( HAVE_GETPROTOBYNAME_R ) && defined( GETPROTOBYNAME_R_STRUCT_PROTOENT_P )
 	char buf[BUFSIZ];
 	struct protoent protobuf;
 	if (NULL == (pe = getprotobyname_r (name, &protobuf, buf, BUFSIZ)))
 		return NULL;
-#elif defined( HAVE_GETPROTOBYNAME_R2 )
+#elif defined( HAVE_GETPROTOBYNAME_R )
 	char buf[BUFSIZ];
 	struct protoent protobuf;
 	if (0 != getprotobyname_r (name, &protobuf, buf, BUFSIZ, &pe) || NULL == pe)

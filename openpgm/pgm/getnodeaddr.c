@@ -1,6 +1,10 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable function to return the nodes IP address.
+ * Portable function to return the nodes IP address.  IPv6 addressing
+ * is often complicated on dual-stack machines that are configured to
+ * only resolve an IPv4 address against the node name.  In such
+ * circumstances the primary IPv6 for the interface with that IPv4
+ * address is taken as the node address.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *
