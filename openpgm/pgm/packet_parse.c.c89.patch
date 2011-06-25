@@ -1,5 +1,5 @@
---- packet_parse.c	2011-06-19 07:22:45.000000000 +0800
-+++ packet_parse.c89.c	2011-06-19 07:22:56.000000000 +0800
+--- packet_parse.c	2011-06-25 22:34:15.000000000 +0800
++++ packet_parse.c89.c	2011-06-26 07:33:04.000000000 +0800
 @@ -118,6 +118,7 @@
   */
  
@@ -25,7 +25,7 @@
  	}
  
 +	{
- #ifndef CONFIG_HOST_ORDER_IP_LEN
+ #ifndef HAVE_HOST_ORDER_IP_LEN
  	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
  #else
 @@ -174,13 +177,14 @@
@@ -53,7 +53,7 @@
  
  /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
 +	{
- #ifndef CONFIG_HOST_ORDER_IP_OFF
+ #ifndef HAVE_HOST_ORDER_IP_OFF
  	const uint16_t offset = ntohs (ip->ip_off);
  #else
 @@ -229,8 +235,12 @@
