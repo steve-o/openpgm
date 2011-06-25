@@ -106,7 +106,7 @@ for (my $i = 0; $i < $GF_NO_ELEMENTS; $i++)
 print<<MOO;
 };
 
-#ifdef CONFIG_GALOIS_MUL_LUT
+#ifdef USE_GALOIS_MUL_LUT
 const pgm_gf8_t pgm_gftable[PGM_GF_NO_ELEMENTS * PGM_GF_NO_ELEMENTS] =
 {
 MOO

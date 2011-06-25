@@ -480,7 +480,7 @@ parse_interface (
 				break;
 			}
 			case AF_INET6: {
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef HAVE_GETNETENT
 				pgm_set_error (error,
 					       PGM_ERROR_DOMAIN_IF,
 					       PGM_ERROR_NODEV,
@@ -508,7 +508,7 @@ parse_interface (
 				check_inet6_network = TRUE;
 				check_addr = TRUE;
 				break;
-#endif
+#endif /* HAVE_GETNETENT */
 			}
 			default:
 				pgm_set_error (error,
@@ -917,7 +917,7 @@ parse_group (
 			return FALSE;
 		}
 		case AF_INET6: {
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef HAVE_GETNETENT
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
 				     PGM_ERROR_NODEV,
@@ -945,7 +945,7 @@ parse_group (
 				     _("IP address class conflict when resolving network name %s%s%s, expected IPv6 multicast."),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
-#endif /* CONFIG_HAVE_GETNETENT */
+#endif /* HAVE_GETNETENT */
 		}
 		default:
 			pgm_set_error (error,

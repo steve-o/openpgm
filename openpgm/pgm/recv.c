@@ -62,7 +62,7 @@
 #	define PGM_CMSG_LEN(len)		WSA_CMSG_LEN(len)
 #endif
 
-#ifdef CONFIG_HAVE_WSACMSGHDR
+#ifdef HAVE_WSACMSGHDR
 #	ifdef __GNU__
 /* as listed in MSDN */
 #		define pgm_cmsghdr			wsacmsghdr
@@ -495,7 +495,7 @@ on_downstream (
 			memcpy (&(*source)->group_nla, dst_addr, pgm_sockaddr_len(dst_addr));
 		break;
 
-#ifdef CONFIG_PGM_POLLING
+#ifdef USE_PGM_PROTOCOL_POLL
 	case PGM_POLL:
 		if (PGM_UNLIKELY(!pgm_on_poll (sock, *source, skb)))
 			goto out_discarded;
@@ -590,7 +590,7 @@ wait_for_event (
 /* tight loop on blocked send */
 			pgm_on_deferred_nak (sock);
 
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 		struct pollfd fds[ n_fds ];
 		memset (fds, 0, sizeof(fds));
 		const int status = pgm_poll_info (sock, fds, &n_fds, POLLIN);
@@ -600,7 +600,7 @@ wait_for_event (
 		FD_ZERO(&readfds);
 		const int status = pgm_select_info (sock, &readfds, NULL, &n_fds);
 		pgm_assert (-1 != status);
-#endif /* CONFIG_HAVE_POLL */
+#endif /* HAVE_POLL */
 
 /* flush any waiting notifications */
 		if (sock->is_pending_read) {
@@ -614,7 +614,7 @@ wait_for_event (
 		else
 			timeout = (int)pgm_timer_expiration (sock);
 		
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
 #else
 		struct timeval tv_timeout = {
@@ -622,7 +622,7 @@ wait_for_event (
 			.tv_usec	= timeout > 1000000L ? (timeout % 1000000L) : timeout
 		};
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
-#endif
+#endif /* HAVE_POLL */
 		if (PGM_UNLIKELY(SOCKET_ERROR == ready)) {
 			pgm_debug ("block returned errno=%i",errno);
 			return EFAULT;

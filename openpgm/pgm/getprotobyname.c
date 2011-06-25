@@ -47,12 +47,12 @@ _pgm_native_getprotobyname (
 	if (NULL == name)
 		return NULL;
 
-#ifdef CONFIG_HAVE_GETPROTOBYNAME_R
+#if defined( HAVE_GETPROTOBYNAME_R )
 	char buf[BUFSIZ];
 	struct protoent protobuf;
 	if (NULL == (pe = getprotobyname_r (name, &protobuf, buf, BUFSIZ)))
 		return NULL;
-#elif defined(CONFIG_HAVE_GETPROTOBYNAME_R2)
+#elif defined( HAVE_GETPROTOBYNAME_R2 )
 	char buf[BUFSIZ];
 	struct protoent protobuf;
 	if (0 != getprotobyname_r (name, &protobuf, buf, BUFSIZ, &pe) || NULL == pe)
@@ -60,7 +60,7 @@ _pgm_native_getprotobyname (
 #else
 	if (NULL == (pe = getprotobyname (name)))
 		return NULL;
-#endif
+#endif /* HAVE_GETPROTOBYNAME_R */
 	len = strlen (pe->p_name) + 1;
 	if (len > BUFSIZ)
 		return NULL;
