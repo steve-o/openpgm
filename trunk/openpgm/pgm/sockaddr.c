@@ -898,7 +898,7 @@ pgm_sockaddr_msfilter (
 #	else
 /* IPv4-only filter API alternative */
 	if (AF_INET == sa_family) {
-		const socklen_t len = IP_MSFILTER_SIZE(gf_list->gr_numsrc);
+		const socklen_t len = IP_MSFILTER_SIZE(gf_list->gf_numsrc);
 		struct ip_msfilter* filter = pgm_alloca (len);
 		struct sockaddr_in sa4;
 		unsigned i;
@@ -918,9 +918,11 @@ pgm_sockaddr_msfilter (
 #		elif defined( SIOCSIPMSFILTER )
 /* RFC3678 API for struct ip_msfilter */
 		retval = ioctlsocket (s, SIOCSIPMSFILTER, (const char*)filter);
-#		else
+#		elif defined( IP_MSFILTER )
 /* NB: Windows SDK for Vista+ defines a typedef IP_MSFILTER */
 		retval = ioctlsocket (s, IP_MSFILTER, (const char*)filter);
+#		else
+/* Cygwin has no socket option defined */
 #		endif
 	}
 #	endif

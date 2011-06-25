@@ -87,8 +87,8 @@ galois_tables.c: galois_generator.pl
 
 libpgm_noinst_la_CFLAGS = \
 	-I$(top_srcdir)/include \
-	-DCONFIG_16BIT_CHECKSUM \
-	-DCONFIG_GALOIS_MUL_LUT \
+	-DUSE_16BIT_CHECKSUM \
+	-DUSE_GALOIS_MUL_LUT \
 	-DGETTEXT_PACKAGE='"pgm"'
 
 lib_LTLIBRARIES   = libpgm.la
