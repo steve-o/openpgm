@@ -1,6 +1,10 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable error reporting.
+ * Portable advanced error reporting.  In addition to a basic error code
+ * this module provides a domain code and a textual description of the error.
+ * Text is localised per gettext() configuration and hence is generally
+ * limited to one language per process and an application restart is required
+ * to read updated catalogue translations.
  *
  * Copyright (c) 2010-2011 Miru Limited.
  *

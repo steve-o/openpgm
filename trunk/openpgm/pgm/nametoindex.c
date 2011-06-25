@@ -1,6 +1,7 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Windows interface name to interface index function.
+ * Interface name to interface index function.  Defined as part of RFC2553
+ * for IPv6 basic socket extensions.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *
@@ -242,6 +243,7 @@ pgm_if_nametoindex (
 	pgm_return_val_if_fail (NULL != ifname, 0);
 
 #ifndef _WIN32
+/* Vista+ implements if_nametoindex for IPv6 */
 	return if_nametoindex (ifname);
 #elif defined(CONFIG_TARGET_WINE)
 	return _pgm_getadaptersinfo_nametoindex (iffamily, ifname);

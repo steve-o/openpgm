@@ -1,6 +1,14 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * PGM engine.
+ * PGM engine environment, i.e. bare minimum to get anything running.
+ * - WinSock on Windows,
+ * - Thread API to detect #cores,
+ * - Logging API for global lock and debug flags,
+ * - Memory API for debug flags,
+ * - PRNG API for global lock on global generator,
+ * - Timing API for calibration, device locking as appropriate,
+ * - PGM protocol# resolution,
+ * - Lock on global list of PGM sockets.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *
