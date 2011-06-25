@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable interface index to socket address function.
+ * Portable interface index to socket address function.  The underlying
+ * socket implementation may manage separate numerical spaces for each
+ * address family.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *

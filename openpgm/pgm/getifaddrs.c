@@ -1,6 +1,11 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable getifaddrs implementation.
+ * A portable getifaddrs implementation, an API to enumerate all system
+ * network interfaces.
+ *
+ * Note that Windows 7 introduces a feature to hide interfaces from
+ * enumeration which may cause confusion, see MSDN(getaddrinfo Function)
+ * for further details.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *

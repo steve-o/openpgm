@@ -26,29 +26,14 @@ main ()
 	return result;
 
 # NSS protocol lookup
-def CheckGetProtoByNameR4Param (context):
-	context.Message ('Checking for 4-param getprotobyname_r...');
+def CheckGetProtoByNameR (context):
+	context.Message ('Checking whether getprotobyname_r returns struct protoent *...');
 	source = """
 #include <netdb.h>
 int
 main ()
 {
-	getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (int)0);
-	return 0;
-}
-	""";
-	result = context.TryCompile (source, '.c');
-	context.Result (result);
-	return result;
-
-def CheckGetProtoByNameR5Param (context):
-	context.Message ('Checking for 5-param getprotobyname_r...');
-	source = """
-#include <netdb.h>
-int
-main ()
-{
-	getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (size_t)0, (struct protoent**)0);
+	struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (size_t)0, (struct protoent**)0);
 	return 0;
 }
 	""";
@@ -288,8 +273,8 @@ def AutoConf (env):
 	settings['HAVE_GETTIMEOFDAY'] = conf.CheckFunc ('gettimeofday');
 	# Custom checks
 	settings['HAVE_PTHREAD_SPINLOCK'] = conf.CheckPthreadSpinlock();
-	settings['HAVE_GETPROTOBYNAME_R'] = conf.CheckGetProtoByNameR4Param();
-	settings['HAVE_GETPROTOBYNAME_R2'] = conf.CheckGetProtoByNameR5Param();
+	settings['HAVE_GETPROTOBYNAME_R'] = conf.CheckFunc ('getprotobyname_r');
+	settings['GETPROTOBYNAME_R_STRUCT_PROTOENT_P'] = conf.CheckGetProtoByNameR();
 	settings['HAVE_GETNETENT'] = conf.CheckFunc ('getnetent');
 	settings['HAVE_ISO_VARARGS'] = conf.CheckIsoVariadicMacros();
 	settings['HAVE_GNUC_VARARGS'] = conf.CheckGnuVariadicMacros();

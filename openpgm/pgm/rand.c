@@ -1,6 +1,7 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable weak pseudo-random generator.
+ * Portable weak pseudo-random generator.  Performance is explicitly
+ * chosen in preference to randomness.
  *
  * Copyright (c) 2010-2011 Miru Limited.
  *

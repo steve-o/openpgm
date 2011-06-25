@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable fail fast memory allocation.
+ * Portable fail fast memory allocation.
+ *
+ * Run with PGM_DEBUG=gc-friendly to appease most memory profilers.
  *
  * Copyright (c) 2010-2011 Miru Limited.
  *

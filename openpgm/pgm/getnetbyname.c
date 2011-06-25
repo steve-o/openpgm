@@ -1,6 +1,11 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * portable implementation of getnetbyname
+ * Portable implementation of getnetbyname, returns a network address
+ * from a given name.  On Unix systems the mapping is managed by a
+ * system service and may be sourced from a network service, cached 
+ * locally, or read directly from a local file.  On systems without
+ * such a service or when IPv6 is required a local file is supported
+ * with compatible parsing of the network-name mapping format.
  *
  * Copyright (c) 2010-2011 Miru Limited.
  *
