@@ -1,9 +1,9 @@
---- gsi.c	2011-06-19 07:26:54.000000000 +0800
-+++ gsi.c89.c	2011-06-19 07:27:20.000000000 +0800
-@@ -55,12 +55,14 @@
- 	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
- 	g_checksum_free (checksum);
- #else
+--- gsi.c	2011-06-25 22:34:16.000000000 +0800
++++ gsi.c89.c	2011-06-26 07:58:12.000000000 +0800
+@@ -48,12 +48,14 @@
+ 	pgm_return_val_if_fail (NULL != data, FALSE);
+ 	pgm_return_val_if_fail (length > 1, FALSE);
+ 
 +	{
  	struct pgm_md5_t ctx;
  	char resblock[16];
@@ -12,10 +12,10 @@
  	pgm_md5_finish_ctx (&ctx, resblock);
  	memcpy (gsi, resblock + 10, 6);
 +	}
- #endif
  	return TRUE;
  }
-@@ -95,6 +97,7 @@
+ 
+@@ -87,6 +89,7 @@
  {
  	pgm_return_val_if_fail (NULL != gsi, FALSE);
  
@@ -23,7 +23,7 @@
  	char hostname[NI_MAXHOST];
  	int retval = gethostname (hostname, sizeof(hostname));
  	if (0 != retval) {
-@@ -110,6 +113,7 @@
+@@ -102,6 +105,7 @@
  	}
  
  	return pgm_gsi_create_from_string (gsi, hostname, -1);
@@ -31,7 +31,7 @@
  }
  
  /* create a global session ID based on the IP address.
-@@ -128,6 +132,7 @@
+@@ -120,6 +124,7 @@
  
  	pgm_return_val_if_fail (NULL != gsi, FALSE);
  
@@ -39,7 +39,7 @@
  	int retval = gethostname (hostname, sizeof(hostname));
  	if (0 != retval) {
  		const int save_errno = pgm_get_last_sock_error();
-@@ -158,8 +163,11 @@
+@@ -150,8 +155,11 @@
   */
  	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
  	freeaddrinfo (res);
