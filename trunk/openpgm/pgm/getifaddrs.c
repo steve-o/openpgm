@@ -21,7 +21,7 @@
 
 #include <config.h>
 #include <errno.h>
-#ifdef CONFIG_HAVE_GETIFADDRS
+#ifdef HAVE_GETIFADDRS
 #	include <sys/types.h>
 #	include <ifaddrs.h>
 #endif
@@ -217,7 +217,7 @@ again:
 /* netmask */
 		if (SOCKET_ERROR != ioctlsocket (sock, SIOCGLIFNETMASK, lifr)) {
 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
-#		ifdef CONFIG_HAVE_IFR_NETMASK
+#		ifdef HAVE_STRUCT_IFADDRS_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_netmask, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_netmask));
 #		else
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
@@ -270,7 +270,7 @@ again:
 /* netmask */
 		if (SOCKET_ERROR != ioctlsocket (sock6, SIOCGLIFNETMASK, lifr)) {
 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
-#		ifdef CONFIG_HAVE_IFR_NETMASK
+#		ifdef HAVE_STRUCT_IFADDRS_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_netmask, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_netmask));
 #		else
 			memcpy (ift->_ifa.ifa_netmask, &lifr->lifr_addr, pgm_sockaddr_len((struct sockaddr*)&lifr->lifr_addr));
@@ -339,7 +339,7 @@ _pgm_getifaddrs (
 	}
 	int if_count = ifc.ifc_len / sizeof(struct ifreq);
 
-#	ifdef CONFIG_HAVE_IPV6_SIOCGIFADDR
+#	ifdef HAVE_IPV6_SIOCGIFADDR
 /* process IPv6 interfaces */
 	const SOCKET sock6 = socket (AF_INET6, SOCK_DGRAM, 0);
 	if (SOCKET_ERROR == sock6) {
@@ -371,7 +371,7 @@ _pgm_getifaddrs (
 		return FALSE;
 	}
 	if_count += ifc6.ifc_len / sizeof(struct ifreq);
-#	endif /* CONFIG_HAVE_IPV6_SIOCGIFADDR */
+#	endif /* HAVE_IPV6_SIOCGIFADDR */
 
 /* alloc a contiguous block for entire list */
 	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, if_count);
@@ -408,7 +408,7 @@ _pgm_getifaddrs (
 /* netmask */
 		if (SOCKET_ERROR != ioctlsocket (sock, SIOCGIFNETMASK, ifr)) {
 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
-#	ifdef CONFIG_HAVE_IFR_NETMASK
+#	ifdef HAVE_STRUCT_IFADDRS_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
 #	else
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
@@ -425,7 +425,7 @@ _pgm_getifaddrs (
 		}
 	}
 
-#	ifdef CONFIG_HAVE_IPV6_SIOCGIFADDR
+#	ifdef HAVE_IPV6_SIOCGIFADDR
 /* repeat everything for IPv6 */
 	ifr  = ifc6.ifc_req;
 	ifr_end = (struct ifreq *)&ifc6.ifc_buf[ifc6.ifc_len];
@@ -462,7 +462,7 @@ _pgm_getifaddrs (
 /* netmask */
 		if (SOCKET_ERROR != ioctlsocket (sock6, SIOCGIFNETMASK, ifr)) {
 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
-#		ifdef CONFIG_HAVE_IFR_NETMASK
+#		ifdef HAVE_STRUCT_IFADDRS_IFR_NETMASK
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
 #		else
 			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
@@ -481,7 +481,7 @@ _pgm_getifaddrs (
 		pgm_warn (_("Closing IPv6 socket failed: %s"),
 			pgm_sock_strerror_s (errbuf, sizeof(errbuf), save_errno));
 	}
-#	endif /* CONFIG_HAVE_IPV6_SIOCGIFADDR */
+#	endif /* HAVE_IPV6_SIOCGIFADDR */
 
 	if (SOCKET_ERROR == closesocket (sock)) {
 		const int save_errno = pgm_get_last_sock_error();
@@ -502,7 +502,7 @@ _pgm_heap_alloc (
 	const size_t	n_bytes
 	)
 {
-#	ifdef CONFIG_USE_HEAPALLOC
+#	ifdef USE_HEAPALLOC
 /* Does not appear very safe with re-entrant calls on XP */
 	return HeapAlloc (GetProcessHeap(), HEAP_GENERATE_EXCEPTIONS, n_bytes);
 #	else
@@ -516,7 +516,7 @@ _pgm_heap_free (
 	void*		mem
 	)
 {
-#	ifdef CONFIG_USE_HEAPALLOC
+#	ifdef USE_HEAPALLOC
 	HeapFree (GetProcessHeap(), 0, mem);
 #	else
 	pgm_free (mem);
@@ -833,7 +833,7 @@ pgm_getifaddrs (
 	pgm_debug ("pgm_getifaddrs (ifap:%p error:%p)",
 		(void*)ifap, (void*)error);
 
-#ifdef CONFIG_HAVE_GETIFADDRS
+#if defined( HAVE_GETIFADDRS )
 	const int e = getifaddrs ((struct ifaddrs**)ifap);
 	if (-1 == e) {
 		char errbuf[1024];
@@ -845,17 +845,17 @@ pgm_getifaddrs (
 		return FALSE;
 	}
 	return TRUE;
-#elif defined(CONFIG_TARGET_WINE)
+#elif defined( CONFIG_TARGET_WINE )
 	return _pgm_getadaptersinfo (ifap, error);
-#elif defined(_WIN32)
+#elif defined( _WIN32 )
 	return _pgm_getadaptersaddresses (ifap, error);
-#elif defined(SIOCGLIFCONF)
+#elif defined( SIOCGLIFCONF )
 	return _pgm_getlifaddrs (ifap, error);
-#elif defined(SIOCGIFCONF)
+#elif defined( SIOCGIFCONF )
 	return _pgm_getifaddrs (ifap, error);
 #else
 #	error "Unsupported interface enumeration on this platform."
-#endif /* !CONFIG_HAVE_GETIFADDRS */
+#endif /* !HAVE_GETIFADDRS */
 }
 
 void
@@ -865,7 +865,7 @@ pgm_freeifaddrs (
 {
 	pgm_return_if_fail (NULL != ifa);
 
-#ifdef CONFIG_HAVE_GETIFADDRS
+#ifdef HAVE_GETIFADDRS
 	freeifaddrs ((struct ifaddrs*)ifa);
 #else
 	pgm_free (ifa);

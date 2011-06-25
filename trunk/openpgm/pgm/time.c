@@ -68,19 +68,19 @@ static UINT			wTimerRes = 0;
 static void			pgm_time_conv (const pgm_time_t*const restrict, time_t*restrict);
 static void			pgm_time_conv_from_reset (const pgm_time_t*const restrict, time_t*restrict);
 
-#if defined(CONFIG_HAVE_CLOCK_GETTIME)
+#if defined(HAVE_CLOCK_GETTIME)
 #	include <time.h>
 static pgm_time_t		pgm_clock_update (void);
 #endif
-#ifdef CONFIG_HAVE_FTIME
+#ifdef HAVE_FTIME
 #	include <sys/timeb.h>
 static pgm_time_t		pgm_ftime_update (void);
 #endif
-#ifdef CONFIG_HAVE_GETTIMEOFDAY
+#ifdef HAVE_GETTIMEOFDAY
 #	include <sys/time.h>
 static pgm_time_t		pgm_gettimeofday_update (void);
 #endif
-#ifdef CONFIG_HAVE_HPET
+#ifdef HAVE_DEV_HPET
 #	include <fcntl.h>
 #	include <sys/types.h>
 #	include <sys/stat.h>
@@ -140,7 +140,7 @@ static bool			pgm_hpet_init (pgm_error_t**);
 static bool			pgm_hpet_shutdown (void);
 static pgm_time_t		pgm_hpet_update (void);
 #endif
-#ifdef CONFIG_HAVE_RTC
+#ifdef HAVE_DEV_RTC
 #	include <fcntl.h>
 #	include <sys/types.h>
 #	include <sys/stat.h>
@@ -154,7 +154,7 @@ static bool			pgm_rtc_init (pgm_error_t**);
 static bool			pgm_rtc_shutdown (void);
 static pgm_time_t		pgm_rtc_update (void);
 #endif
-#ifdef CONFIG_HAVE_TSC
+#ifdef HAVE_RDTSC
 #	include <stdio.h>
 #	include <string.h>
 #	if defined(__APPLE__) || defined(__FreeBSD__)
@@ -248,7 +248,7 @@ pgm_time_init (
 	err = pgm_dupenv_s (&pgm_timer, &envlen, "PGM_TIMER");
 	if (0 != err || 0 == envlen) {
 		pgm_timer = pgm_strdup (
-#ifdef CONFIG_HAVE_TSC
+#ifdef HAVE_RDTSC
 			"TSC"
 #else
 			"GTOD"
@@ -259,26 +259,26 @@ pgm_time_init (
 	pgm_time_since_epoch = pgm_time_conv;
 
 	switch (pgm_timer[0]) {
-#ifdef CONFIG_HAVE_FTIME
+#ifdef HAVE_FTIME
 	case 'F':
 		pgm_minor (_("Using ftime() timer."));
 		pgm_time_update_now	= pgm_ftime_update;
 		break;
 #endif
-#ifdef CONFIG_HAVE_CLOCK_GETTIME
+#ifdef HAVE_CLOCK_GETTIME
 	case 'C':
 		pgm_minor (_("Using clock_gettime() timer."));
 		pgm_time_update_now	= pgm_clock_update;
 		break;
 #endif
-#ifdef CONFIG_HAVE_RTC
+#ifdef HAVE_DEV_RTC
 	case 'R':
 		pgm_minor (_("Using /dev/rtc timer."));
 		pgm_time_update_now	= pgm_rtc_update;
 		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
-#ifdef CONFIG_HAVE_TSC
+#ifdef HAVE_RDTSC
 #	ifdef _WIN32
 	default:
 #	endif
@@ -288,7 +288,7 @@ pgm_time_init (
 		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
-#ifdef CONFIG_HAVE_HPET
+#ifdef HAVE_DEV_HPET
 	case 'H':
 		pgm_minor (_("Using HPET timer."));
 		pgm_time_update_now	= pgm_hpet_update;
@@ -296,7 +296,7 @@ pgm_time_init (
 		break;
 #endif
 
-#ifdef CONFIG_HAVE_GETTIMEOFDAY
+#ifdef HAVE_GETTIMEOFDAY
 #	ifndef _WIN32
 	default:
 #	endif
@@ -310,7 +310,7 @@ pgm_time_init (
 /* clean environment copy */
 	pgm_free (pgm_timer);
 
-#ifdef CONFIG_HAVE_RTC
+#ifdef HAVE_DEV_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
 	{
 		pgm_error_t* sub_error = NULL;
@@ -320,12 +320,12 @@ pgm_time_init (
 		}
 	}
 #endif
-#ifdef CONFIG_HAVE_TSC
+#ifdef HAVE_RDTSC
 	if (pgm_time_update_now == pgm_tsc_update)
 	{
 		char	*rdtsc_frequency;
 
-#ifdef CONFIG_HAVE_PROC
+#ifdef HAVE_PROC_CPUINFO
 /* attempt to parse clock ticks from kernel
  */
 		FILE	*fp = fopen ("/proc/cpuinfo", "r");
@@ -418,9 +418,9 @@ pgm_time_init (
 		pgm_minor (_("TSC frequency set to %u MHz"), (unsigned)(tsc_mhz / 1000));
 		set_tsc_mul (tsc_mhz);
 	}
-#endif /* CONFIG_HAVE_TSC */
+#endif /* HAVE_RDTSC */
 
-#ifdef CONFIG_HAVE_HPET
+#ifdef HAVE_DEV_HPET
 	if (pgm_time_update_now == pgm_hpet_update)
 	{
 		pgm_error_t* sub_error = NULL;
@@ -434,19 +434,19 @@ pgm_time_init (
 	pgm_time_update_now();
 
 /* calculate relative time offset */
-#if defined(CONFIG_HAVE_RTC) || defined(CONFIG_HAVE_TSC)
+#if defined(HAVE_DEV_RTC) || defined(HAVE_RDTSC)
 	if (	0
-#	ifdef CONFIG_HAVE_RTC
+#	ifdef HAVE_DEV_RTC
 		|| pgm_time_update_now == pgm_rtc_update
 #	endif
-#	ifdef CONFIG_HAVE_TSC
+#	ifdef HAVE_RDTSC
 		|| pgm_time_update_now == pgm_tsc_update
 #	endif
 	   )
 	{
-#	if defined( CONFIG_HAVE_GETTIMEOFDAY )
+#	if defined( HAVE_GETTIMEOFDAY )
 		rel_offset = pgm_gettimeofday_update() - pgm_time_update_now();
-#	elif defined( CONFIG_HAVE_FTIME )
+#	elif defined( HAVE_FTIME )
 		rel_offset = pgm_ftime_update() - pgm_time_update_now();
 #	else
 #		error "gettimeofday() or ftime() required to calculate counter offset"
@@ -472,12 +472,12 @@ pgm_time_init (
 #endif
 
 	return TRUE;
-#if defined(CONFIG_HAVE_RTC) || (defined(CONFIG_HAVE_TSC) && !defined(_WIN32)) || defined(CONFIG_HAVE_HPET)
+#if defined(HAVE_DEV_RTC) || (defined(HAVE_RDTSC) && !defined(_WIN32)) || defined(HAVE_DEV_HPET)
 err_cleanup:
 	pgm_atomic_dec32 (&time_ref_count);
 	return FALSE;
 #endif
-#if !defined(CONFIG_HAVE_RTC) && !defined(CONFIG_HAVE_TSC) && !defined(CONFIG_HAVE_HPET)
+#if !defined(HAVE_DEV_RTC) && !defined(HAVE_RDTSC) && !defined(HAVE_DEV_HPET)
 /* unused parameters */
 	(void)error;
 #endif
@@ -501,18 +501,18 @@ pgm_time_shutdown (void)
 	timeEndPeriod (wTimerRes);
 #endif
 
-#ifdef CONFIG_HAVE_RTC
+#ifdef HAVE_DEV_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
 		retval = pgm_rtc_shutdown ();
 #endif
-#ifdef CONFIG_HAVE_HPET
+#ifdef HAVE_DEV_HPET
 	if (pgm_time_update_now == pgm_hpet_update)
 		retval = pgm_hpet_shutdown ();
 #endif
 	return retval;
 }
 
-#ifdef CONFIG_HAVE_GETTIMEOFDAY
+#ifdef HAVE_GETTIMEOFDAY
 static
 pgm_time_t
 pgm_gettimeofday_update (void)
@@ -528,9 +528,9 @@ pgm_gettimeofday_update (void)
 	else
 		return last = now;
 }
-#endif /* CONFIG_HAVE_GETTIMEOFDAY */
+#endif /* HAVE_GETTIMEOFDAY */
 
-#ifdef CONFIG_HAVE_CLOCK_GETTIME
+#ifdef HAVE_CLOCK_GETTIME
 static
 pgm_time_t
 pgm_clock_update (void)
@@ -546,9 +546,9 @@ pgm_clock_update (void)
 	else
 		return last = now;
 }
-#endif /* CONFIG_HAVE_CLOCK_GETTIME */
+#endif /* HAVE_CLOCK_GETTIME */
 
-#ifdef CONFIG_HAVE_FTIME
+#ifdef HAVE_FTIME
 static
 pgm_time_t
 pgm_ftime_update (void)
@@ -570,9 +570,9 @@ pgm_ftime_update (void)
 	else
 		return last = now;
 }
-#endif /* CONFIG_HAVE_FTIME */
+#endif /* HAVE_FTIME */
 
-#ifdef CONFIG_HAVE_RTC
+#ifdef HAVE_DEV_RTC
 /* Old PC/AT-Compatible driver:  /dev/rtc
  *
  * Not so speedy 8192 Hz timer, thats 122us resolution.
@@ -650,9 +650,9 @@ pgm_rtc_update (void)
 	rtc_count += data >> 8;
 	return rtc_count * 1000000UL / rtc_frequency;
 }
-#endif /* CONFIG_HAVE_RTC */
+#endif /* HAVE_DEV_RTC */
 
-#ifdef CONFIG_HAVE_TSC
+#ifdef HAVE_RDTSC
 /* read time stamp counter (TSC), count of ticks from processor reset.
  *
  * NB: On Windows this will usually be HPET or PIC timer interpolated with TSC.
@@ -694,7 +694,7 @@ pgm_tsc_init (
 	PGM_GNUC_UNUSED pgm_error_t**	error
 	)
 {
-#		ifdef CONFIG_HAVE_PROC
+#		ifdef HAVE_PROC_CPUINFO
 /* Test for constant TSC from kernel
  */
 	FILE	*fp = fopen ("/proc/cpuinfo", "r");
@@ -722,7 +722,7 @@ pgm_tsc_init (
 		pgm_time_update_now	= pgm_gettimeofday_update;
 		return TRUE;
 	}
-#		endif /* CONFIG_HAVE_PROC */
+#		endif /* HAVE_PROC_CPUINFO */
 
 	pgm_time_t		start, stop, elapsed;
 	const pgm_time_t	calibration_usec = secs_to_usecs (4);
@@ -786,7 +786,7 @@ pgm_tsc_update (void)
 }
 #endif
 
-#ifdef CONFIG_HAVE_HPET
+#ifdef HAVE_DEV_HPET
 /* High Precision Event Timer (HPET) created as a system wide stable high resolution timer
  * to replace dependency on core specific counters (TSC).
  *
@@ -861,7 +861,7 @@ pgm_hpet_update (void)
 	hpet_last = hpet_count;
 	return hpet_to_us (hpet_offset + hpet_count);
 }
-#endif /* CONFIG_HAVE_HPET */
+#endif /* HAVE_DEV_HPET */
 
 /* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
  */

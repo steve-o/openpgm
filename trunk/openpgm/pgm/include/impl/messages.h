@@ -45,7 +45,7 @@ PGM_BEGIN_DECLS
 PGM_GNUC_INTERNAL void pgm__log  (const int, const char*, ...) PGM_GNUC_PRINTF (2, 3);
 PGM_GNUC_INTERNAL void pgm__logv (const int, const char*, va_list) PGM_GNUC_PRINTF (2, 0);
 
-#ifdef CONFIG_HAVE_ISO_VARARGS
+#if defined( HAVE_ISO_VARARGS )
 
 /* debug trace level only valid in debug mode */
 #	ifdef PGM_DEBUG
@@ -88,7 +88,7 @@ PGM_GNUC_INTERNAL void pgm__logv (const int, const char*, va_list) PGM_GNUC_PRIN
 				pgm__log (PGM_LOG_LEVEL_FATAL, __VA_ARGS__); \
 			} while (0)
 
-#elif defined(CONFIG_HAVE_GNUC_VARARGS)
+#elif defined( HAVE_GNUC_VARARGS )
 
 #	ifdef PGM_DEBUG
 #		define pgm_debug(f...) \

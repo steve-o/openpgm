@@ -25,7 +25,7 @@
 #ifndef __PGM_IMPL_I18N_H__
 #define __PGM_IMPL_I18N_H__
 
-#ifdef CONFIG_HAVE_GETTEXT
+#ifdef HAVE_GETTEXT
 #	include <libintl.h>
 #	define _(String) dgettext (GETTEXT_PACKAGE, String)
 #else

@@ -21,7 +21,7 @@
 
 #include <config.h>
 
-#if defined(CONFIG_HAVE_VASPRINTF) && !defined(_GNU_SOURCE)
+#if defined( HAVE_VASPRINTF ) && !defined( _GNU_SOURCE )
 #	define _GNU_SOURCE	/* vasprintf */
 #endif
 
@@ -68,6 +68,7 @@ pgm_printf_string_upper_bound (
 	va_list		args
 	)
 {
+/* MinGW family supports vsnprintf and so limit platform separation to MSVC. */
 #ifdef _MSC_VER
 	return _vscprintf (format, args) + 1;
 #else
@@ -91,7 +92,7 @@ pgm_vasprintf (
 
 	pgm_return_val_if_fail (string != NULL, -1);
 
-#ifdef CONFIG_HAVE_VASPRINTF
+#ifdef HAVE_VASPRINTF
 	char *strp;
 	len = vasprintf (&strp, format, args);
 	if (len < 0) {
@@ -139,7 +140,7 @@ pgm_stpcpy (
 	pgm_return_val_if_fail (dest != NULL, NULL);
 	pgm_return_val_if_fail (src != NULL, NULL);
 
-#ifdef CONFIG_HAVE_STPCPY
+#ifdef HAVE_STPCPY
 	return stpcpy (dest, src);
 #else
 	char		*d = dest;
