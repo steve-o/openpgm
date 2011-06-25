@@ -1,7 +1,7 @@
---- indextoname.c	2011-06-19 07:24:09.000000000 +0800
-+++ indextoname.c89.c	2011-06-19 07:25:08.000000000 +0800
-@@ -41,12 +41,20 @@
- #else
+--- indextoname.c	2011-06-26 07:53:49.000000000 +0800
++++ indextoname.c89.c	2011-06-26 07:53:55.000000000 +0800
+@@ -48,12 +48,20 @@
+  */
  	pgm_return_val_if_fail (NULL != ifname, NULL);
  
 -	MIB_IFROW ifRow = { .dwIndex = ifindex };
