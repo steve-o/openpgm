@@ -21,7 +21,7 @@
 
 #include <config.h>
 #include <errno.h>
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 #	include <poll.h>
 #endif
 #ifndef _WIN32
@@ -114,7 +114,7 @@ pgm_sendto_hops (
 		 		 save_errno != PGM_SOCK_EHOSTUNREACH &&	/* No route to host */
 		    		 save_errno != PGM_SOCK_EAGAIN))	/* would block on non-blocking send */
 		{
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 /* poll for cleared socket */
 			struct pollfd p = {
 				.fd		= send_sock,
@@ -136,7 +136,7 @@ pgm_sendto_hops (
 				.tv_usec = 500 /* ms */ * 1000
 			};
 			const int ready = select (n_fds, NULL, &writefds, NULL, &tv);
-#endif /* CONFIG_HAVE_POLL */
+#endif /* HAVE_POLL */
 			if (ready > 0)
 			{
 				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);

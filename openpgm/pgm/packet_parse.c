@@ -153,7 +153,7 @@ pgm_parse_raw (
 		return FALSE;
 	}
 
-#ifndef CONFIG_HOST_ORDER_IP_LEN
+#ifndef HAVE_HOST_ORDER_IP_LEN
 	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
 #else
 	size_t packet_length = ip->ip_len;		/* total packet length */
@@ -194,7 +194,7 @@ pgm_parse_raw (
 #endif
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
-#ifndef CONFIG_HOST_ORDER_IP_OFF
+#ifndef HAVE_HOST_ORDER_IP_OFF
 	const uint16_t offset = ntohs (ip->ip_off);
 #else
 	const uint16_t offset = ip->ip_off;

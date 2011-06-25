@@ -98,7 +98,7 @@ AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <pthread.h>]],
 		[[pthread_spinlock_t spinlock; pthread_spin_lock (&spinlock);]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_POSIX_SPINLOCK"],
+		CFLAGS="$CFLAGS -DHAVE_PTHREAD_SPINLOCK"],
 	[AC_MSG_RESULT([no])])
 # NSS protocol lookup
 AC_CHECK_FUNC([getprotobyname_r])
@@ -108,13 +108,12 @@ AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <netdb.h>]],
 		[[getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (size_t)0, (struct protoent**)0);]])],
 	[AC_MSG_RESULT([5-param])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_GETPROTOBYNAME_R2"],
+		CFLAGS="$CFLAGS -DHAVE_GETPROTOBYNAME_R2"],
 	[AC_MSG_RESULT([4-param])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_GETPROTOBYNAME_R"])
+		CFLAGS="$CFLAGS -DHAVE_GETPROTOBYNAME_R"])
 fi
 # NSS networks lookup, IPv4 only
-AC_CHECK_FUNC([getnetent],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_GETNETENT",)
+AC_CHECK_FUNC([getnetent])
 # variadic macros
 AC_MSG_CHECKING([for C99 variadic macros])
 AC_COMPILE_IFELSE(
@@ -122,7 +121,7 @@ AC_COMPILE_IFELSE(
 #define error(...) fprintf (stderr, __VA_ARGS__)]],
 		[[error("moo");]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_ISO_VARARGS"],
+		CFLAGS="$CFLAGS -DHAVE_ISO_VARARGS"],
 	[AC_MSG_RESULT([no])])
 AC_MSG_CHECKING([for GNU-style variadic macros])
 AC_COMPILE_IFELSE(
@@ -130,35 +129,25 @@ AC_COMPILE_IFELSE(
 #define error(x...) fprintf (stderr, x)]],
 		[[error("moo");]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_GNUC_VARARGS"],
+		CFLAGS="$CFLAGS -DHAVE_GNUC_VARARGS"],
 	[AC_MSG_RESULT([no])])
 # stack memory api header
-AC_MSG_CHECKING([for alloca.h])
-AC_COMPILE_IFELSE(
-	[AC_LANG_PROGRAM([[#include <alloca.h>]],
-		[[void* ptr = alloca (1);]])],
-	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_ALLOCA_H"],
-	[AC_MSG_RESULT([no])])
+AC_FUNC_ALLOCA
 # eventfd API
 AC_MSG_CHECKING([for eventfd])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <sys/eventfd.h>]],
                 [[eventfd (0, 0);]])],
         [AC_MSG_RESULT([yes])
-                CFLAGS="$CFLAGS -DCONFIG_HAVE_EVENTFD"],
+                CFLAGS="$CFLAGS -DHAVE_EVENTFD"],
         [AC_MSG_RESULT([no])])
 # useful /proc system
-AC_CHECK_FILE([/proc/cpuinfo],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_PROC",)
+AC_CHECK_FILES([/proc/cpuinfo])
 # example: crash handling
-AC_CHECK_FUNC([backtrace],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_BACKTRACE",)
+AC_CHECK_FUNC([backtrace])
 # timing
-AC_CHECK_FUNC([pselect],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_PSELECT",)
-AC_CHECK_FILE([/dev/rtc],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_RTC",)
+AC_CHECK_FUNC([pselect])
+AC_CHECK_FILES([/dev/rtc])
 AC_MSG_CHECKING([for RDTSC instruction])
 case "$host_os" in
 darwin*)
@@ -169,20 +158,16 @@ AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM(,[[unsigned long lo, hi;
 __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_TSC"],
+		CFLAGS="$CFLAGS -DHAVE_RDTSC"],
 	[AC_MSG_RESULT([no])])
 	;;
 esac
-AC_CHECK_FILE([/dev/hpet],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_HPET",)
+AC_CHECK_FILES([/dev/hpet])
 # event handling
-AC_CHECK_FUNC([poll],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_POLL",)
-AC_CHECK_FUNC([epoll_ctl],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_EPOLL",)
+AC_CHECK_FUNC([poll])
+AC_CHECK_FUNC([epoll_ctl])
 # interface enumeration
-AC_CHECK_FUNC([getifaddrs],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_GETIFADDRS",)
+AC_CHECK_FUNC([getifaddrs])
 AC_MSG_CHECKING([for struct ifreq.ifr_netmask])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <sys/types.h>
@@ -190,11 +175,11 @@ AC_COMPILE_IFELSE(
 		[[struct ifaddrs ifa;
 ifa.ifa_netmask = (struct sockaddr*)0;]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_IFR_NETMASK"],
+		CFLAGS="$CFLAGS -DHAVE_STRUCT_IFREQ_IFR_NETMASK"],
 	[AC_MSG_RESULT([no])])
 # win32 cmsg
 AC_CHECK_MEMBER([struct _WSAMSG.name],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_WSACMSGHDR",)
+		CFLAGS="$CFLAGS -DHAVE_WSACMSGHDR",)
 # multicast
 AC_MSG_CHECKING([for struct group_req.gr_interface])
 AC_COMPILE_IFELSE(
@@ -202,7 +187,7 @@ AC_COMPILE_IFELSE(
 		[[struct group_req gr;
 gr.gr_interface = 0;]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_MCAST_JOIN"],
+		CFLAGS="$CFLAGS -DHAVE_STRUCT_GROUP_REQ"],
 	[AC_MSG_RESULT([no])])
 AC_MSG_CHECKING([for struct ip_mreqn.imr_ifindex])
 AC_COMPILE_IFELSE(
@@ -210,17 +195,16 @@ AC_COMPILE_IFELSE(
 		[[struct ip_mreqn mreqn;
 mreqn.imr_ifindex = 0;]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_IP_MREQN"],
+		CFLAGS="$CFLAGS -DHAVE_STRUCT_IP_MREQN"],
 	[AC_MSG_RESULT([no])])
 # sprintf, caveat http://savannah.gnu.org/patch/?6848 (ax_c_printf_thsep)
 AC_MSG_CHECKING([for printf thousands' grouping])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM(,[[printf ("%'d", 1000000);]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_SPRINTF_GROUPING"],
+		CFLAGS="$CFLAGS -DHAVE_SPRINTF_GROUPING"],
 	[AC_MSG_RESULT([no])])
-AC_CHECK_FUNC([vasprintf],
-		CFLAGS="$CFLAGS -DCONFIG_HAVE_VASPRINTF",)
+AC_CHECK_FUNC([vasprintf])
 # symbol linking scope
 # nb: sun x86 ld doesn't support DSO visibility but the compiler raises
 # warnings and these are easier to detect in autoconf.
@@ -236,12 +220,12 @@ __attribute__((visibility("hidden")))
 void moo (void) {};]],
 		[[moo();]])],
 	[AC_MSG_RESULT([yes])
-		CFLAGS="$save_CFLAGS -DCONFIG_HAVE_DSO_VISIBILITY"],
+		CFLAGS="$save_CFLAGS -DHAVE_DSO_VISIBILITY"],
 	[AC_MSG_RESULT([no])
 		CFLAGS="$save_CFLAGS"])
 
 # socket binding
-CFLAGS="$CFLAGS -DCONFIG_BIND_INADDR_ANY"
+CFLAGS="$CFLAGS -DUSE_BIND_INADDR_ANY"
 # IP header order as per IP(4) on FreeBSD
 AC_MSG_CHECKING([for raw IP sockets ip_{len,off} host byte ordering])
 case "$host_os" in
@@ -250,7 +234,7 @@ case "$host_os" in
 	;;
 *bsd*|*darwin*|*osf*|*unixware*)
 	AC_MSG_RESULT([yes])
-	CFLAGS="$CFLAGS -DCONFIG_HOST_ORDER_IP_LEN -DCONFIG_HOST_ORDER_IP_OFF"
+	CFLAGS="$CFLAGS -DHAVE_HOST_ORDER_IP_LEN -DHAVE_HOST_ORDER_IP_OFF"
 	;;
 *)
 	AC_MSG_RESULT([no])
@@ -301,9 +285,9 @@ AC_COMPILE_IFELSE(
 #endif]])],
 	[AC_MSG_RESULT([yes])
 		if test "$pgm_unaligned_pointers" = yes; then
-			CFLAGS="$CFLAGS -DCONFIG_TICKET_SPINLOCK -DCONFIG_DUMB_RWSPINLOCK"
+			CFLAGS="$CFLAGS -DUSE_TICKET_SPINLOCK -DUSE_DUMB_RWSPINLOCK"
 		else
-			CFLAGS="$CFLAGS -DCONFIG_TICKET_SPINLOCK"
+			CFLAGS="$CFLAGS -DUSE_TICKET_SPINLOCK"
 		fi],
 	[AC_MSG_RESULT([no])])
 

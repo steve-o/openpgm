@@ -22,10 +22,10 @@
 
 #include <config.h>
 #include <errno.h>
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 #	include <poll.h>
 #endif
-#ifdef CONFIG_HAVE_EPOLL
+#ifdef HAVE_EPOLL_CTL
 #	include <sys/epoll.h>
 #endif
 #include <stdio.h>
@@ -2149,7 +2149,7 @@ pgm_bind3 (
 		struct sockaddr_storage	ss;
 	} recv_addr, recv_addr2, send_addr, send_with_router_alert_addr;
 
-#ifdef CONFIG_BIND_INADDR_ANY
+#ifdef USE_BIND_INADDR_ANY
 /* force default interface for bind-only, source address is still valid for multicast membership.
  * effectively same as running getaddrinfo(hints = {ai_flags = AI_PASSIVE})
  */
@@ -2176,7 +2176,7 @@ pgm_bind3 (
 	}
 	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
-		if (AF_INET6 == sock_family)
+		if (AF_INET6 == sock->family)
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %u scope %u"),
 				   recv_req->ir_interface,
 				   recv_req->ir_scope_id);
@@ -2185,7 +2185,7 @@ pgm_bind3 (
 				   recv_req->ir_interface);
 	}
 
-#endif /* CONFIG_BIND_INADDR_ANY */
+#endif /* USE_BIND_INADDR_ANY */
 
 	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
 
@@ -2527,7 +2527,9 @@ pgm_select_info (
 #endif
 }
 
-#if defined(CONFIG_HAVE_POLL) || defined(CONFIG_HAVE_WSAPOLL)
+#if defined( HAVE_POLL ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
+/* Windows Vista supports WSAPoll() interface for compatibility with poll(). */
+
 /* add poll parameters for the receive socket(s)
  *
  * returns number of pollfd structures filled.
@@ -2541,18 +2543,23 @@ pgm_select_info (
 #	define PGM_POLLOUT		POLLWRNORM
 #endif
 
+#ifndef _WIN32
 int
 pgm_poll_info (
 	pgm_sock_t*	 const restrict	sock,
-#ifndef _WIN32
 	struct pollfd*   const restrict	fds,
 	int*		 const restrict	n_fds,		/* in: #fds, out: used #fds */
-#else
-	WSAPOLLFD*	 const restrict	fds,
-	ULONG*		 const restrict	n_fds,
-#endif
 	const short			events		/* POLLIN, POLLOUT */
 	)
+#else
+int
+pgm_wsapoll_info (
+	pgm_sock_t*	 const restrict	sock,
+	WSAPOLLFD*	 const restrict	fds,
+	ULONG*		 const restrict	n_fds,
+	const short			events		/* POLLIN, POLLOUT */
+	)
+#endif
 {
 #ifndef _WIN32
 	int nfds = 0;
@@ -2607,7 +2614,7 @@ pgm_poll_info (
 
 	return *n_fds = nfds;
 }
-#endif /* CONFIG_HAVE_POLL */
+#endif /* defined( HAVE_POLL ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) ) */
 
 /* add epoll parameters for the recieve socket(s), events should
  * be set to EPOLLIN to wait for incoming events (data), and EPOLLOUT to wait
@@ -2615,7 +2622,7 @@ pgm_poll_info (
  *
  * returns 0 on success, -1 on failure and sets errno appropriately.
  */
-#ifdef CONFIG_HAVE_EPOLL
+#ifdef HAVE_EPOLL_CTL
 int
 pgm_epoll_ctl (
 	pgm_sock_t* const	sock,
@@ -2693,7 +2700,7 @@ pgm_epoll_ctl (
 out:
 	return retval;
 }
-#endif
+#endif /* HAVE_EPOLL_CTL */
 
 static
 const char*

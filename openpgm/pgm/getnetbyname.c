@@ -200,7 +200,7 @@ found:
 	return p;
 }
 
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef HAVE_GETNETENT
 static
 struct pgm_netent_t*
 _pgm_native_getnetbyname (
@@ -271,7 +271,7 @@ pgm_getnetbyname (
 	const char*	name
 	)
 {
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef HAVE_GETNETENT
 	char*   netdb;
 	size_t  envlen;
 	errno_t err;

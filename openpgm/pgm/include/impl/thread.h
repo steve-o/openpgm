@@ -50,7 +50,6 @@ extern bool pgm_smp_system;
 #		include <thread.h>
 #	endif
 #else
-#	define VC_EXTRALEAN
 #	define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
 #endif
@@ -58,10 +57,10 @@ extern bool pgm_smp_system;
 #	include <libkern/OSAtomic.h>
 #endif
 #include <pgm/types.h>
-#if defined( CONFIG_TICKET_SPINLOCK )
+#if defined( USE_TICKET_SPINLOCK )
 #	include <impl/ticket.h>
 #endif
-#if defined( CONFIG_DUMB_RWSPINLOCK )
+#if defined( USE_DUMB_RWSPINLOCK )
 #	include <impl/rwspinlock.h>
 #endif
 
@@ -78,10 +77,10 @@ struct pgm_mutex_t {
 };
 
 struct pgm_spinlock_t {
-#if defined( CONFIG_TICKET_SPINLOCK )
+#if defined( USE_TICKET_SPINLOCK )
 /* ticket based spinlock */
 	pgm_ticket_t		ticket_lock;
-#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
+#elif defined( HAVE_PTHREAD_SPINLOCK )
 /* POSIX spinlock, not available on OSX */
 	pthread_spinlock_t	pthread_spinlock;
 #elif defined( __APPLE__ )
@@ -100,29 +99,29 @@ struct pgm_cond_t {
 #ifndef _WIN32
 /* POSIX condition variable */
 	pthread_cond_t		pthread_cond;
-#elif defined( CONFIG_HAVE_WIN_COND )
+#elif ( _WIN32_WINNT >= 0x0600 )
 /* Windows Vista+ condition variable */
 	CONDITION_VARIABLE	win32_cond;
 #else
-/* Windows XP friendly condition variable implementation */
+/* Windows XP condition variable implementation */
 	CRITICAL_SECTION	win32_crit;
 	size_t			len;
 	size_t			allocated_len;
 	HANDLE*			phandle;
-#endif /* !_WIN32 */
+#endif /* _WIN32 */
 };
 
 struct pgm_rwlock_t {
-#if defined( CONFIG_DUMB_RWSPINLOCK )
+#if defined( USE_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_t	rwspinlock;
 #elif !defined( _WIN32 )
 /* POSIX read-write lock */
 	pthread_rwlock_t	pthread_rwlock;
-#elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
-/* Windows Vista+ user-space (slim) read-write lock */
+#elif ( _WIN32_WINNT >= 0x0600 )
+/* Windows Vista+ user-space slim read-write lock */
 	SRWLOCK			win32_rwlock;
 #else
-/* Windows XP friendly read-write lock implementation */
+/* Windows XP read-write lock implementation */
 	CRITICAL_SECTION	win32_crit;
 	pgm_cond_t		read_cond;
 	pgm_cond_t		write_cond;
@@ -130,7 +129,7 @@ struct pgm_rwlock_t {
 	bool			have_writer;
 	unsigned		want_to_read;
 	unsigned		want_to_write;
-#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
+#endif /* USE_DUMB_RWSPINLOCK */
 };
 
 PGM_GNUC_INTERNAL void pgm_mutex_init (pgm_mutex_t*);
@@ -174,9 +173,9 @@ PGM_GNUC_INTERNAL void pgm_spinlock_init (pgm_spinlock_t*);
 PGM_GNUC_INTERNAL void pgm_spinlock_free (pgm_spinlock_t*);
 
 static inline bool pgm_spinlock_trylock (pgm_spinlock_t* spinlock) {
-#if defined( CONFIG_TICKET_SPINLOCK )
+#if defined( USE_TICKET_SPINLOCK )
 	return pgm_ticket_trylock (&spinlock->ticket_lock);
-#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
+#elif defined( HAVE_PTHREAD_SPINLOCK )
 	const int result = pthread_spin_trylock (&spinlock->pthread_spinlock);
 	if (EBUSY == result)
 		return FALSE;
@@ -193,9 +192,9 @@ static inline bool pgm_spinlock_trylock (pgm_spinlock_t* spinlock) {
 }
 
 static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
-#if defined( CONFIG_TICKET_SPINLOCK )
+#if defined( USE_TICKET_SPINLOCK )
 	pgm_ticket_lock (&spinlock->ticket_lock);
-#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
+#elif defined( HAVE_PTHREAD_SPINLOCK )
 	pthread_spin_lock (&spinlock->pthread_spinlock);
 #elif defined( __APPLE__ )
 /* Anderson's exponential back-off */
@@ -212,7 +211,7 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 			else
 				YieldProcessor();
 #elif defined( __i386__ ) || defined( __i386 ) || defined( __x86_64__ ) || defined( __amd64 )
-/* GCC atomics */
+/* GCC atomics with x86 pause */
 	unsigned spins = 0;
 	while (__sync_lock_test_and_set (&spinlock->taken, 1))
 		while (spinlock->taken)
@@ -221,6 +220,7 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 			else
 				__asm volatile ("pause" ::: "memory");
 #else
+/* GCC atomics */
 	while (__sync_lock_test_and_set (&spinlock->taken, 1))
 		while (spinlock->taken)
 			sched_yield();
@@ -228,9 +228,9 @@ static inline void pgm_spinlock_lock (pgm_spinlock_t* spinlock) {
 }
 
 static inline void pgm_spinlock_unlock (pgm_spinlock_t* spinlock) {
-#if defined( CONFIG_TICKET_SPINLOCK )
+#if defined( USE_TICKET_SPINLOCK )
 	pgm_ticket_unlock (&spinlock->ticket_lock);
-#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
+#elif defined( HAVE_PTHREAD_SPINLOCK )
 	pthread_spin_unlock (&spinlock->pthread_spinlock);
 #elif defined( __APPLE__ )
 	OSSpinLockUnlock (&spinlock->darwin_spinlock);
@@ -251,68 +251,72 @@ PGM_GNUC_INTERNAL void pgm_cond_wait (pgm_cond_t*, CRITICAL_SECTION*);
 #endif
 PGM_GNUC_INTERNAL void pgm_cond_free (pgm_cond_t*);
 
-#if defined( CONFIG_HAVE_WIN_SRW_LOCK ) || defined( CONFIG_DUMB_RWSPINLOCK ) || !defined( _WIN32 )
-static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
-#	if defined( CONFIG_DUMB_RWSPINLOCK )
-	pgm_rwspinlock_reader_lock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
-	AcquireSRWLockShared (&rwlock->win32_rwlock);
-#	else
-	pthread_rwlock_rdlock (&rwlock->pthread_rwlock);
-#	endif
-}
-static inline bool pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
-#	if defined( CONFIG_DUMB_RWSPINLOCK )
-	return pgm_rwspinlock_reader_trylock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
-	return TryAcquireSRWLockShared (&rwlock->win32_rwlock);
-#	else
-	return !pthread_rwlock_tryrdlock (&rwlock->pthread_rwlock);
-#	endif
-}
-static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
-#	if defined( CONFIG_DUMB_RWSPINLOCK )
-	pgm_rwspinlock_reader_unlock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
-	ReleaseSRWLockShared (&rwlock->win32_rwlock);
-#	else
-	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
-#	endif
-}
-static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
-#	if defined( CONFIG_DUMB_RWSPINLOCK )
-	pgm_rwspinlock_writer_lock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
-	AcquireSRWLockExclusive (&rwlock->win32_rwlock);
-#	else
-	pthread_rwlock_wrlock (&rwlock->pthread_rwlock);
-#	endif
-}
-static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
-#	if defined( CONFIG_DUMB_RWSPINLOCK )
-	return pgm_rwspinlock_writer_trylock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
-	return TryAcquireSRWLockExclusive (&rwlock->win32_rwlock);
-#	else
-	return !pthread_rwlock_trywrlock (&rwlock->pthread_rwlock);
-#	endif
-}
-static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
-#	if defined( CONFIG_DUMB_RWSPINLOCK )
-	pgm_rwspinlock_writer_unlock (&rwlock->rwspinlock);
-#	elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
-	ReleaseSRWLockExclusive (&rwlock->win32_rwlock);
-#	else
-	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
-#	endif
-}
-#else
+#if defined( _WIN32 ) && !( _WIN32_WINNT >= 0x600 ) && !defined( USE_DUMB_RWSPINLOCK )
+/* read-write lock implementation for Windows XP */
 PGM_GNUC_INTERNAL void pgm_rwlock_reader_lock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL bool pgm_rwlock_reader_trylock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL void pgm_rwlock_reader_unlock(pgm_rwlock_t*);
 PGM_GNUC_INTERNAL void pgm_rwlock_writer_lock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL bool pgm_rwlock_writer_trylock (pgm_rwlock_t*);
 PGM_GNUC_INTERNAL void pgm_rwlock_writer_unlock (pgm_rwlock_t*);
+#else
+static inline void pgm_rwlock_reader_lock (pgm_rwlock_t* rwlock) {
+#	if defined( USE_DUMB_RWSPINLOCK )
+/* User-space read/write lock */
+	pgm_rwspinlock_reader_lock (&rwlock->rwspinlock);
+#	elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+/* Vista+ slim read/write lock */
+	AcquireSRWLockShared (&rwlock->win32_rwlock);
+#	else
+/* POSIX read/write lock */
+	pthread_rwlock_rdlock (&rwlock->pthread_rwlock);
+#	endif
+}
+static inline bool pgm_rwlock_reader_trylock (pgm_rwlock_t* rwlock) {
+#	if defined( USE_DUMB_RWSPINLOCK )
+	return pgm_rwspinlock_reader_trylock (&rwlock->rwspinlock);
+#	elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+	return TryAcquireSRWLockShared (&rwlock->win32_rwlock);
+#	else
+	return !pthread_rwlock_tryrdlock (&rwlock->pthread_rwlock);
+#	endif
+}
+static inline void pgm_rwlock_reader_unlock(pgm_rwlock_t* rwlock) {
+#	if defined( USE_DUMB_RWSPINLOCK )
+	pgm_rwspinlock_reader_unlock (&rwlock->rwspinlock);
+#	elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+	ReleaseSRWLockShared (&rwlock->win32_rwlock);
+#	else
+	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
+#	endif
+}
+static inline void pgm_rwlock_writer_lock (pgm_rwlock_t* rwlock) {
+#	if defined( USE_DUMB_RWSPINLOCK )
+	pgm_rwspinlock_writer_lock (&rwlock->rwspinlock);
+#	elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+	AcquireSRWLockExclusive (&rwlock->win32_rwlock);
+#	else
+	pthread_rwlock_wrlock (&rwlock->pthread_rwlock);
+#	endif
+}
+static inline bool pgm_rwlock_writer_trylock (pgm_rwlock_t* rwlock) {
+#	if defined( USE_DUMB_RWSPINLOCK )
+	return pgm_rwspinlock_writer_trylock (&rwlock->rwspinlock);
+#	elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+	return TryAcquireSRWLockExclusive (&rwlock->win32_rwlock);
+#	else
+	return !pthread_rwlock_trywrlock (&rwlock->pthread_rwlock);
+#	endif
+}
+static inline void pgm_rwlock_writer_unlock (pgm_rwlock_t* rwlock) {
+#	if defined( USE_DUMB_RWSPINLOCK )
+	pgm_rwspinlock_writer_unlock (&rwlock->rwspinlock);
+#	elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+	ReleaseSRWLockExclusive (&rwlock->win32_rwlock);
+#	else
+	pthread_rwlock_unlock (&rwlock->pthread_rwlock);
+#	endif
+}
 #endif
 
 PGM_GNUC_INTERNAL void pgm_rwlock_init (pgm_rwlock_t*);
@@ -326,9 +330,9 @@ void
 pgm_thread_yield (void)
 {
 #if defined( __sun )
-	thr_yield();
+	thr_yield();		/* Solaris specific thread API */
 #elif !defined( _WIN32 )
-	sched_yield();
+	sched_yield();		/* most Unix platforms */
 #else
 	SwitchToThread();	/* yields only current processor */
 #	if 0

@@ -41,7 +41,7 @@ _pgm_heap_alloc (
 	const size_t	n_bytes
 	)
 {
-#       ifdef CONFIG_USE_HEAPALLOC
+#       ifdef USE_HEAPALLOC
 	return HeapAlloc (GetProcessHeap(), HEAP_GENERATE_EXCEPTIONS, n_bytes);
 #	else
 	return pgm_malloc (n_bytes);
@@ -54,7 +54,7 @@ _pgm_heap_free (
 	void*		mem
 	)
 {
-#       ifdef CONFIG_USE_HEAPALLOC
+#       ifdef USE_HEAPALLOC
 	HeapFree (GetProcessHeap(), 0, mem);
 #	else
 	pgm_free (mem);
