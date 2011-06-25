@@ -1,89 +1,32 @@
---- nametoindex.c	2011-06-19 07:40:07.000000000 +0800
-+++ nametoindex.c89.c	2011-06-19 07:40:20.000000000 +0800
-@@ -79,6 +79,7 @@
- 
- 	pgm_assert (AF_INET6 != iffamily);
- 
-+	{
- 	DWORD dwRet, ifIndex;
- 	ULONG ulOutBufLen = DEFAULT_BUFFER_SIZE;
- 	PIP_ADAPTER_INFO pAdapterInfo = NULL;
-@@ -87,7 +88,9 @@
- /* loop to handle interfaces coming online causing a buffer overflow
-  * between first call to list buffer length and second call to enumerate.
-  */
--	for (unsigned i = MAX_TRIES; i; i--)
-+	{
-+	unsigned i;
-+	for (i = MAX_TRIES; i; i--)
- 	{
- 		pgm_debug ("IP_ADAPTER_INFO buffer length %lu bytes.", ulOutBufLen);
- 		pAdapterInfo = (IP_ADAPTER_INFO*)_pgm_heap_alloc (ulOutBufLen);
-@@ -99,6 +102,7 @@
- 			break;
- 		}
- 	}
-+	}
- 
- 	switch (dwRet) {
- 	case ERROR_SUCCESS:	/* NO_ERROR */
-@@ -119,7 +123,9 @@
- 		 pAdapter;
- 		 pAdapter = pAdapter->Next)
- 	{
--		for (IP_ADDR_STRING *pIPAddr = &pAdapter->IpAddressList;
-+		{
-+		IP_ADDR_STRING *pIPAddr;
-+		for (pIPAddr = &pAdapter->IpAddressList;
- 			 pIPAddr;
- 			 pIPAddr = pIPAddr->Next)
- 		{
-@@ -133,11 +139,13 @@
- 				return ifIndex;
- 			}
- 		}
-+		}
- 	}
- 
- 	if (pAdapterInfo)
- 		_pgm_heap_free (pAdapterInfo);
- 	return 0;
-+	}
- }
- 
- /* Retrieve adapter index via name.
-@@ -156,6 +164,7 @@
- {
- 	pgm_return_val_if_fail (NULL != ifname, 0);
- 
-+	{
- 	ULONG ifIndex;
- 	DWORD dwSize = DEFAULT_BUFFER_SIZE, dwRet;
- 	IP_ADAPTER_ADDRESSES *pAdapterAddresses = NULL, *adapter;
-@@ -173,7 +182,9 @@
- /* loop to handle interfaces coming online causing a buffer overflow
-  * between first call to list buffer length and second call to enumerate.
-  */
--	for (unsigned i = MAX_TRIES; i; i--)
-+	{
-+	unsigned i;
-+	for (i = MAX_TRIES; i; i--)
- 	{
- 		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)_pgm_heap_alloc (dwSize);
- 		dwRet = GetAdaptersAddresses (AF_UNSPEC,
-@@ -191,6 +202,7 @@
- 			break;
- 		}
- 	}
-+	}
- 
- 	switch (dwRet) {
- 	case ERROR_SUCCESS:
-@@ -221,6 +233,7 @@
- 	if (pAdapterAddresses)
- 		_pgm_heap_free (pAdapterAddresses);
- 	return 0;
-+	}
- }
- #endif /* _WIN32 */
- 
+82a83
+> 	{
+91c92,94
+< 	for (unsigned i = MAX_TRIES; i; i--)
+---
+> 	{
+> 	unsigned i;
+> 	for (i = MAX_TRIES; i; i--)
+102a106
+> 	}
+123c127,129
+< 		for (IP_ADDR_STRING *pIPAddr = &pAdapter->IpAddressList;
+---
+> 		{
+> 		IP_ADDR_STRING *pIPAddr;
+> 		for (pIPAddr = &pAdapter->IpAddressList;
+136a143
+> 		}
+141a149
+> 	}
+159a168
+> 	{
+177c186,188
+< 	for (unsigned i = MAX_TRIES; i; i--)
+---
+> 	{
+> 	unsigned i;
+> 	for (i = MAX_TRIES; i; i--)
+194a206
+> 	}
+224a237
+> 	}
