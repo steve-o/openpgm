@@ -1,5 +1,5 @@
---- thread.c	2011-06-19 07:23:32.000000000 +0800
-+++ thread.c89.c	2011-06-19 07:23:42.000000000 +0800
+--- thread.c	2011-06-25 22:34:16.000000000 +0800
++++ thread.c89.c	2011-06-26 07:15:32.000000000 +0800
 @@ -141,11 +141,13 @@
  
  #ifdef PTHREAD_MUTEX_ADAPTIVE_NP
@@ -13,10 +13,10 @@
 +	}
  #elif !defined( _WIN32 )
  	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
- #elif defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
-@@ -283,8 +285,11 @@
- 	WakeAllConditionVariable (&cond->win32_cond);
+ #elif ( _WIN32_WINNT >= 0x0600 )
+@@ -286,8 +288,11 @@
  #else
+ /* Condition variable implementation for Windows XP */
  	EnterCriticalSection (&cond->win32_crit);
 -	for (unsigned i = 0; i < cond->len; i++)
 +	{
@@ -26,16 +26,16 @@
 +	}
  	cond->len = 0;
  	LeaveCriticalSection (&cond->win32_crit);
- #endif /* !_WIN32 */
-@@ -317,6 +322,7 @@
- #	if defined(CONFIG_HAVE_WIN_COND)
+ #endif /* ( _WIN32 < 0x600 ) */
+@@ -324,6 +329,7 @@
  	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
  #	else
+ /* Condition variable implementation for Windows XP */
 +	{
  	DWORD status;
  	HANDLE event = TlsGetValue (cond_event_tls);
  
-@@ -340,7 +346,9 @@
+@@ -347,7 +353,9 @@
  
  	if (WAIT_TIMEOUT == status) {
  		EnterCriticalSection (&cond->win32_crit);
@@ -46,7 +46,7 @@
  			if (cond->phandle[ i ] == event) {
  				if (i != cond->len - 1)
  					memmove (&cond->phandle[ i ], &cond->phandle[ i + 1 ], sizeof(HANDLE) * (cond->len - i - 1));
-@@ -348,9 +356,11 @@
+@@ -355,9 +363,11 @@
  				break;
  			}
  		}
@@ -55,6 +55,6 @@
  		LeaveCriticalSection (&cond->win32_crit);
  	}
 +	}
- #	endif /* !CONFIG_HAVE_WIN_COND */
+ #	endif /* ( _WIN32_WINNT < 0x600 ) */
  }
- #endif /* !_WIN32 */
+ #endif /* defined( _WIN32 ) */
