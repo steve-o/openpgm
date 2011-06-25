@@ -109,9 +109,9 @@ pgm_vasprintf (
 	va_list args2;
 	va_copy (args2, args);
 #	endif
-	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
-/* NB: must be able to handle NULL args, fails on GCC */
-	len = vsprintf (*string, format, args2);
+	len = pgm_printf_string_upper_bound (format, args);
+	*string = pgm_malloc (len);
+	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
 	va_end (args2);
 #endif
 	return len;
