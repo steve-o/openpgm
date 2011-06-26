@@ -1,9 +1,9 @@
---- reed_solomon.c	2011-06-19 07:58:01.000000000 +0800
-+++ reed_solomon.c89.c	2011-06-19 07:58:20.000000000 +0800
+--- reed_solomon.c	2011-06-25 22:34:24.000000000 +0800
++++ reed_solomon.c89.c	2011-06-26 08:39:57.000000000 +0800
 @@ -49,6 +49,7 @@
  		return;
  
- #ifdef CONFIG_GALOIS_MUL_LUT
+ #ifdef USE_GALOIS_MUL_LUT
 +	{
          const pgm_gf8_t* gfmul_b = &pgm_gftable[ (uint16_t)b << 8 ];
  #endif
@@ -13,7 +13,7 @@
  		i++;
  	}
 +
-+#ifdef CONFIG_GALOIS_MUL_LUT
++#ifdef USE_GALOIS_MUL_LUT
 +	}
 +#endif
  }
@@ -270,7 +270,7 @@
   * Be careful, Harry!
   */
 +	{
- #ifdef CONFIG_PREFER_MALLOC
+ #ifdef USE_MALLOC_MATRIX
  	pgm_gf8_t* V = pgm_new0 (pgm_gf8_t, n * k);
  #else
  	pgm_gf8_t* V = pgm_newa (pgm_gf8_t, n * k);
@@ -375,7 +375,7 @@
  			continue;
  
 +		{
- #ifdef CONFIG_PREFER_MALLOC
+ #ifdef USE_MALLOC_MATRIX
  		pgm_gf8_t* erasure = repairs[ j ] = pgm_malloc0 (len);
  #else
  		pgm_gf8_t* erasure = repairs[ j ] = pgm_alloca (len);
