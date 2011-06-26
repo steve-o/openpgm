@@ -1,5 +1,5 @@
---- socket.c	2011-06-19 07:58:59.000000000 +0800
-+++ socket.c89.c	2011-06-19 07:59:16.000000000 +0800
+--- socket.c	2011-06-25 22:34:25.000000000 +0800
++++ socket.c89.c	2011-06-26 08:05:55.000000000 +0800
 @@ -378,7 +378,9 @@
  	new_sock->adv_mode	= 0;	/* advance with time */
  
@@ -276,4 +276,4 @@
 +	}
  }
  
- #if defined(CONFIG_HAVE_POLL) || defined(CONFIG_HAVE_WSAPOLL)
+ #if defined( HAVE_POLL ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )

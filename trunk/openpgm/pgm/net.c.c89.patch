@@ -1,5 +1,5 @@
---- net.c	2011-06-19 07:30:56.000000000 +0800
-+++ net.c89.c	2011-06-19 07:31:10.000000000 +0800
+--- net.c	2011-06-25 22:34:17.000000000 +0800
++++ net.c89.c	2011-06-26 08:36:56.000000000 +0800
 @@ -65,6 +65,7 @@
  	pgm_assert( tolen > 0 );
  
@@ -63,7 +63,7 @@
 +			tv.tv_sec  = 0;
 +			tv.tv_usec = 500 /* ms */ * 1000;
 +			ready = select (n_fds, NULL, &writefds, NULL, &tv);
- #endif /* CONFIG_HAVE_POLL */
+ #endif /* HAVE_POLL */
  			if (ready > 0)
  			{
 -				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);

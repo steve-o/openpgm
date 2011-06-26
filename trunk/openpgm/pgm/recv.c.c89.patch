@@ -1,5 +1,5 @@
---- recv.c	2011-06-19 07:21:48.000000000 +0800
-+++ recv.c89.c	2011-06-19 07:22:04.000000000 +0800
+--- recv.c	2011-06-25 22:34:14.000000000 +0800
++++ recv.c89.c	2011-06-26 08:08:36.000000000 +0800
 @@ -49,12 +49,21 @@
  #endif
  
@@ -240,7 +240,7 @@
 +		{
  		const int status = pgm_select_info (sock, &readfds, NULL, &n_fds);
  		pgm_assert (-1 != status);
- #endif /* CONFIG_HAVE_POLL */
+ #endif /* HAVE_POLL */
 @@ -608,6 +642,7 @@
  			sock->is_pending_read = FALSE;
  		}
@@ -250,7 +250,7 @@
  		if (sock->can_send_data && !pgm_txw_retransmit_is_empty (sock->window))
  			timeout = 0;
 @@ -617,10 +652,11 @@
- #ifdef CONFIG_HAVE_POLL
+ #ifdef HAVE_POLL
  		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
  #else
 -		struct timeval tv_timeout = {
@@ -263,7 +263,7 @@
 +		tv_timeout.tv_usec	= timeout > 1000000L ? (timeout % 1000000L) : timeout;
 +		{
  		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
- #endif
+ #endif /* HAVE_POLL */
  		if (PGM_UNLIKELY(SOCKET_ERROR == ready)) {
 @@ -630,6 +666,11 @@
  			pgm_debug ("recv again on empty");
