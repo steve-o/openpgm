@@ -44,18 +44,11 @@
 #	include <sys/ioctl.h>
 #endif
 #if !defined( SOL_IP )
-#	if defined( IPPROTO_IP )
-#		define SOL_IP			IPPROTO_IP
-#	else
-#		error "Neither SOL_IP or IPPROTO_IP defined."
-#	endif
+/* IPPROTO_IP is often an enum value whilst SOL_IP is a pre-processor definition */
+#	define SOL_IP			IPPROTO_IP
 #endif
 #if !defined( SOL_IPV6 )
-#	if defined( IPPROTO_IPV6 )
-#		define SOL_IPV6			IPPROTO_IPV6
-#	else
-#		error "Neither SOL_IPV6 or IPPROTO_IPV6 defined."
-#	endif
+#	define SOL_IPV6			IPPROTO_IPV6
 #endif
 #ifndef IP_MAX_MEMBERSHIPS
 /* NB: New platforms may have very high membership limit but not exported for evaluation. */
