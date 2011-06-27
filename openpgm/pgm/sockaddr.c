@@ -524,7 +524,7 @@ pgm_sockaddr_join_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#ifdef HAVE_STRUCT_GROUP_REQ
+#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."  Presumably with source field zeroed out.
  * Solaris:ip6(7P) "Takes a struct group_req as the parameter."
@@ -622,7 +622,7 @@ pgm_sockaddr_leave_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#ifdef HAVE_STRUCT_GROUP_REQ
+#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_LEAVE_GROUP, gr, sizeof(struct group_req));
 #else
@@ -678,7 +678,7 @@ pgm_sockaddr_block_source (
 	)
 {
 	int retval = SOCKET_ERROR;
-#ifdef HAVE_STRUCT_GROUP_REQ
+#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_BLOCK_SOURCE, gsr, sizeof(struct group_source_req));
 #elif defined( IP_BLOCK_SOURCE )
@@ -723,7 +723,7 @@ pgm_sockaddr_unblock_source (
 	)
 {
 	int retval = SOCKET_ERROR;
-#ifdef HAVE_STRUCT_GROUP_REQ
+#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_UNBLOCK_SOURCE, gsr, sizeof(struct group_source_req));
 #elif defined( IP_UNBLOCK_SOURCE )
@@ -773,7 +773,7 @@ pgm_sockaddr_join_source_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#ifdef HAVE_STRUCT_GROUP_REQ
+#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."
  * Solaris:ip6(7P) "Takes a struct group_source_req as the parameter."
@@ -843,7 +843,7 @@ pgm_sockaddr_leave_source_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#ifdef HAVE_STRUCT_GROUP_REQ
+#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	retval = setsockopt (s, recv_level, MCAST_LEAVE_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
 #elif defined( IP_ADD_SOURCE_MEMBERSHIP )
