@@ -1,6 +1,6 @@
---- string.c	2011-06-26 07:29:35.000000000 +0800
-+++ string.c89.c	2011-06-26 07:25:20.000000000 +0800
-@@ -102,17 +102,19 @@
+--- string.c	2011-06-27 22:58:17.000000000 +0800
++++ string.c89.c	2011-06-27 23:08:39.000000000 +0800
+@@ -104,10 +104,12 @@
  		free (strp);
  	}
  #else
@@ -13,16 +13,15 @@
  	va_list args2;
  	va_copy (args2, args);
  #	endif
--	len = pgm_printf_string_upper_bound (format, args);
--	*string = pgm_malloc (len);
-+	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
+@@ -115,6 +117,7 @@
+ 	*string = pgm_malloc (len);
  	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
  	va_end (args2);
 +	}
  #endif
  	return len;
  }
-@@ -143,13 +145,14 @@
+@@ -145,13 +148,14 @@
  #ifdef HAVE_STPCPY
  	return stpcpy (dest, src);
  #else
@@ -38,7 +37,7 @@
  #endif
  }
  
-@@ -258,8 +261,11 @@
+@@ -260,8 +264,11 @@
  {
  	if (PGM_LIKELY (NULL != str_array))
  	{
