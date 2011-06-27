@@ -104,7 +104,7 @@
 /* Raise compiler warning if caller ignores return value */
 #	define PGM_GNUC_WARN_UNUSED_RESULT	__attribute__((warn_unused_result))
 
-#	ifdef CONFIG_HAVE_DSO_VISIBILITY
+#	ifdef HAVE_DSO_VISIBILITY
 /* Hidden visibility */
 #		define PGM_GNUC_INTERNAL		__attribute__((visibility("hidden")))
 #	else
@@ -112,7 +112,7 @@
 #	endif
 #else /* !__GNUC__ */
 #	define PGM_GNUC_WARN_UNUSED_RESULT
-#	if ((defined(__SUNPRO_C) && (__SUNPRO_C >= 0x550)) || (defined(__SUNPRO_CC) && (__SUNPRO_CC >= 0x550))) && defined(CONFIG_HAVE_DSO_VISIBILITY)
+#	if ((defined(__SUNPRO_C) && (__SUNPRO_C >= 0x550)) || (defined(__SUNPRO_CC) && (__SUNPRO_CC >= 0x550))) && defined(HAVE_DSO_VISIBILITY)
 #		define PGM_GNUC_INTERNAL		__hidden
 #	else
 #		define PGM_GNUC_INTERNAL

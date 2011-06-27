@@ -30,10 +30,10 @@ struct pgm_sockaddr_t;
 struct pgm_addrinfo_t;
 struct pgm_fecinto_t;
 
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 #	include <poll.h>
 #endif
-#ifdef CONFIG_HAVE_EPOLL
+#ifdef HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
 #ifndef _WIN32
@@ -177,12 +177,13 @@ int pgm_recvfrom (pgm_sock_t*const restrict, void*restrict, const size_t, const 
 
 bool pgm_getsockname (pgm_sock_t*const restrict, struct pgm_sockaddr_t*restrict, socklen_t*restrict);
 int pgm_select_info (pgm_sock_t*const restrict, fd_set*const restrict, fd_set*const restrict, int*const restrict);
-#ifdef CONFIG_HAVE_POLL
+#if defined( POLLIN ) && defined( POLLOUT )
 int pgm_poll_info (pgm_sock_t*const restrict, struct pollfd*const restrict, int*const restrict, const short);
-#elif defined(CONFIG_HAVE_WSAPOLL)
-int pgm_poll_info (pgm_sock_t*const restrict, WSAPOLLFD*const restrict, ULONG*const restrict, const short);
 #endif
-#ifdef CONFIG_HAVE_EPOLL
+#if defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+int pgm_wsapoll_info (pgm_sock_t*const restrict, WSAPOLLFD*const restrict, ULONG*const restrict, const short);
+#endif
+#if defined( EPOLLIN ) && defined( EPOLLOUT )
 int pgm_epoll_ctl (pgm_sock_t*const, const int, const int, const int);
 #endif
 
