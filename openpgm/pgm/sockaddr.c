@@ -31,19 +31,31 @@
 
 
 /* FreeBSD */
-#if !defined( IPV6_ADD_MEMBERSHIP ) && defined( IPV6_JOIN_GROUP )
-#	define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP
-#	define IPV6_DROP_MEMBERSHIP	IPV6_LEAVE_GROUP
+#if !defined( IPV6_ADD_MEMBERSHIP )
+#	if defined( IPV6_JOIN_GROUP )
+#		define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP
+#		define IPV6_DROP_MEMBERSHIP	IPV6_LEAVE_GROUP
+#	else
+#		error "Neither IPV6_ADD_MEMBERSHIP or IPV6_JOIN_GROUP defined."
+#	endif
 #endif
 /* OpenSolaris differences */
 #if !defined( _WIN32 ) && !defined( MCAST_MSFILTER )
 #	include <sys/ioctl.h>
 #endif
-#if !defined( SOL_IP ) && defined( IPPROTO_IP )
-#	define SOL_IP			IPPROTO_IP
+#if !defined( SOL_IP )
+#	if defined( IPPROTO_IP )
+#		define SOL_IP			IPPROTO_IP
+#	else
+#		error "Neither SOL_IP or IPPROTO_IP defined."
+#	endif
 #endif
-#if !defined( SOL_IPV6 ) && defined( IPPROTO_IPV6 )
-#	define SOL_IPV6			IPPROTO_IPV6
+#if !defined( SOL_IPV6 )
+#	if defined( IPPROTO_IPV6 )
+#		define SOL_IPV6			IPPROTO_IPV6
+#	else
+#		error "Neither SOL_IPV6 or IPPROTO_IPV6 defined."
+#	endif
 #endif
 #ifndef IP_MAX_MEMBERSHIPS
 /* NB: New platforms may have very high membership limit but not exported for evaluation. */
