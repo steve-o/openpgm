@@ -27,7 +27,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <config.h>
+#ifdef HAVE_CONFIG_H
+#	include <config.h>
+#endif
 
 #ifndef _BSD_SOURCE
 #	define _BSD_SOURCE	1	/* getprotobyname_r */

@@ -85,6 +85,8 @@ env = Environment(
 #			'-DUSE_VECTOR_CHECKSUM',
 # optimum galois field multiplication
 			'-DUSE_GALOIS_MUL_LUT',
+# Autoconf config.h
+			'-DHAVE_CONFIG_H',
 # Wine limited API support
 #			'-DCONFIG_TARGET_WINE',
 		],
