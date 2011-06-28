@@ -65,7 +65,7 @@ public:
 	{
 		data_.sa_port = port_num;
 		data_.sa_addr.sport = 0;
-		pgm_gsi_create_from_hostname (&data_.sa_addr.gsi, NULL);
+		cpgm::pgm_gsi_create_from_hostname (&data_.sa_addr.gsi, NULL);
 	}
 
 	/// Construct an endpoint using a port number and a TSI.
@@ -82,7 +82,7 @@ public:
 	{
 		data_.sa_port = port_num;
 		data_.sa_addr.sport = 0;
-		pgm_gsi_create_from_data (&data_.sa_addr.gsi, static_cast<const uint8_t*>(src), len);
+		cpgm::pgm_gsi_create_from_data (&data_.sa_addr.gsi, static_cast<const uint8_t*>(src), len);
 	}
 
 	/// Copy constructor.
