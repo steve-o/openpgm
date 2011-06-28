@@ -31,7 +31,8 @@ opt.AddOptions (
 # Dependencies
 
 def force_intelc(env):
-	env.Tool('intelc', version='11.1', topdir='/opt/intel/Compiler/11.1/064/bin/intel64');
+#	env.Tool('intelc', version='11.1', topdir='/opt/intel/Compiler/11.1/064/bin/intel64');
+	env.Tool('intelc', topdir='/opt/intel/composerxe');
 
 env = Environment();
 force_intelc(env);
@@ -133,6 +134,10 @@ env = Environment(ENV = os.environ,
 #                 pgm_udpport_string(pgm_header->pgm_sport));
 				'-wd981',
 
+# 1292: attribute ignored
+# - Ignored for GCC and other compiler targetted attributes
+				'-wd1292',
+
 # 2259: non-pointer conversion from "/type a/" to "/type b/" may lose significant bits
 # - Ignored for really pedantic compiler temporary value conversions,
 #   e.g. uint16_t j = 1, i = ~j;
@@ -147,63 +152,66 @@ env = Environment(ENV = os.environ,
 # re-entrant libc
 			'-D_REENTRANT',
 # POSIX spinlocks
-			'-DCONFIG_HAVE_POSIX_SPINLOCK',
+			'-DHAVE_PTHREAD_SPINLOCK',
 # NSS protocol lookup
-#			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
-			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
+			'-DHAVE_GETPROTOBYNAME_R',
+#			'-DGETPROTOBYNAME_R_STRUCT_PROTOENT_P',
 # NSS networks lookup, IPv4 only
- 			'-DCONFIG_HAVE_GETNETENT',
+ 			'-DHAVE_GETNETENT',
 # variadic macros
- 			'-DCONFIG_HAVE_ISO_VARARGS',
-#			'-DCONFIG_HAVE_GNUC_VARARGS',
+ 			'-DHAVE_ISO_VARARGS',
+#			'-DHAVE_GNUC_VARARGS',
 # stack memory api header
-			'-DCONFIG_HAVE_ALLOCA_H',
+			'-DHAVE_ALLOCA_H',
 # optimium checksum implementation
-#			'-DCONFIG_8BIT_CHECKSUM',
-			'-DCONFIG_16BIT_CHECKSUM',
-#			'-DCONFIG_32BIT_CHECKSUM',
-#			'-DCONFIG_64BIT_CHECKSUM',
-#			'-DCONFIG_VECTOR_CHECKSUM',
+#			'-DUSE_8BIT_CHECKSUM',
+			'-DUSE_16BIT_CHECKSUM',
+#			'-DUSE_32BIT_CHECKSUM',
+#			'-DUSE_64BIT_CHECKSUM',
+#			'-DUSE_VECTOR_CHECKSUM',
 # useful /proc system
-			'-DCONFIG_HAVE_PROC',
+			'-DHAVE_PROC_CPUINFO',
 # example: crash handling
-			'-DCONFIG_HAVE_BACKTRACE',
+			'-DHAVE_BACKTRACE',
 # timing
-			'-DCONFIG_HAVE_PSELECT',
+			'-DHAVE_FTIME',
+			'-DHAVE_GETTIMEOFDAY',
+			'-DHAVE_CLOCK_GETTIME',
+			'-DHAVE_PSELECT',
 # ioctl RTC_IRQP_SET: undefined reference to `__invalid_size_argument_for_IOC'
-#			'-DCONFIG_HAVE_RTC',
-			'-DCONFIG_HAVE_TSC',
+#			'-DHAVE_DEV_RTC',
+			'-DHAVE_RDTSC',
 # event handling
-			'-DCONFIG_HAVE_POLL',
-			'-DCONFIG_HAVE_EPOLL',
+			'-DHAVE_POLL',
+			'-DHAVE_EPOLL_CTL',
 # interface enumeration
-			'-DCONFIG_HAVE_GETIFADDRS',
-			'-DCONFIG_HAVE_IFR_NETMASK',
+			'-DHAVE_GETIFADDRS',
+			'-DHAVE_STRUCT_IFADDRS_IFR_NETMASK',
 # win32 cmsg
-#			'-DCONFIG_HAVE_WSACMSGHDR',
+#			'-DHAVE_WSACMSGHDR',
 # multicast
-			'-DCONFIG_HAVE_MCAST_JOIN',
-			'-DCONFIG_HAVE_IP_MREQN',
+			'-DHAVE_STRUCT_GROUP_REQ',
+			'-DHAVE_STRUCT_IP_MREQN',
 # sprintf
-			'-DCONFIG_HAVE_SPRINTF_GROUPING',
-			'-DCONFIG_HAVE_VASPRINTF',
+			'-DHAVE_SPRINTF_GROUPING',
+			'-DHAVE_VASPRINTF',
 # symbol linking scope
-			'-DCONFIG_HAVE_DSO_VISIBILITY',
+			'-DHAVE_DSO_VISIBILITY',
 # socket binding
-			'-DCONFIG_BIND_INADDR_ANY',
+			'-DUSE_BIND_INADDR_ANY',
 # IP header order as per IP(4) on FreeBSD
-#			'-DCONFIG_HOST_ORDER_IP_LEN',
-#			'-DCONFIG_HOST_ORDER_IP_OFF',
+#			'-DHAVE_HOST_ORDER_IP_LEN',
+#			'-DHAVE_HOST_ORDER_IP_OFF',
 # ticket based spinlocks
-			'-DCONFIG_TICKET_SPINLOCK',
+			'-DUSE_TICKET_SPINLOCK',
 # dumb read-write spinlock
-			'-DCONFIG_DUMB_RWSPINLOCK',
+			'-DUSE_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
-			'-DCONFIG_GALOIS_MUL_LUT',
+			'-DUSE_GALOIS_MUL_LUT',
 # Wine limited API support
 #			'-DCONFIG_TARGET_WINE',
 # GNU getopt
-			'-DCONFIG_HAVE_GETOPT'
+			'-DHAVE_GETOPT'
 		 ],
 	LINKFLAGS = [	'-pipe'
 		    ],
@@ -270,11 +278,11 @@ else:
 
 # l10n
 if env['WITH_GETTEXT'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
+	env.Append(CCFLAGS = '-DHAVE_GETTEXT');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
+	env.Append(CCFLAGS = '-DUSE_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
 if env['WITH_SNMP'] == 'true':
@@ -356,7 +364,7 @@ else:
 
 if conf.CheckEventFD():
 	print 'Enabling kernel eventfd notification mechanism.';
-	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
+	conf.env.Append(CCFLAGS = '-DHAVE_EVENTFD');
 
 env = conf.Finish();
 
