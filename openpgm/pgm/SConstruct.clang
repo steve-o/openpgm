@@ -31,6 +31,7 @@ vars.AddVariables (
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_TEST', 'Network test system', 'false',
 			allowed_values=('true', 'false')),
+# clang++ in Debian wheezy may require installation of libstdc++6-4.4-dev
 	EnumVariable ('WITH_CC', 'C++ examples', 'true',
 			allowed_values=('true', 'false')),
 	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
@@ -42,45 +43,11 @@ vars.AddVariables (
 )
 
 #-----------------------------------------------------------------------------
-# Dependencies
+# Platform specifics
 
 def force_clang(env):
 	env['CC'] = 'clang';
-
-env = Environment();
-force_clang(env);
-
-def CheckPKGConfig(context, version):
-	context.Message( 'Checking for pkg-config... ' )
-	ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
-	context.Result( ret )
-	return ret
-
-def CheckPKG(context, name):
-	context.Message( 'Checking for %s... ' % name )
-	ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
-	context.Result( ret )
-	return ret
-
-conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
-				       'CheckPKG' : CheckPKG })
-
-if not conf.CheckPKGConfig('0.15.0'):
-	print 'pkg-config >= 0.15.0 not found.'
-#	Exit(1)
-
-if not conf.CheckPKG('glib-2.0 >= 2.10'):
-	print 'glib-2.0 >= 2.10 not found.'
-#	Exit(1)
-
-if not conf.CheckPKG('gthread-2.0'):
-	print 'gthread-2.0 not found.'
-#	Exit(1)
-
-env = conf.Finish();
-
-#-----------------------------------------------------------------------------
-# Platform specifics
+	env['CXX'] = 'clang++';
 
 env = Environment(
 	variables = vars,
@@ -106,7 +73,8 @@ env = Environment(
 				'-Wmissing-format-attribute',
 				'-Wredundant-decls',
 				'-Wnested-externs',
-				'-Winline',
+#				'-Winline',
+				'-Wno-inline',
 				'-Wno-unused-function',
 #			'-pedantic',
 # C99
@@ -115,75 +83,33 @@ env = Environment(
 			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
-# POSIX spinlocks
-			'-DCONFIG_HAVE_POSIX_SPINLOCK',
-# NSS protocol lookup
-#			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
-			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
-# NSS networks lookup, IPv4 only
- 			'-DCONFIG_HAVE_GETNETENT',
-# variadic macros
-			'-DCONFIG_HAVE_ISO_VARARGS',
-#			'-DCONFIG_HAVE_GNUC_VARARGS',
-# stack memory api header
-			'-DCONFIG_HAVE_ALLOCA_H',
 # optimium checksum implementation
-#			'-DCONFIG_8BIT_CHECKSUM',
-			'-DCONFIG_16BIT_CHECKSUM',
-#			'-DCONFIG_32BIT_CHECKSUM',
-#			'-DCONFIG_64BIT_CHECKSUM',
-#			'-DCONFIG_VECTOR_CHECKSUM',
-# useful /proc system
-			'-DCONFIG_HAVE_PROC',
-# example: crash handling
-			'-DCONFIG_HAVE_BACKTRACE',
-# timing
-			'-DCONFIG_HAVE_PSELECT',
-			'-DCONFIG_HAVE_RTC',
-			'-DCONFIG_HAVE_TSC',
-			'-DCONFIG_HAVE_HPET',
-# event handling
-			'-DCONFIG_HAVE_POLL',
-			'-DCONFIG_HAVE_EPOLL',
-# interface enumeration
-			'-DCONFIG_HAVE_GETIFADDRS',
-			'-DCONFIG_HAVE_IFR_NETMASK',
-# win32 cmsg
-#			'-DCONFIG_HAVE_WSACMSGHDR',
-# multicast
-			'-DCONFIG_HAVE_MCAST_JOIN',
-			'-DCONFIG_HAVE_IP_MREQN',
-# sprintf
-# NB: raises invalid conversion specifier ''' [-Wformat] in clang
-#			'-DCONFIG_HAVE_SPRINTF_GROUPING',
-			'-DCONFIG_HAVE_VASPRINTF',
-# symbol linking scope
-			'-DCONFIG_HAVE_DSO_VISIBILITY',
-# socket binding
-			'-DCONFIG_BIND_INADDR_ANY',
-# IP header order as per IP(4) on FreeBSD
-#			'-DCONFIG_HOST_ORDER_IP_LEN',
-#			'-DCONFIG_HOST_ORDER_IP_OFF',
-# ticket based spinlocks
-			'-DCONFIG_TICKET_SPINLOCK',
-# dumb read-write spinlock
-			'-DCONFIG_DUMB_RWSPINLOCK',
+#			'-DUSE_8BIT_CHECKSUM',
+			'-DUSE_16BIT_CHECKSUM',
+#			'-DUSE_32BIT_CHECKSUM',
+#			'-DUSE_64BIT_CHECKSUM',
+#			'-DUSE_VECTOR_CHECKSUM',
 # optimum galois field multiplication
-			'-DCONFIG_GALOIS_MUL_LUT',
+			'-DUSE_GALOIS_MUL_LUT',
+# Autoconf config.h
+			'-DHAVE_CONFIG_H',
 # Wine limited API support
 #			'-DCONFIG_TARGET_WINE',
-# GNU getopt
-			'-DCONFIG_HAVE_GETOPT'
 		],
-	LINKFLAGS = [	'-pipe'
+	LINKFLAGS = [	'-pipe',
+			'-lpthread'
 		],
 	LIBS = [
 # histogram math
 			'm',
 # clock_gettime()
 			'rt'
-		]
+		],
+	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.3.0/clang/include',
+	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.3.0/clang/lib/libprotobuf.a',
+	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.3.0/clang/bin/protoc'
 )
+
 force_clang(env);
 
 # Branch prediction
@@ -236,11 +162,11 @@ else:
 
 # l10n
 if env['WITH_GETTEXT'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
+	env.Append(CCFLAGS = '-DHAVE_GETTEXT');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
+	env.Append(CCFLAGS = '-DUSE_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
 if env['WITH_SNMP'] == 'true':
@@ -287,22 +213,8 @@ def CheckCheck(context):
 	context.Result(result);
 	return result;
 
-def CheckEventFD(context):
-	context.Message('Checking eventfd...');
-	result = context.TryLink("""
-#include <sys/eventfd.h>
-int main(int argc, char**argv)
-{
-	eventfd(0,0);
-	return 0;
-}
-""", '.c')
-	context.Result(result);
-	return result;
-
 tests = {
 	'CheckCheck':	CheckCheck,
-	'CheckEventFD':	CheckEventFD
 }
 if env['WITH_SNMP'] == 'true':
 	tests['CheckSNMP'] = CheckSNMP;
@@ -319,10 +231,6 @@ if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
 else:
 	print 'Disabling Check unit tests.';
 	conf.env['CHECK'] = 'false';
-
-if conf.CheckEventFD():
-	print 'Enabling kernel eventfd notification mechanism.';
-	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
 
 env = conf.Finish();
 
@@ -345,9 +253,15 @@ env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
 ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '-clang/';
 BuildDir(ref_node, '.', duplicate=0)
 
-env.Append(CPPPATH = os.getcwd() + '/include');
+env.Append(CPPPATH = [
+# $(top_builddir)/include
+	os.getcwd() + '/' + ref_node + 'include',
+# $(srcdir)/include
+	os.getcwd() + '/include'
+		]);
 env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
+SConscript(ref_node + 'SConscript.autoconf');
 if env['WITH_GLIB'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmex');
 SConscript(ref_node + 'SConscript.libpgm');
