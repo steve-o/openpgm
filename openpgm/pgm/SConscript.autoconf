@@ -33,7 +33,7 @@ def CheckGetProtoByNameR (context):
 int
 main ()
 {
-	struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (size_t)0, (struct protoent**)0);
+	struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (int)0);
 	return 0;
 }
 	""";
@@ -252,8 +252,7 @@ main ()
 def AutoConf (env):
 	settings = {};
 	conf = Configure (env, custom_tests = {	'CheckPthreadSpinlock': CheckPthreadSpinlock,
-						'CheckGetProtoByNameR4Param': CheckGetProtoByNameR4Param,
-						'CheckGetProtoByNameR5Param': CheckGetProtoByNameR5Param,
+						'CheckGetProtoByNameR': CheckGetProtoByNameR,
 						'CheckIsoVariadicMacros': CheckIsoVariadicMacros,
 						'CheckGnuVariadicMacros': CheckGnuVariadicMacros,
 						'CheckFile': CheckFile,

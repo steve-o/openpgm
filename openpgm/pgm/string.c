@@ -23,8 +23,8 @@
 #	include <config.h>
 #endif
 
-#if defined( HAVE_VASPRINTF ) && !defined( _GNU_SOURCE )
-#	define _GNU_SOURCE	/* vasprintf */
+#if ( defined( HAVE_VASPRINTF ) || defined( HAVE_STPCPY ) ) && !defined( _GNU_SOURCE )
+#	define _GNU_SOURCE	/* vasprintf, stpcpy */
 #endif
 
 #include <limits.h>
