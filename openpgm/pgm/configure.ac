@@ -101,18 +101,18 @@ AC_COMPILE_IFELSE(
 		CFLAGS="$CFLAGS -DHAVE_PTHREAD_SPINLOCK"],
 	[AC_MSG_RESULT([no])])
 # NSS protocol lookup
-AC_CHECK_FUNC([getprotobyname_r])
+AC_CHECK_FUNCS([getprotobyname_r])
 if test "x$ac_cv_func_getprotobyname_r" = "xyes"; then
 AC_MSG_CHECKING([whether getprotobyname_r returns struct protoent *])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <netdb.h>]],
-		[[struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (size_t)0, (struct protoent**)0);]])],
+		[[struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (int)0);]])],
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DGETPROTOBYNAME_R_STRUCT_PROTOENT_P"],
 	[AC_MSG_RESULT([no])])
 fi
 # NSS networks lookup, IPv4 only
-AC_CHECK_FUNC([getnetent])
+AC_CHECK_FUNCS([getnetent])
 # variadic macros
 AC_MSG_CHECKING([for C99 variadic macros])
 AC_COMPILE_IFELSE(
@@ -143,9 +143,9 @@ AC_COMPILE_IFELSE(
 # useful /proc system
 AC_CHECK_FILES([/proc/cpuinfo])
 # example: crash handling
-AC_CHECK_FUNC([backtrace])
+AC_CHECK_FUNCS([backtrace])
 # timing
-AC_CHECK_FUNC([pselect])
+AC_CHECK_FUNCS([pselect])
 AC_CHECK_FILES([/dev/rtc])
 AC_MSG_CHECKING([for RDTSC instruction])
 case "$host_os" in
@@ -163,10 +163,10 @@ __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));]])],
 esac
 AC_CHECK_FILES([/dev/hpet])
 # event handling
-AC_CHECK_FUNC([poll])
-AC_CHECK_FUNC([epoll_ctl])
+AC_CHECK_FUNCS([poll])
+AC_CHECK_FUNCS([epoll_ctl])
 # interface enumeration
-AC_CHECK_FUNC([getifaddrs])
+AC_CHECK_FUNCS([getifaddrs])
 AC_MSG_CHECKING([for struct ifreq.ifr_netmask])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <sys/types.h>
@@ -203,7 +203,7 @@ AC_COMPILE_IFELSE(
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DHAVE_SPRINTF_GROUPING"],
 	[AC_MSG_RESULT([no])])
-AC_CHECK_FUNC([vasprintf])
+AC_CHECK_FUNCS([vasprintf])
 # symbol linking scope
 # nb: sun x86 ld doesn't support DSO visibility but the compiler raises
 # warnings and these are easier to detect in autoconf.
