@@ -69,6 +69,8 @@ _pgm_heap_free (
  * adapters via GetAdaptersInfo().
  *
  * On error returns zero, no errors are defined.
+ *
+ * Requires Windows 2000 or Wine 1.0.
  */
 
 static
@@ -148,6 +150,8 @@ _pgm_getadaptersinfo_nametoindex (
  * adapters via GetAdaptersAddresses().
  *
  * On error returns zero, no errors are defined.
+ *
+ * Requires Windows XP or Wine 1.3.
  */
 
 static
@@ -247,8 +251,6 @@ pgm_if_nametoindex (
 #ifndef _WIN32
 /* Vista+ implements if_nametoindex for IPv6 */
 	return if_nametoindex (ifname);
-#elif defined(CONFIG_TARGET_WINE)
-	return _pgm_getadaptersinfo_nametoindex (iffamily, ifname);
 #else
 	return _pgm_getadaptersaddresses_nametoindex (iffamily, ifname);
 #endif

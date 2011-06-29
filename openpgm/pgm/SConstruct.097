@@ -151,8 +151,6 @@ env = Environment(ENV = os.environ,
 			'-DUSE_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DUSE_GALOIS_MUL_LUT',
-# Wine limited API support
-#			'-DCONFIG_TARGET_WINE',
 # GNU getopt
 			'-DHAVE_GETOPT',
 # temporary for pgmping
