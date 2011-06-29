@@ -93,8 +93,6 @@ env = Environment(
 			'-DUSE_GALOIS_MUL_LUT',
 # Autoconf config.h
 			'-DHAVE_CONFIG_H',
-# Wine limited API support
-#			'-DCONFIG_TARGET_WINE',
 		],
 	LINKFLAGS = [	'-pipe',
 			'-lpthread'

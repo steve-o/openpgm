@@ -509,8 +509,10 @@ pgm_socket (
 		}
 #endif
 
-/* request extra packet information to determine destination address on each packet */
-#ifndef CONFIG_TARGET_WINE
+/* Request extra packet information to determine destination address on each packet
+ * 
+ * Requires Windows XP or Wine 1.3.
+ */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
 		const sa_family_t recv_family = new_sock->family;
 		if (SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
@@ -524,7 +526,6 @@ pgm_socket (
 				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			goto err_destroy;
 		}
-#endif
 	}
 	else
 	{
@@ -1164,7 +1165,6 @@ pgm_setsockopt (
 /* 0 < hops < 256, hops == -1 use kernel default (ignored).
  */
 	case PGM_MULTICAST_HOPS:
-#ifndef CONFIG_TARGET_WINE
 		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		if (PGM_UNLIKELY(*(const int*)optval <= 0))
@@ -1177,7 +1177,6 @@ pgm_setsockopt (
 			    SOCKET_ERROR == pgm_sockaddr_multicast_hops (sock->send_with_router_alert_sock, sock->family, sock->hops))
 				break;
 		}
-#endif
 		status = TRUE;
 		break;
 
@@ -2359,9 +2358,7 @@ pgm_connect (
 {
 	pgm_return_val_if_fail (sock != NULL, FALSE);
 	pgm_return_val_if_fail (sock->recv_gsr_len > 0, FALSE);
-#ifdef CONFIG_TARGET_WINE
 	pgm_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
-#endif
 	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
 	{
 		pgm_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);

@@ -124,8 +124,8 @@ pgm_init (
 		goto err_shutdown;
 	}
 
-#	ifndef CONFIG_TARGET_WINE
-/* find WSARecvMsg API */
+/* Find WSARecvMsg API.  Available in Windows XP and Wine 1.3.
+ */
 	if (NULL == pgm_WSARecvMsg) {
 		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
 		DWORD cbBytesReturned;
@@ -157,7 +157,6 @@ pgm_init (
 		pgm_debug ("Retrieved address of WSARecvMsg.");
 		closesocket (sock);
 	}
-#	endif
 #endif /* _WIN32 */
 
 /* find PGM protocol id overriding default value, use first value from NIS */
