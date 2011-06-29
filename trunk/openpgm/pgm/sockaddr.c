@@ -1078,6 +1078,8 @@ pgm_sockaddr_multicast_loop (
  * If no error occurs, pgm_sockaddr_multicast_hops returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_get_last_sock_error().
+ *
+ * Requires Wine 1.3, supported in Windows 9x/Me.
  */
 
 PGM_GNUC_INTERNAL

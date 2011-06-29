@@ -42,45 +42,10 @@ vars.AddVariables (
 )
 
 #-----------------------------------------------------------------------------
-# Dependencies
+# Platform specifics
 
 def force_mingw(env):
 	env.Tool('crossmingw', toolpath=['.']);
-
-env = Environment();
-force_mingw(env);
-
-def CheckPKGConfig(context, version):
-	context.Message( 'Checking for pkg-config... ' )
-	ret = context.TryAction('PKG_CONFIG_PATH=win/lib/pkgconfig pkg-config --atleast-pkgconfig-version=%s' % version)[0]
-	context.Result( ret )
-	return ret
-
-def CheckPKG(context, name):
-	context.Message( 'Checking for %s... ' % name )
-	ret = context.TryAction('PKG_CONFIG_PATH=win/lib/pkgconfig pkg-config --exists \'%s\'' % name)[0]
-	context.Result( ret )
-	return ret
-
-conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
-				       'CheckPKG' : CheckPKG })
-
-if not conf.CheckPKGConfig('0.15.0'):
-	print 'pkg-config >= 0.15.0 not found.'
-#	Exit(1)
-
-if not conf.CheckPKG('glib-2.0 >= 2.10'):
-	print 'glib-2.0 >= 2.10 not found.'
-#	Exit(1)
-
-if not conf.CheckPKG('gthread-2.0'):
-	print 'gthread-2.0 not found.'
-#	Exit(1)
-
-env = conf.Finish();
-
-#-----------------------------------------------------------------------------
-# Platform specifics
 
 env = Environment(
 	variables = vars,
@@ -178,8 +143,6 @@ env = Environment(
 			'-DUSE_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DUSE_GALOIS_MUL_LUT',
-# Wine limited API support
-#			'-DCONFIG_TARGET_WINE',
 # GNU getopt
 #			'-DHAVE_GETOPT'
 		 ],

@@ -533,6 +533,8 @@ _pgm_heap_free (
 /* NB: IP_ADAPTER_INFO size varies size due to sizeof (time_t), the API assumes
  * 4-byte datatype whilst compiler uses an 8-byte datatype.  Size can be forced
  * with -D_USE_32BIT_TIME_T with side effects to everything else.
+ *
+ * Available in Windows 2000 and Wine 1.0.
  */
 
 static
@@ -653,6 +655,9 @@ _pgm_getadaptersinfo (
 	*ifap = (struct pgm_ifaddrs_t*)ifa;
 	return TRUE;
 }
+
+/* Available in Windows XP and Wine 1.3.
+ */
 
 static
 bool
@@ -852,8 +857,6 @@ pgm_getifaddrs (
 		return FALSE;
 	}
 	return TRUE;
-#elif defined( CONFIG_TARGET_WINE )
-	return _pgm_getadaptersinfo (ifap, error);
 #elif defined( _WIN32 )
 	return _pgm_getadaptersaddresses (ifap, error);
 #elif defined( SIOCGLIFCONF )

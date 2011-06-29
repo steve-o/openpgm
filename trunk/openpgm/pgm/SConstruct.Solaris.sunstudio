@@ -158,8 +158,6 @@ env = Environment(
 			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
-# Wine limited API support
-#			'-DCONFIG_TARGET_WINE',
 # GNU getopt
 			'-DCONFIG_HAVE_GETOPT'
 		 ],
