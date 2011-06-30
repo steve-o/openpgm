@@ -43,6 +43,15 @@ struct group_source_req
 	struct sockaddr_storage	gsr_source;	/* group source */
 };
 
+struct group_filter
+{
+	uint32_t		gf_interface;	/* interface index */
+	struct sockaddr_storage	gf_group;	/* multicast address */
+	uint32_t		gf_fmode;	/* filter mode */
+	uint32_t		gf_numsrc;	/* number of sources */
+	struct sockaddr_storage gf_slist[1];	/* source address */
+};
+
 PGM_BEGIN_DECLS
 
 /* nc */

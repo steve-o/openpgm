@@ -143,6 +143,7 @@ env = Environment(ENV = os.environ,
 # multicast
 			'-DHAVE_STRUCT_GROUP_REQ',
 			'-DHAVE_STRUCT_IP_MREQN',
+			'-DHAVE_STRUCT_IP_MSFILTER',
 # sprintf
 			'-DHAVE_SPRINTF_GROUPING',
 			'-DHAVE_VASPRINTF',
