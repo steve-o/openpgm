@@ -33,6 +33,9 @@
 #else
 #	include "getopt.h"
 #endif
+#ifdef __APPLE__
+#	include <pgm/in.h>
+#endif
 #include <pgm/pgm.hh>
 
 

@@ -73,8 +73,8 @@ env = Environment(
 			'-pedantic',
 # C99
 			'-std=gnu99',
-			'-D_XOPEN_SOURCE=600',
-			'-D_BSD_SOURCE',
+#			'-D_XOPEN_SOURCE=600',
+#			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
 # optimium checksum implementation
@@ -88,14 +88,9 @@ env = Environment(
 # Autoconf config.h
 			'-DHAVE_CONFIG_H',
 		],
-	LINKFLAGS = [	'-pipe',
-			'-lpthread'
+	LINKFLAGS = [	'-pipe'
 		],
 	LIBS = [
-# histogram math
-			'm',
-# clock_gettime()
-			'rt'
 		],
 	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.3.0/gcc64/include',
 	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.3.0/gcc64/lib/libprotobuf.a',

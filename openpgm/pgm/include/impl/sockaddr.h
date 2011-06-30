@@ -145,21 +145,19 @@ PGM_GNUC_INTERNAL int pgm_sockaddr_block_source (const SOCKET s, const sa_family
 PGM_GNUC_INTERNAL int pgm_sockaddr_unblock_source (const SOCKET s, const sa_family_t sa_family, const struct group_source_req* gsr);
 PGM_GNUC_INTERNAL int pgm_sockaddr_join_source_group (const SOCKET s, const sa_family_t sa_family, const struct group_source_req* gsr);
 PGM_GNUC_INTERNAL int pgm_sockaddr_leave_source_group (const SOCKET s, const sa_family_t sa_family, const struct group_source_req* gsr);
-#if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
-#	ifndef GROUP_FILTER_SIZE
-#		define GROUP_FILTER_SIZE(numsrc) (sizeof (struct group_filter)		\
-						 - sizeof (struct sockaddr_storage)	\
-						 + ((numsrc)				\
-						    * sizeof (struct sockaddr_storage)))
-#	endif
-#	ifndef IP_MSFILTER_SIZE
-#		define IP_MSFILTER_SIZE(numsrc) (sizeof (struct ip_msfilter)		\
-						- sizeof (struct in_addr)		\
-						+ ((numsrc)				\
-						   * sizeof (struct in_addr)))
-#	endif
-PGM_GNUC_INTERNAL int pgm_sockaddr_msfilter (const SOCKET s, const sa_family_t sa_family, const struct group_filter* gf_list);
+#ifndef GROUP_FILTER_SIZE
+#	define GROUP_FILTER_SIZE(numsrc) (sizeof (struct group_filter)		\
+					 - sizeof (struct sockaddr_storage)	\
+					 + ((numsrc)				\
+					    * sizeof (struct sockaddr_storage)))
 #endif
+#ifndef IP_MSFILTER_SIZE
+#	define IP_MSFILTER_SIZE(numsrc) (sizeof (struct ip_msfilter)		\
+					- sizeof (struct in_addr)		\
+					+ ((numsrc)				\
+					   * sizeof (struct in_addr)))
+#endif
+PGM_GNUC_INTERNAL int pgm_sockaddr_msfilter (const SOCKET s, const sa_family_t sa_family, const struct group_filter* gf_list);
 PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_if (const SOCKET s, const struct sockaddr* address, const unsigned ifindex);
 PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_loop (const SOCKET s, const sa_family_t sa_family, const bool v);
 PGM_GNUC_INTERNAL int pgm_sockaddr_multicast_hops (const SOCKET s, const sa_family_t sa_family, const unsigned hops);
