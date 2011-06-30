@@ -886,12 +886,12 @@ pgm_sockaddr_msfilter (
 	)
 {
 	int retval = SOCKET_ERROR;
-#	if defined( MCAST_MSFILTER )
+#if defined( MCAST_MSFILTER )
 /* Linux 2.6 API pre-empting RFC3678 naming scheme */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	const socklen_t len = GROUP_FILTER_SIZE(gf_list->gf_numsrc);
 	retval = setsockopt (s, recv_level, MCAST_MSFILTER, (const char*)gf_list, len);
-#	elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x600 )
+#elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x600 )
 /* Windows Server 2008+, note MSDN(GROUP_FILTER Structure) does not list
  * desktop support.  This contrasts to MSDN(Final-State-Based Multicast Programming)
  * which does list support for Vista+.
@@ -902,7 +902,7 @@ pgm_sockaddr_msfilter (
 	u_long* filter = pgm_alloca (len);
 	memcpy (filter, gf_list, len);
 	retval = ioctlsocket (s, SIOCSMSFILTER, filter);
-#	else
+#elif defined( HAVE_STRUCT_IP_MSFILTER )
 /* IPv4-only filter API alternative */
 	if (AF_INET == sa_family) {
 		const socklen_t len = IP_MSFILTER_SIZE(gf_list->gf_numsrc);
@@ -919,20 +919,20 @@ pgm_sockaddr_msfilter (
 			memcpy (&sa4, &gf_list->gf_slist[i], sizeof (sa4));
 			filter->imsf_slist[i].s_addr = sa4.sin_addr.s_addr;
 		}
-#		if defined( SIO_SET_MULTICAST_FILTER )
+#	if defined( SIO_SET_MULTICAST_FILTER )
 /* Windows XP */
 		retval = ioctlsocket (s, SIO_SET_MULTICAST_FILTER, (u_long*)filter);
-#		elif defined( SIOCSIPMSFILTER )
+#	elif defined( SIOCSIPMSFILTER )
 /* RFC3678 API for struct ip_msfilter */
 		retval = ioctlsocket (s, SIOCSIPMSFILTER, (const char*)filter);
-#		elif defined( IP_MSFILTER )
+#	elif defined( IP_MSFILTER )
 /* NB: Windows SDK for Vista+ defines a typedef IP_MSFILTER */
 		retval = ioctlsocket (s, IP_MSFILTER, (const char*)filter);
-#		else
+#	else
 /* Cygwin has no socket option defined */
-#		endif
-	}
 #	endif
+	}
+#endif
 	return retval;
 }
 

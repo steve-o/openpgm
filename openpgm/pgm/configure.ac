@@ -196,6 +196,14 @@ mreqn.imr_ifindex = 0;]])],
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DHAVE_STRUCT_IP_MREQN"],
 	[AC_MSG_RESULT([no])])
+AC_MSG_CHECKING([for struct ip_msfilter.imsf_multiaddr])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[#include <sys/sockio.h>]],
+		[[struct ip_msfilter msf;
+msf.imsf_numsrc = 0;]])],
+	[AC_MSG_RESULT([yes])
+		CFLAGS="$CFLAGS -DHAVE_STRUCT_IP_MSFILTER"],
+	[AC_MSG_RESULT([no])])
 # sprintf, caveat http://savannah.gnu.org/patch/?6848 (ax_c_printf_thsep)
 AC_MSG_CHECKING([for printf thousands' grouping])
 AC_COMPILE_IFELSE(

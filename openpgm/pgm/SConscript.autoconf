@@ -292,6 +292,7 @@ def AutoConf (env):
 	settings['HAVE_WSACMSGHDR'] = conf.CheckMember ('struct _WSAMSG.name', "#include <winsock2.h>\n");
 	settings['HAVE_STRUCT_GROUP_REQ'] = conf.CheckMember ('struct group_req.gr_interface', "#include <netinet/in.h>\n");
 	settings['HAVE_STRUCT_IP_MREQN'] = conf.CheckMember ('struct ip_mreqn.imr_ifindex', "#include <netinet/in.h>\n");
+	settings['HAVE_STRUCT_IP_MSFILTER'] = conf.CheckMember ('struct ip_msfilter.imsf_multiaddr', "#include <sys/sockio.h>\n");
 	settings['HAVE_SPRINTF_GROUPING'] = conf.CheckSprintfGrouping();
 	settings['HAVE_VASPRINTF'] = conf.CheckFunc ('vasprintf');
 	settings['HAVE_DSO_VISIBILITY'] = conf.CheckDsoVisibility();
@@ -301,6 +302,14 @@ def AutoConf (env):
 	settings['USE_TICKET_SPINLOCK'] = conf.CheckTicketSpinlock();
 	settings['USE_DUMB_RWSPINLOCK'] = conf.CheckDumbRwSpinlock();
 	settings['HAVE_GETOPT'] = conf.CheckFunc ('getopt');
+
+	conf.CheckLibWithHeader ('pthread', 'pthread.h', 'c');
+	conf.CheckLib ( library='m', symbol='sqrt' );
+	conf.CheckLib ( library='rt', symbol='clock_gettime' );
+	conf.CheckLib ( library='socket', symbol='socket' );
+	conf.CheckLib ( library='nsl', symbol='gethostname' );
+	conf.CheckLib ( library='resolv', symbol='inet_aton' );
+	conf.CheckLib ( library='kstat', symbol='kstat_open' );
 
 	env = conf.Finish();
 	env['settings'] = settings;
