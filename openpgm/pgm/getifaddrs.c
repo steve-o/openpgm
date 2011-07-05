@@ -7,6 +7,10 @@
  * enumeration which may cause confusion, see MSDN(getaddrinfo Function)
  * for further details.
  *
+ * No support is provided for dynamic interfaces, however interfaces are
+ * not cached and so closing a socket and creating anew would use any
+ * updated addressing.
+ *
  * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
@@ -40,7 +44,7 @@
 #endif
 #if defined( _WIN32 )
 #	include <ws2tcpip.h>
-#	include <iphlpapi.h>
+#	include <iphlpapi.h>		/* must be after Winsock2.h on early SDKs */
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
@@ -59,13 +63,23 @@ struct _pgm_ifaddrs_t
 
 /* Number of attempts to try enumerating the interface list */
 #define MAX_TRIES		3
-#define DEFAULT_BUFFER_SIZE	4096
-
-/* returns TRUE on success setting ifap to a linked list of system interfaces,
- * returns FALSE on failure and sets error appropriately.
+#ifdef _WIN32
+/* MSDN(GetAdaptersAddresses Function) recommends pre-allocating a 15KB
+ * working buffer to reduce chances of a buffer overflow.
+ * NB: The article actually recommends 15,000 and not 15,360 bytes.
  */
+#	define DEFAULT_BUFFER_SIZE	15000
+#else
+#	define DEFAULT_BUFFER_SIZE	4096
+#endif
 
 #ifdef SIOCGLIFCONF
+/* returns TRUE on success setting ifap to a linked list of system interfaces,
+ * returns FALSE on failure and sets error appropriately.
+ *
+ * Long form of SIOCGIFCONF, Solaris solution to add IPv6 support.
+ */
+
 static
 bool
 _pgm_getlifaddrs (
@@ -309,6 +323,14 @@ again:
 #endif /* SIOCGLIFCONF */
 
 #ifdef SIOCGIFCONF
+/* Popular socket option for enumerating interfaces.  However returned
+ * structure is often harded coded for IPv4 addressing and so either
+ * an alternative or additional API is required for IPv6 support.
+ *
+ * Windows does not provide a support method for returning IPv6 addresses
+ * via a socket forcing use of iphlpapi.dll APIs.
+ */
+
 static
 bool
 _pgm_getifaddrs (
@@ -534,6 +556,8 @@ _pgm_heap_free (
  * 4-byte datatype whilst compiler uses an 8-byte datatype.  Size can be forced
  * with -D_USE_32BIT_TIME_T with side effects to everything else.
  *
+ * Only supports IPv4 addressing similar to SIOCGIFCONF socket option.
+ *
  * Available in Windows 2000 and Wine 1.0.
  */
 
@@ -656,7 +680,10 @@ _pgm_getadaptersinfo (
 	return TRUE;
 }
 
-/* Available in Windows XP and Wine 1.3.
+/* Supports both IPv4 and IPv6 addressing.  The size of IP_ADAPTER_ADDRESSES
+ * changes between Windows XP, XP SP1, and Vista with additional members.
+ *
+ * Available in Windows XP and Wine 1.3.
  */
 
 static
@@ -677,6 +704,7 @@ _pgm_getadaptersaddresses (
 		pgm_debug ("IP_ADAPTER_ADDRESSES buffer length %lu bytes.", dwSize);
 		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)_pgm_heap_alloc (dwSize);
 		dwRet = GetAdaptersAddresses (AF_UNSPEC,
+/* requires Windows XP SP1 */
 						GAA_FLAG_INCLUDE_PREFIX |
 						GAA_FLAG_SKIP_ANYCAST |
 						GAA_FLAG_SKIP_DNS_SERVER |
@@ -779,33 +807,162 @@ _pgm_getadaptersaddresses (
 /* netmask */
 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
 
-/* pre-Vista must hunt for matching prefix in linked list, otherwise use OnLinkPrefixLength */
-			int prefixIndex = 0;
+/* pre-Vista must hunt for matching prefix in linked list, otherwise use
+ * OnLinkPrefixLength from IP_ADAPTER_UNICAST_ADDRESS structure.
+ * FirstPrefix requires Windows XP SP1, from SP1 to pre-Vista provides a
+ * single adapter prefix for each IP address.  Vista and later provides
+ * host IP address prefix, subnet IP address, and subnet broadcast IP
+ * address.  In addition there is a multicast and broadcast address prefix.
+ */
+			{
 			ULONG prefixLength = 0;
+
+#if defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+/* For a unicast IPv4 address, any value greater than 32 is an illegal
+ * value. For a unicast IPv6 address, any value greater than 128 is an
+ * illegal value. A value of 255 is commonly used to represent an illegal
+ * value.
+ *
+ * Windows 7 SP1 returns 64 for Teredo links which is incorrect.
+ */
+
+#define IN6_IS_ADDR_TEREDO(addr) \
+	(((const uint32_t *)(addr))[0] == ntohl (0x20010000))
+
+			if (AF_INET6 == unicast->Address.lpSockaddr->sa_family &&
+				IN6_IS_ADDR_TEREDO( &((struct sockaddr_in6*)(unicast->Address.lpSockaddr))->sin6_addr) &&
+				32 != unicast->OnLinkPrefixLength)
+			{
+				pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv6 Teredo tunneling adapter %s prefix length is an illegal value %lu, overriding to 32."),
+					adapter->AdapterName,
+					unicast->OnLinkPrefixLength);
+				prefixLength = 32;
+			}
+			else
+				prefixLength = unicast->OnLinkPrefixLength;
+#else
+			{
+			IP_ADAPTER_PREFIX *prefix;
+/* The order of linked IP_ADAPTER_UNICAST_ADDRESS structures pointed to by
+ * the FirstUnicastAddress member does not have any relationship with the
+ * order of linked IP_ADAPTER_PREFIX structures pointed to by the FirstPrefix
+ * member.
+ *
+ * Example enumeration:
+ *    [ no subnet ]
+ *   ::1/128            - address
+ *   ff00::%1/8         - multicast (no IPv6 broadcast)
+ *   127.0.0.0/8        - subnet
+ *   127.0.0.1/32       - address
+ *   127.255.255.255/32 - subnet broadcast
+ *   224.0.0.0/4        - multicast
+ *   255.255.255.255/32 - broadcast
+ *
+ * Which differs from most adapters listing three IPv6:
+ *   fe80::%10/64       - subnet
+ *   fe80::51e9:5fe5:4202:325a%10/128 - address
+ *   ff00::%10/8        - multicast
+ *
+ * !IfOperStatusUp IPv4 addresses are skipped:
+ *   fe80::%13/64       - subnet
+ *   fe80::d530:946d:e8df:8c91%13/128 - address
+ *   ff00::%13/8        - multicast
+ *    [ no subnet  ]
+ *    [ no address ]
+ *   224.0.0.0/4        - multicast
+ *   255.255.255.255/32 - broadcast
+ *
+ * On PTP links no multicast or broadcast addresses are returned:
+ *    [ no subnet ]
+ *   fe80::5efe:10.203.9.30/128 - address
+ *    [ no multicast ]
+ *    [ no multicast ]
+ *    [ no broadcast ]
+ *
+ * Active primary IPv6 interfaces are a bit overloaded:
+ *   ::/0               - default route
+ *   2001::/32          - global subnet
+ *   2001:0:4137:9e76:2443:d6:ba87:1a2a/128 - global address
+ *   fe80::/64          - link-local subnet
+ *   fe80::2443:d6:ba87:1a2a/128 - link-local address
+ *   ff00::/8           - multicast
+ */
+
+#define IN_LINKLOCAL(a)	((((uint32_t) (a)) & 0xaffff0000) == 0xa9fe0000)
+
 			for (IP_ADAPTER_PREFIX *prefix = adapter->FirstPrefix;
 				prefix;
-				prefix = prefix->Next, ++prefixIndex)
+				prefix = prefix->Next)
 			{
-				if (prefixIndex == unicastIndex) {
-					prefixLength = prefix->PrefixLength;
+				LPSOCKADDR lpSockaddr = prefix->Address.lpSockaddr;
+				if (lpSockaddr->sa_family != unicast->Address.lpSockaddr->sa_family)
+					continue;
+/* special cases */
+/* RFC2863: IPv4 interface not up */
+				if (AF_INET == lpSockaddr->sa_family &&
+					adapter->OperStatus != IfOperStatusUp)
+				{
+/* RFC3927: link-local IPv4 always has 16-bit CIDR */
+					if (IN_LINKLOCAL( ntohl (((struct sockaddr_in*)(unicast->Address.lpSockaddr))->sin_addr.s_addr)))
+					{
+						pgm_trace (PGM_LOG_ROLE_NETWORK,_("Assuming 16-bit prefix length for link-local IPv4 adapter %s."),
+							adapter->AdapterName);
+						prefixLength = 16;
+					}
+					else
+					{
+						pgm_trace (PGM_LOG_ROLE_NETWORK,_("Prefix length unavailable for IPv4 adapter %s."),
+							adapter->AdapterName);
+					}
 					break;
 				}
+/* default IPv6 route */
+				if (AF_INET6 == lpSockaddr->sa_family &&
+					IN6_IS_ADDR_UNSPECIFIED( &((struct sockaddr_in6*)(lpSockaddr))->sin6_addr))
+				{
+					pgm_trace (PGM_LOG_ROLE_NETWORK,_("Ingoring unspecified address prefix on IPv6 adapter %s."),
+						adapter->AdapterName);
+					continue;
+				}
+/* Assume unicast address */
+				if (AF_INET == lpSockaddr->sa_family)
+					pgm_assert (!IN_MULTICAST( ntohl (((struct sockaddr_in*)(lpSockaddr))->sin_addr.s_addr)));
+				if (AF_INET6 == lpSockaddr->sa_family)
+					pgm_assert (!IN6_IS_ADDR_MULTICAST( &((struct sockaddr_in6*)(lpSockaddr))->sin6_addr));
+
+				prefixLength = prefix->PrefixLength;
+				break;
 			}
+ 			}
+#endif /* defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) */
 
 /* map prefix to netmask */
 			ift->_ifa.ifa_netmask->sa_family = unicast->Address.lpSockaddr->sa_family;
 			switch (unicast->Address.lpSockaddr->sa_family) {
 			case AF_INET:
-				if (0 == prefixLength) {
-					pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv4 adapter %s prefix length is 0, overriding to 32."), adapter->AdapterName);
+				if (0 == prefixLength || prefixLength > 32) {
+					pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv4 adapter %s prefix length is an illegal value %lu, overriding to 32."),
+						adapter->AdapterName,
+						prefixLength);
 					prefixLength = 32;
 				}
+#if defined( _WIN32) && ( _WIN32_WINNT >= 0x0600 )
+/* Added in Vista, but no IPv6 equivalent. */
+				{
+				ULONG Mask;
+				ConvertLengthToIpv4Mask (prefixLength, &Mask);
+				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( Mask );
+				}
+#else
 				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( 0xffffffffU << ( 32 - prefixLength ) );
+#endif
 				break;
 
 			case AF_INET6:
-				if (0 == prefixLength) {
-					pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv6 adapter %s prefix length is 0, overriding to 128."), adapter->AdapterName);
+				if (0 == prefixLength || prefixLength > 128) {
+					pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv6 adapter %s prefix length is an illegal value %lu, overriding to 128."),
+						adapter->AdapterName,
+						prefixLength);
 					prefixLength = 128;
 				}
 				for (ULONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
