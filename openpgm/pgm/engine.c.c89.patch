@@ -1,6 +1,6 @@
---- engine.c	2011-06-26 00:57:27.000000000 +0800
-+++ engine.c89.c	2011-06-26 08:35:47.000000000 +0800
-@@ -99,6 +99,7 @@
+--- engine.c	2011-06-30 01:56:07.000000000 +0800
++++ engine.c89.c	2011-07-03 02:00:59.000000000 +0800
+@@ -101,6 +101,7 @@
  	pgm_rand_init();
  
  #ifdef _WIN32
@@ -8,10 +8,10 @@
  	WORD wVersionRequested = MAKEWORD (2, 2);
  	WSADATA wsaData;
  	if (WSAStartup (wVersionRequested, &wsaData) != 0)
-@@ -156,9 +157,11 @@
+@@ -157,9 +158,11 @@
+ 		pgm_debug ("Retrieved address of WSARecvMsg.");
  		closesocket (sock);
  	}
- #	endif
 +	}
  #endif /* _WIN32 */
  
@@ -20,7 +20,7 @@
  	const struct pgm_protoent_t *proto = pgm_getprotobyname ("pgm");
  	if (proto != NULL) {
  		if (proto->p_proto != pgm_ipproto_pgm) {
-@@ -167,8 +170,10 @@
+@@ -168,8 +171,10 @@
  			pgm_ipproto_pgm = proto->p_proto;
  		}
  	}
@@ -31,7 +31,7 @@
  	pgm_error_t* sub_error = NULL;
  	if (!pgm_time_init (&sub_error)) {
  		if (sub_error)
-@@ -178,9 +183,11 @@
+@@ -179,9 +184,11 @@
  #endif
  		goto err_shutdown;
  	}
@@ -43,7 +43,7 @@
  	char* env;
  	size_t envlen;
  
-@@ -193,6 +200,7 @@
+@@ -194,6 +201,7 @@
  		}
  		pgm_free (env);
  	}
@@ -51,14 +51,3 @@
  #endif
  
  /* create global sock list lock */
-@@ -225,9 +233,7 @@
- bool
- pgm_shutdown (void)
- {
--/* cannot use pgm_return_val_if_fail() as logging may not be started */
--	if (0 == pgm_atomic_read32 (&pgm_ref_count))
--		return FALSE;
-+	pgm_return_val_if_fail (pgm_atomic_read32 (&pgm_ref_count) > 0, FALSE);
- 
- 	if (pgm_atomic_exchange_and_add32 (&pgm_ref_count, (uint32_t)-1) != 1)
- 		return TRUE;
