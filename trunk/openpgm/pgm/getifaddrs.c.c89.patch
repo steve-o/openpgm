@@ -1,6 +1,6 @@
---- getifaddrs.c	2011-06-26 02:14:37.000000000 +0800
-+++ getifaddrs.c89.c	2011-06-26 07:44:45.000000000 +0800
-@@ -548,7 +548,9 @@
+--- getifaddrs.c	2011-07-06 05:28:07.000000000 +0800
++++ getifaddrs.c89.c	2011-07-06 05:29:58.000000000 +0800
+@@ -576,7 +576,9 @@
  /* loop to handle interfaces coming online causing a buffer overflow
   * between first call to list buffer length and second call to enumerate.
   */
@@ -11,7 +11,7 @@
  	{
  		pgm_debug ("IP_ADAPTER_INFO buffer length %lu bytes.", ulOutBufLen);
  		pAdapterInfo = (IP_ADAPTER_INFO*)_pgm_heap_alloc (ulOutBufLen);
-@@ -560,6 +562,7 @@
+@@ -588,6 +590,7 @@
  			break;
  		}
  	}
@@ -19,7 +19,7 @@
  
  	switch (dwRet) {
  	case ERROR_SUCCESS:	/* NO_ERROR */
-@@ -584,12 +587,15 @@
+@@ -612,12 +615,15 @@
  	}
  
  /* count valid adapters */
@@ -36,7 +36,7 @@
  			 pIPAddr;
  			 pIPAddr = pIPAddr->Next)
  		{
-@@ -599,10 +605,12 @@
+@@ -627,10 +633,12 @@
  			++n;
  		}
  	}
@@ -49,7 +49,7 @@
  	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
  	struct _pgm_ifaddrs_t* ift = ifa;
  
-@@ -611,7 +619,9 @@
+@@ -639,7 +647,9 @@
  		 pAdapter;
  		 pAdapter = pAdapter->Next)
  	{
@@ -60,7 +60,7 @@
  			 pIPAddr;
  			 pIPAddr = pIPAddr->Next)
  		{
-@@ -644,11 +654,14 @@
+@@ -672,11 +682,14 @@
  				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
  			}
  		}
@@ -75,7 +75,7 @@
  	return TRUE;
  }
  
-@@ -665,7 +678,9 @@
+@@ -699,12 +712,13 @@
  /* loop to handle interfaces coming online causing a buffer overflow
   * between first call to list buffer length and second call to enumerate.
   */
@@ -86,7 +86,12 @@
  	{
  		pgm_debug ("IP_ADAPTER_ADDRESSES buffer length %lu bytes.", dwSize);
  		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)_pgm_heap_alloc (dwSize);
-@@ -685,6 +700,7 @@
+ 		dwRet = GetAdaptersAddresses (AF_UNSPEC,
+-/* requires Windows XP SP1 */
+ 						GAA_FLAG_INCLUDE_PREFIX |
+ 						GAA_FLAG_SKIP_ANYCAST |
+ 						GAA_FLAG_SKIP_DNS_SERVER |
+@@ -720,6 +734,7 @@
  			break;
  		}
  	}
@@ -94,7 +99,7 @@
  
  	switch (dwRet) {
  	case ERROR_SUCCESS:
-@@ -709,12 +725,15 @@
+@@ -744,12 +759,15 @@
  	}
  
  /* count valid adapters */
@@ -111,7 +116,7 @@
  			 unicast;
  			 unicast = unicast->Next)
  		{
-@@ -727,9 +746,11 @@
+@@ -762,9 +780,11 @@
  
  			++n;
  		}
@@ -123,7 +128,7 @@
  	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
  	struct _pgm_ifaddrs_t* ift = ifa;
  
-@@ -739,7 +760,9 @@
+@@ -774,7 +794,9 @@
  		 adapter = adapter->Next)
  	{
  		int unicastIndex = 0;
@@ -134,30 +139,26 @@
  			 unicast;
  			 unicast = unicast->Next, ++unicastIndex)
  		{
-@@ -773,9 +796,12 @@
- 			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
+@@ -890,7 +912,7 @@
  
- /* pre-Vista must hunt for matching prefix in linked list, otherwise use OnLinkPrefixLength */
-+			{
- 			int prefixIndex = 0;
- 			ULONG prefixLength = 0;
+ #define IN_LINKLOCAL(a)	((((uint32_t) (a)) & 0xaffff0000) == 0xa9fe0000)
+ 
 -			for (IP_ADAPTER_PREFIX *prefix = adapter->FirstPrefix;
-+			{
-+			IP_ADAPTER_PREFIX *prefix;
 +			for (prefix = adapter->FirstPrefix;
  				prefix;
- 				prefix = prefix->Next, ++prefixIndex)
+ 				prefix = prefix->Next)
  			{
-@@ -784,6 +810,7 @@
- 					break;
- 				}
+@@ -933,7 +955,7 @@
+ 				prefixLength = prefix->PrefixLength;
+ 				break;
  			}
+- 			}
 +			}
+ #endif /* defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) */
  
  /* map prefix to netmask */
- 			ift->_ifa.ifa_netmask->sa_family = unicast->Address.lpSockaddr->sa_family;
-@@ -801,12 +828,16 @@
- 					pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv6 adapter %s prefix length is 0, overriding to 128."), adapter->AdapterName);
+@@ -965,12 +987,16 @@
+ 						prefixLength);
  					prefixLength = 128;
  				}
 -				for (ULONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
@@ -174,7 +175,7 @@
  
  /* next */
  			if (k++ < (n - 1)) {
-@@ -814,11 +845,14 @@
+@@ -978,11 +1004,14 @@
  				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
  			}
  		}
