@@ -1,5 +1,5 @@
---- getifaddrs.c	2011-07-06 05:28:07.000000000 +0800
-+++ getifaddrs.c89.c	2011-07-06 05:29:58.000000000 +0800
+--- getifaddrs.c	2011-07-06 06:21:51.000000000 +0800
++++ getifaddrs.c89.c	2011-07-06 06:23:57.000000000 +0800
 @@ -576,7 +576,9 @@
  /* loop to handle interfaces coming online causing a buffer overflow
   * between first call to list buffer length and second call to enumerate.
@@ -148,7 +148,7 @@
  				prefix;
  				prefix = prefix->Next)
  			{
-@@ -933,7 +955,7 @@
+@@ -935,7 +957,7 @@
  				prefixLength = prefix->PrefixLength;
  				break;
  			}
@@ -157,7 +157,7 @@
  #endif /* defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) */
  
  /* map prefix to netmask */
-@@ -965,12 +987,16 @@
+@@ -967,12 +989,16 @@
  						prefixLength);
  					prefixLength = 128;
  				}
@@ -175,7 +175,7 @@
  
  /* next */
  			if (k++ < (n - 1)) {
-@@ -978,11 +1004,14 @@
+@@ -980,11 +1006,14 @@
  				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
  			}
  		}
