@@ -918,17 +918,19 @@ _pgm_getadaptersaddresses (
 				}
 /* default IPv6 route */
 				if (AF_INET6 == lpSockaddr->sa_family &&
+					0 == prefix->PrefixLength &&
 					IN6_IS_ADDR_UNSPECIFIED( &((struct sockaddr_in6*)(lpSockaddr))->sin6_addr))
 				{
 					pgm_trace (PGM_LOG_ROLE_NETWORK,_("Ingoring unspecified address prefix on IPv6 adapter %s."),
 						adapter->AdapterName);
 					continue;
 				}
-/* Assume unicast address */
+/* Assume unicast address for first prefix of operational adapter */
 				if (AF_INET == lpSockaddr->sa_family)
 					pgm_assert (!IN_MULTICAST( ntohl (((struct sockaddr_in*)(lpSockaddr))->sin_addr.s_addr)));
 				if (AF_INET6 == lpSockaddr->sa_family)
 					pgm_assert (!IN6_IS_ADDR_MULTICAST( &((struct sockaddr_in6*)(lpSockaddr))->sin6_addr));
+/* Assume subnet or host IP address for XP backward compatibility */
 
 				prefixLength = prefix->PrefixLength;
 				break;
