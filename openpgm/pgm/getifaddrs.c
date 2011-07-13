@@ -558,6 +558,14 @@ _pgm_heap_free (
  *
  * Only supports IPv4 addressing similar to SIOCGIFCONF socket option.
  *
+ * Interfaces that are not "operationally up" will return the address 0.0.0.0,
+ * this includes adapters with static IP addresses but with disconnected cable.
+ * This is documented under the GetIpAddrTable API.  Interface status can only
+ * be determined by the address, a separate flag is introduced with the
+ * GetAdapterAddresses API.
+ *
+ * The IPv4 loopback interface is not included.
+ *
  * Available in Windows 2000 and Wine 1.0.
  */
 
@@ -682,6 +690,15 @@ _pgm_getadaptersinfo (
 
 /* Supports both IPv4 and IPv6 addressing.  The size of IP_ADAPTER_ADDRESSES
  * changes between Windows XP, XP SP1, and Vista with additional members.
+ *
+ * Interfaces that are not "operationally up" will typically return a host
+ * IP address with the defined IPv4 link-local prefix 169.254.0.0/16.
+ * Adapters with a static configured IP address but down will return both
+ * the IPv4 link-local prefix and the static address.
+ *
+ * It is easier to say "not up" rather than "down" as this API returns six
+ * effective down status values: down, testing, unknown, dormant, not present,
+ * and lower layer down.
  *
  * Available in Windows XP and Wine 1.3.
  */
@@ -830,7 +847,16 @@ _pgm_getadaptersaddresses (
 	(((const uint32_t *)(addr))[0] == ntohl (0x20010000))
 
 			if (AF_INET6 == unicast->Address.lpSockaddr->sa_family &&
+/* TunnelType only applies to one interface on the adapter and no
+ * convenient method is provided to determine which.
+ */
+				TUNNEL_TYPE_TEREDO == adapter->TunnelType &&
+/* Test the interface with the known Teredo network prefix.
+ */
 				IN6_IS_ADDR_TEREDO( &((struct sockaddr_in6*)(unicast->Address.lpSockaddr))->sin6_addr) &&
+/* Test that this version is actually wrong, subsequent releases from Microsoft
+ * may resolve the issue.
+ */
 				32 != unicast->OnLinkPrefixLength)
 			{
 				pgm_trace (PGM_LOG_ROLE_NETWORK,_("IPv6 Teredo tunneling adapter %s prefix length is an illegal value %lu, overriding to 32."),
