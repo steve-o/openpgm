@@ -1,6 +1,6 @@
---- getifaddrs.c	2011-07-06 06:21:51.000000000 +0800
-+++ getifaddrs.c89.c	2011-07-06 06:23:57.000000000 +0800
-@@ -576,7 +576,9 @@
+--- getifaddrs.c	2011-07-14 01:41:39.000000000 +0800
++++ getifaddrs.c89.c	2011-07-14 01:41:01.000000000 +0800
+@@ -584,7 +584,9 @@
  /* loop to handle interfaces coming online causing a buffer overflow
   * between first call to list buffer length and second call to enumerate.
   */
@@ -11,7 +11,7 @@
  	{
  		pgm_debug ("IP_ADAPTER_INFO buffer length %lu bytes.", ulOutBufLen);
  		pAdapterInfo = (IP_ADAPTER_INFO*)_pgm_heap_alloc (ulOutBufLen);
-@@ -588,6 +590,7 @@
+@@ -596,6 +598,7 @@
  			break;
  		}
  	}
@@ -19,7 +19,7 @@
  
  	switch (dwRet) {
  	case ERROR_SUCCESS:	/* NO_ERROR */
-@@ -612,12 +615,15 @@
+@@ -620,12 +623,15 @@
  	}
  
  /* count valid adapters */
@@ -36,7 +36,7 @@
  			 pIPAddr;
  			 pIPAddr = pIPAddr->Next)
  		{
-@@ -627,10 +633,12 @@
+@@ -635,10 +641,12 @@
  			++n;
  		}
  	}
@@ -49,7 +49,7 @@
  	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
  	struct _pgm_ifaddrs_t* ift = ifa;
  
-@@ -639,7 +647,9 @@
+@@ -647,7 +655,9 @@
  		 pAdapter;
  		 pAdapter = pAdapter->Next)
  	{
@@ -60,7 +60,7 @@
  			 pIPAddr;
  			 pIPAddr = pIPAddr->Next)
  		{
-@@ -672,11 +682,14 @@
+@@ -680,11 +690,14 @@
  				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
  			}
  		}
@@ -75,7 +75,7 @@
  	return TRUE;
  }
  
-@@ -699,12 +712,13 @@
+@@ -716,12 +729,13 @@
  /* loop to handle interfaces coming online causing a buffer overflow
   * between first call to list buffer length and second call to enumerate.
   */
@@ -91,7 +91,7 @@
  						GAA_FLAG_INCLUDE_PREFIX |
  						GAA_FLAG_SKIP_ANYCAST |
  						GAA_FLAG_SKIP_DNS_SERVER |
-@@ -720,6 +734,7 @@
+@@ -737,6 +751,7 @@
  			break;
  		}
  	}
@@ -99,7 +99,7 @@
  
  	switch (dwRet) {
  	case ERROR_SUCCESS:
-@@ -744,12 +759,15 @@
+@@ -761,12 +776,15 @@
  	}
  
  /* count valid adapters */
@@ -116,7 +116,7 @@
  			 unicast;
  			 unicast = unicast->Next)
  		{
-@@ -762,9 +780,11 @@
+@@ -779,9 +797,11 @@
  
  			++n;
  		}
@@ -128,7 +128,7 @@
  	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
  	struct _pgm_ifaddrs_t* ift = ifa;
  
-@@ -774,7 +794,9 @@
+@@ -791,7 +811,9 @@
  		 adapter = adapter->Next)
  	{
  		int unicastIndex = 0;
@@ -139,7 +139,7 @@
  			 unicast;
  			 unicast = unicast->Next, ++unicastIndex)
  		{
-@@ -890,7 +912,7 @@
+@@ -916,7 +938,7 @@
  
  #define IN_LINKLOCAL(a)	((((uint32_t) (a)) & 0xaffff0000) == 0xa9fe0000)
  
@@ -148,7 +148,7 @@
  				prefix;
  				prefix = prefix->Next)
  			{
-@@ -935,7 +957,7 @@
+@@ -961,7 +983,7 @@
  				prefixLength = prefix->PrefixLength;
  				break;
  			}
@@ -157,7 +157,7 @@
  #endif /* defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) */
  
  /* map prefix to netmask */
-@@ -967,12 +989,16 @@
+@@ -993,12 +1015,16 @@
  						prefixLength);
  					prefixLength = 128;
  				}
@@ -175,7 +175,7 @@
  
  /* next */
  			if (k++ < (n - 1)) {
-@@ -980,11 +1006,14 @@
+@@ -1006,11 +1032,14 @@
  				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
  			}
  		}
