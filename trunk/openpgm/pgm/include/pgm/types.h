@@ -54,7 +54,12 @@
 #		define bool		pgm_bool_t
 #		define PGM_BOOL_DEFINED
 #	endif
-#	include <pgm/winint.h>
+#	if (_MSC_VER >= 1600)
+#		include <stdint.h>
+#	else
+/* compatibility implementation */
+#		include <pgm/winint.h>
+#	endif
 #	if !defined( PGM_SSIZE_T_DEFINED )
 #		define ssize_t		SSIZE_T
 #		define PGM_SSIZE_T_DEFINED
