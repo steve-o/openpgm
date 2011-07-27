@@ -1,4 +1,4 @@
---- getifaddrs.c	2011-07-14 01:41:39.000000000 +0800
+--- getifaddrs.c	2011-07-27 11:52:45.000000000 +0800
 +++ getifaddrs.c89.c	2011-07-14 01:41:01.000000000 +0800
 @@ -584,7 +584,9 @@
  /* loop to handle interfaces coming online causing a buffer overflow
@@ -139,7 +139,24 @@
  			 unicast;
  			 unicast = unicast->Next, ++unicastIndex)
  		{
-@@ -916,7 +938,7 @@
+@@ -831,6 +853,7 @@
+  * host IP address prefix, subnet IP address, and subnet broadcast IP
+  * address.  In addition there is a multicast and broadcast address prefix.
+  */
++			{
+ 			ULONG prefixLength = 0;
+ 
+ #if defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+@@ -866,6 +889,8 @@
+ 			else
+ 				prefixLength = unicast->OnLinkPrefixLength;
+ #else
++			{
++			IP_ADAPTER_PREFIX *prefix;
+ /* The order of linked IP_ADAPTER_UNICAST_ADDRESS structures pointed to by
+  * the FirstUnicastAddress member does not have any relationship with the
+  * order of linked IP_ADAPTER_PREFIX structures pointed to by the FirstPrefix
+@@ -913,7 +938,7 @@
  
  #define IN_LINKLOCAL(a)	((((uint32_t) (a)) & 0xaffff0000) == 0xa9fe0000)
  
@@ -148,16 +165,15 @@
  				prefix;
  				prefix = prefix->Next)
  			{
-@@ -961,7 +983,7 @@
+@@ -958,6 +983,7 @@
  				prefixLength = prefix->PrefixLength;
  				break;
  			}
-- 			}
 +			}
  #endif /* defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) */
  
  /* map prefix to netmask */
-@@ -993,12 +1015,16 @@
+@@ -989,12 +1015,16 @@
  						prefixLength);
  					prefixLength = 128;
  				}
@@ -175,7 +191,7 @@
  
  /* next */
  			if (k++ < (n - 1)) {
-@@ -1006,11 +1032,14 @@
+@@ -1002,11 +1032,14 @@
  				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
  			}
  		}

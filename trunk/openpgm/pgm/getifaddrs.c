@@ -831,7 +831,6 @@ _pgm_getadaptersaddresses (
  * host IP address prefix, subnet IP address, and subnet broadcast IP
  * address.  In addition there is a multicast and broadcast address prefix.
  */
-			{
 			ULONG prefixLength = 0;
 
 #if defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
@@ -867,8 +866,6 @@ _pgm_getadaptersaddresses (
 			else
 				prefixLength = unicast->OnLinkPrefixLength;
 #else
-			{
-			IP_ADAPTER_PREFIX *prefix;
 /* The order of linked IP_ADAPTER_UNICAST_ADDRESS structures pointed to by
  * the FirstUnicastAddress member does not have any relationship with the
  * order of linked IP_ADAPTER_PREFIX structures pointed to by the FirstPrefix
@@ -961,7 +958,6 @@ _pgm_getadaptersaddresses (
 				prefixLength = prefix->PrefixLength;
 				break;
 			}
- 			}
 #endif /* defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) */
 
 /* map prefix to netmask */
