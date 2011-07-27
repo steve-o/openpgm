@@ -129,6 +129,7 @@ PGM_GNUC_INTERNAL sa_family_t pgm_sockaddr_family (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL in_port_t pgm_sockaddr_port (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL socklen_t pgm_sockaddr_len (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL socklen_t pgm_sockaddr_storage_len (const struct sockaddr_storage* ss);
+PGM_GNUC_INTERNAL uint8_t pgm_sockaddr_prefixlen (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL uint32_t pgm_sockaddr_scope_id (const struct sockaddr* sa);
 PGM_GNUC_INTERNAL int pgm_sockaddr_ntop (const struct sockaddr*restrict sa, char*restrict dst, size_t ulen);
 PGM_GNUC_INTERNAL int pgm_sockaddr_pton (const char*restrict src, struct sockaddr*restrict dst);
