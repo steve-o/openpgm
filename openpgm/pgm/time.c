@@ -166,7 +166,7 @@ static pgm_time_t		pgm_rtc_update (void);
 #	endif
 #	define TSC_NS_SCALE	10 /* 2^10, carefully chosen */
 #	define TSC_US_SCALE	20
-static uint_fast32_t		tsc_mhz PGM_GNUC_READ_MOSTLY = 0;
+static uint_fast32_t		tsc_khz PGM_GNUC_READ_MOSTLY = 0;
 static uint_fast32_t		tsc_ns_mul PGM_GNUC_READ_MOSTLY = 0;
 static uint_fast32_t		tsc_us_mul PGM_GNUC_READ_MOSTLY = 0;
 
@@ -338,7 +338,7 @@ pgm_time_init (
 			{
 				if (strstr (buffer, "cpu MHz")) {
 					const char *p = strchr (buffer, ':');
-					if (p) tsc_mhz = atoi (p + 1) * 1000;
+					if (p) tsc_khz = atoi (p + 1) * 1000;
 					break;
 				}
 			}
@@ -353,7 +353,9 @@ pgm_time_init (
 		LARGE_INTEGER frequency;
 		if (QueryPerformanceFrequency (&frequency))
 		{
-			tsc_mhz = (uint_fast32_t)(frequency.QuadPart / 1000);
+			tsc_khz = (uint_fast32_t)(frequency.QuadPart / 1000LL);
+			pgm_minor (_("High-resolution performance counter frequency %lld Hz"),
+				frequency.QuadPart);
 		}
 		else
 		{
@@ -371,14 +373,15 @@ pgm_time_init (
 		size_t len;
 		len = sizeof (cpufrequency);
 		if (0 == sysctlbyname ("hw.cpufrequency", &cpufrequency, &len, NULL, 0)) {
-			tsc_mhz = (uint_fast32_t)(cpufrequency / 1000);
+			tsc_khz = (uint_fast32_t)(cpufrequency / 1000);
 		}
 #elif defined(__FreeBSD__)
+/* frequency in Mhz */
 		unsigned long clockrate;
 		size_t len;
 		len = sizeof (clockrate);
 		if (0 == sysctlbyname ("hw.clockrate", &clockrate, &len, NULL, 0)) {
-			tsc_mhz = (uint_fast32_t)(clockrate * 1000);
+			tsc_khz = (uint_fast32_t)(clockrate * 1000);
 		}
 #elif defined(KSTAT_DATA_INT32)
 /* ref: http://developers.sun.com/solaris/articles/kstatc.html */
@@ -392,7 +395,7 @@ pgm_time_init (
 			NULL != (kdata = kstat_data_lookup (ksp, "clock_MHz")) &&
 			KSTAT_DATA_INT32 == kdata->data_type)
 		{
-			tsc_mhz = (uint_fast32_t)(kdata->value.i32 * 1000);
+			tsc_khz = (uint_fast32_t)(kdata->value.i32 * 1000);
 			kstat_close (kc);
 		}
 #endif /* !_WIN32 */
@@ -403,13 +406,13 @@ pgm_time_init (
  */
 		err = pgm_dupenv_s (&rdtsc_frequency, &envlen, "RDTSC_FREQUENCY");
 		if (0 == err && envlen > 0) {
-			tsc_mhz = atoi (rdtsc_frequency) * 1000;
+			tsc_khz = atoi (rdtsc_frequency) * 1000;
 			pgm_free (rdtsc_frequency);
 		}
 
 #ifndef _WIN32
 /* calibrate */
-		if (0 >= tsc_mhz) {
+		if (0 >= tsc_khz) {
 			pgm_error_t* sub_error = NULL;
 			if (!pgm_tsc_init (&sub_error)) {
 				pgm_propagate_error (error, sub_error);
@@ -417,8 +420,8 @@ pgm_time_init (
 			}
 		}
 #endif
-		pgm_minor (_("TSC frequency set to %u MHz"), (unsigned)(tsc_mhz / 1000));
-		set_tsc_mul (tsc_mhz);
+		pgm_minor (_("TSC frequency set at %u KHz"), (unsigned)(tsc_khz));
+		set_tsc_mul (tsc_khz);
 	}
 #endif /* HAVE_RDTSC */
 
@@ -754,17 +757,17 @@ pgm_tsc_init (
 	elapsed = stop - start;
 	if (elapsed > calibration_usec) {
 /* cpu > 1 Ghz */
-		tsc_mhz = (elapsed * 1000) / calibration_usec;
+		tsc_khz = (elapsed * 1000) / calibration_usec;
 	} else {
 /* cpu < 1 Ghz */
-		tsc_mhz = -( (calibration_usec * 1000) / elapsed );
+		tsc_khz = -( (calibration_usec * 1000) / elapsed );
 	}
 
 	pgm_info (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
 		   "set the environment variable RDTSC_FREQUENCY to %" PRIuFAST32 " on this "
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server."),
-		   tsc_mhz / 1000);
+		   tsc_khz);
 	return TRUE;
 }
 #	endif
