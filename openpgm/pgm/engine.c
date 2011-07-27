@@ -151,7 +151,7 @@ pgm_init (
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_ENGINE,
 				       PGM_ERROR_FAILED,
-				       _("WSARecvMsg function not found."));
+				       _("WSARecvMsg function not found, available in Windows XP or Wine 1.3."));
 			goto err_shutdown;
 		}
 		pgm_debug ("Retrieved address of WSARecvMsg.");
