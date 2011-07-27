@@ -55,6 +55,11 @@
 #	define IP_MAX_MEMBERSHIPS	20
 #endif
 
+static uint8_t pgm_in_mask2len (const struct in_addr*);
+static uint8_t pgm_in6_mask2len (const struct in6_addr*);
+static void pgm_in_len2mask (const uint8_t, struct in_addr*);
+
+
 PGM_GNUC_INTERNAL
 sa_family_t
 pgm_sockaddr_family (
@@ -121,6 +126,89 @@ pgm_sockaddr_storage_len (
 	default:	ss_len = 0; break;
 	}
 	return ss_len;
+}
+
+static
+uint8_t
+pgm_in_mask2len (
+	const struct in_addr*	mask
+	)
+{
+	unsigned x, y;
+	const uint8_t* p;
+
+	p = (const uint8_t*)mask;
+	for (x = 0; x < sizeof (*mask); x++) {
+		if (p[x] != 0xff)
+			break;
+	}
+	y = 0;
+	if (x < sizeof (*mask)) {
+		for (y = 0; y < 8; y++) {
+			if ((p[x] & (0x80 >> y)) == 0)
+				break;
+		}
+	}
+	return x * 8 + y;
+}
+
+static
+uint8_t
+pgm_in6_mask2len (
+	const struct in6_addr*	mask
+	)
+{
+	unsigned x, y;
+	const uint8_t* p;
+
+	p = (const uint8_t*)mask;
+	for (x = 0; x < sizeof (*mask); x++) {
+		if (p[x] != 0xff)
+			break;
+	}
+	y = 0;
+	if (x < sizeof (*mask)) {
+		for (y = 0; y < 8; y++) {
+			if ((p[x] & (0x80 >> y)) == 0)
+				break;
+		}
+	}
+	return x * 8 + y;
+}
+
+PGM_GNUC_INTERNAL
+uint8_t
+pgm_sockaddr_prefixlen (
+	const struct sockaddr*	sa
+	)
+{
+	if (AF_INET6 == sa->sa_family) {
+		struct sockaddr_in6 s6;
+		memcpy (&s6, sa, sizeof(s6));
+		return pgm_in6_mask2len (&s6.sin6_addr);
+	} else {
+		struct sockaddr_in s4;
+		memcpy (&s4, sa, sizeof(s4));
+		return pgm_in_mask2len (&s4.sin_addr);
+	}
+}
+
+static
+void
+pgm_in_len2mask (
+	const uint8_t		prefixlen,
+	struct in_addr*		mask
+	)
+{
+	unsigned i;
+	uint8_t* p;
+
+	p = (uint8_t*)mask;
+	memset (mask, sizeof (*mask), 0);
+	for (i = 0; i < prefixlen / 8; i++)
+		p[i] = 0xff;
+	if (prefixlen % 8)
+		p[i] = (0xff00 >> (prefixlen % 8)) & 0xff;
 }
 
 PGM_GNUC_INTERNAL
