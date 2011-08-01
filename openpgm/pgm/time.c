@@ -392,25 +392,34 @@ pgm_time_init (
 #elif defined(_WIN32)
 /* core frequency HKLM/Hardware/Description/System/CentralProcessor/0/~Mhz
  */
-		DWORD registry_mhz = 0;
-		DWORD registry_mhzlen = sizeof (registry_mhz);
 		HKEY hKey;
-		if ((ERROR_SUCCESS == RegOpenKeyEx (HKEY_LOCAL_MACHINE,
-					"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\0",
+		if (ERROR_SUCCESS == RegOpenKeyExA (HKEY_LOCAL_MACHINE,
+					"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
 					0,
-					KEY_READ,
-					&hKey)) &&
-			(ERROR_SUCCESS == RegQueryValueEx (hKey,
-					"~Mhz",
-					0,
-					NULL,
-					(LPBYTE)&registry_mhz,
-					&registry_mhzlen)))
+					KEY_QUERY_VALUE,
+					&hKey))
 		{
+			DWORD dwData = 0;
+			DWORD dwDataSize = sizeof (dwData);
+			if (ERROR_SUCCESS == RegQueryValueExA (hKey,
+						"~MHz",
+						NULL,
+						NULL,
+						(LPBYTE)&dwData,
+						&dwDataSize))
+			{
+				tsc_khz = dwData * 1000;
+				pgm_minor (_("Registry reports central processor frequency %u MHz"),
+					(unsigned)dwData);
+			}
+			else
+			{
+				const DWORD save_errno = GetLastError();
+				char winstr[1024];
+				pgm_warn (_("Registry query on HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0\\~MHz failed: %s"),
+					pgm_win_strerror (winstr, sizeof (winstr), save_errno));
+			}
 			RegCloseKey (hKey);
-			tsc_khz = registry_mhz * 1000;
-			pgm_minor (_("Registry reports central processor frequency %u MHz"),
-				(unsigned)registry_mhz);
 		}
 #elif defined(__APPLE__)
 /* nb: RDTSC is non-functional on Darwin */

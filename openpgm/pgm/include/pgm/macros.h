@@ -126,7 +126,7 @@
 #define PGM_STATIC_ASSERT(expr) typedef struct { char compile_time_assertion[(expr) ? 1 : -1]; } PGM_PASTE (_pgm_static_assert_, __LINE__)
 
 /* Function declaration wrappers for C++ */
-#ifdef  __cplusplus
+#if defined(__cplusplus) && !defined(PGM_CPP_COMPILATION)
 #	define PGM_BEGIN_DECLS  extern "C" {
 #	define PGM_END_DECLS    }
 #else
