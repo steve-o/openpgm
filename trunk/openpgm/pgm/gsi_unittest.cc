@@ -76,8 +76,18 @@ namespace under_test
 		return md5->pgm_md5_finish_ctx (reinterpret_cast<Pgm::internal::pgm_md5_t*>( ctx ), resbuf);
 	}
 
+// A fake or real messages module is required to debug failures.
+#include <stdarg.h>
 	void pgm__logv (int log_level, const char* format, va_list args) {
-		return messages->pgm__logv (log_level, format, args);
+		vprintf (format, args);
+		putchar ('\n');
+//		return messages->pgm__logv (log_level, format, args);
+	}
+	void pgm__log (int log_level, const char* format, ...) {
+		va_list args;
+		va_start (args, format);
+		pgm__logv (log_level, format, args);
+		va_end (args);
 	}
 
 	int32_t pgm_random_int_range (int32_t begin, int32_t end) {
@@ -87,12 +97,32 @@ namespace under_test
 #define GSI_DEBUG
 #include "gsi.c"
 
-	int pgm_min_log_level = PGM_LOG_LEVEL_NORMAL;
+	int pgm_min_log_level = PGM_LOG_LEVEL_TRACE;
 }
 
-using ::testing::AtLeast;
 using ::testing::_;
+using ::testing::AtLeast;
 using namespace ::under_test;
+
+static
+const char*
+wrap_error_t (pgm_error_t* err)
+{
+	static char buffer[1024];
+	if (NULL == err)
+		strcpy (buffer, "nullptr error");
+	else if (NULL == err->message)
+		strcpy (buffer, "nullptr error::message");
+	else
+		sprintf (buffer, "error::message=\"%s=\"", err->message);
+	return buffer;
+}
+
+ACTION_P(ReturnHostname, hostname)
+{
+	strncpy (arg0, hostname, arg1);
+	return 0;
+}
 
 /* target:
  *	bool
@@ -110,17 +140,18 @@ TEST (GsiFromHostnameTest, HandlesValidInput)
 	Pgm::internal::MockMessages messages;
 	Pgm::internal::MockRand rand;
 	EXPECT_CALL (crt, gethostname (_, _))
-		.Times (AtLeast (1));
+		.Times (AtLeast (2))
+		.WillRepeatedly (ReturnHostname (mock_localhost));
 
-	under_test::crt = &crt;
-	under_test::error = &error;
-	under_test::md5 = &md5;
-	under_test::messages = &messages;
-	under_test::rand = &rand;
+	under_test::crt		= &crt;
+	under_test::error	= &error;
+	under_test::md5		= &md5;
+	under_test::messages	= &messages;
+	under_test::rand	= &rand;
 
 	pgm_gsi_t gsi;
 	pgm_error_t* err = NULL;
-	ASSERT_PRED2 (pgm_gsi_create_from_hostname, &gsi, &err) << "Failed with message: " << err->message;
+	ASSERT_PRED2 (pgm_gsi_create_from_hostname, &gsi, &err) << wrap_error_t (err);
 	ASSERT_EQ (NULL, err);
 	EXPECT_PRED2 (pgm_gsi_create_from_hostname, &gsi, (pgm_error_t**)NULL);
 }
