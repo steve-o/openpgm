@@ -1,5 +1,5 @@
---- time.c	2011-08-01 14:02:18.000000000 +0800
-+++ time.c89.c	2011-08-01 14:05:48.000000000 +0800
+--- time.c	2011-08-01 14:33:14.000000000 +0800
++++ time.c89.c	2011-08-01 14:35:49.000000000 +0800
 @@ -392,6 +392,7 @@
  #elif defined(_WIN32)
  /* core frequency HKLM/Hardware/Description/System/CentralProcessor/0/~Mhz
@@ -8,7 +8,23 @@
  		HKEY hKey;
  		if (ERROR_SUCCESS == RegOpenKeyExA (HKEY_LOCAL_MACHINE,
  					"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
-@@ -421,6 +422,7 @@
+@@ -411,6 +412,7 @@
+ 				tsc_khz = dwData * 1000;
+ 				pgm_minor (_("Registry reports central processor frequency %u MHz"),
+ 					(unsigned)dwData);
++				{
+ /* dump processor name for comparison aid of obtained frequency */
+ 				char szProcessorBrandString[48];
+ 				dwDataSize = sizeof (szProcessorBrandString);
+@@ -423,6 +425,7 @@
+ 				{
+ 					pgm_minor (_("Processor Brand String \"%s\""), szProcessorBrandString);
+ 				}
++				}
+ 			}
+ 			else
+ 			{
+@@ -433,6 +436,7 @@
  			}
  			RegCloseKey (hKey);
  		}
@@ -16,7 +32,7 @@
  #elif defined(__APPLE__)
  /* nb: RDTSC is non-functional on Darwin */
  		uint64_t cpufrequency;
-@@ -524,6 +526,7 @@
+@@ -536,6 +540,7 @@
  
  /* update Windows timer resolution to 1ms */
  #ifdef _WIN32
@@ -24,7 +40,7 @@
  	TIMECAPS tc;
  	if (TIMERR_NOERROR == timeGetDevCaps (&tc, sizeof (TIMECAPS)))
  	{
-@@ -535,6 +538,7 @@
+@@ -547,6 +552,7 @@
  	{
  		pgm_warn (_("Unable to determine timer device resolution."));
  	}
@@ -32,7 +48,7 @@
  #endif
  
  	return TRUE;
-@@ -924,11 +928,15 @@
+@@ -936,11 +942,15 @@
  /* HPET counter tick period is in femto-seconds, a value of 0 is not permitted,
   * the value must be <= 0x05f5e100 or 100ns.
   */
