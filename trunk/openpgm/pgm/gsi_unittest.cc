@@ -102,20 +102,17 @@ namespace under_test
 
 using ::testing::_;
 using ::testing::AtLeast;
+using ::testing::Return;
 using namespace ::under_test;
 
-static
-const char*
-wrap_error_t (pgm_error_t* err)
+std::ostream& operator << (std::ostream& os, const pgm_error_t*& err)
 {
-	static char buffer[1024];
-	if (NULL == err)
-		strcpy (buffer, "nullptr error");
-	else if (NULL == err->message)
-		strcpy (buffer, "nullptr error::message");
+	os << "{ domain=" << err->domain << " code=" << err->code << " message=";
+	if (NULL == err->message)
+		os << err->message;
 	else
-		sprintf (buffer, "error::message=\"%s=\"", err->message);
-	return buffer;
+		os << '"' << err->message << '"';
+	os << " }";
 }
 
 ACTION_P(ReturnHostname, hostname)
@@ -140,8 +137,14 @@ TEST (GsiFromHostnameTest, HandlesValidInput)
 	Pgm::internal::MockMessages messages;
 	Pgm::internal::MockRand rand;
 	EXPECT_CALL (crt, gethostname (_, _))
-		.Times (AtLeast (2))
+		.Times (2)
 		.WillRepeatedly (ReturnHostname (mock_localhost));
+	EXPECT_CALL (md5, pgm_md5_init_ctx (_))
+		.Times (2);
+	EXPECT_CALL (md5, pgm_md5_process_bytes (_, _, _))
+		.Times (AtLeast (2));
+	EXPECT_CALL (md5, pgm_md5_finish_ctx (_, _))
+		.Times (2);
 
 	under_test::crt		= &crt;
 	under_test::error	= &error;
@@ -151,7 +154,7 @@ TEST (GsiFromHostnameTest, HandlesValidInput)
 
 	pgm_gsi_t gsi;
 	pgm_error_t* err = NULL;
-	ASSERT_PRED2 (pgm_gsi_create_from_hostname, &gsi, &err) << wrap_error_t (err);
+	ASSERT_PRED2 (pgm_gsi_create_from_hostname, &gsi, &err) << "err=" << err;
 	ASSERT_EQ (NULL, err);
 	EXPECT_PRED2 (pgm_gsi_create_from_hostname, &gsi, (pgm_error_t**)NULL);
 }
