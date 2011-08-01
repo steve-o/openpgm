@@ -1,6 +1,17 @@
---- gsi.c	2011-06-25 22:34:16.000000000 +0800
-+++ gsi.c89.c	2011-06-26 07:58:12.000000000 +0800
-@@ -48,12 +48,14 @@
+--- gsi.c	2011-07-29 12:11:51.000000000 +0800
++++ gsi.c89.c	2011-08-01 14:08:03.000000000 +0800
+@@ -19,9 +19,7 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ 
+-#ifdef HAVE_CONFIG_H
+-#	include <config.h>
+-#endif
++#include <config.h>
+ #include <errno.h>
+ #include <stdio.h>
+ #ifndef _WIN32
+@@ -50,12 +48,14 @@
  	pgm_return_val_if_fail (NULL != data, FALSE);
  	pgm_return_val_if_fail (length > 1, FALSE);
  
@@ -15,7 +26,7 @@
  	return TRUE;
  }
  
-@@ -87,6 +89,7 @@
+@@ -89,6 +89,7 @@
  {
  	pgm_return_val_if_fail (NULL != gsi, FALSE);
  
@@ -23,7 +34,7 @@
  	char hostname[NI_MAXHOST];
  	int retval = gethostname (hostname, sizeof(hostname));
  	if (0 != retval) {
-@@ -102,6 +105,7 @@
+@@ -104,6 +105,7 @@
  	}
  
  	return pgm_gsi_create_from_string (gsi, hostname, -1);
@@ -31,7 +42,7 @@
  }
  
  /* create a global session ID based on the IP address.
-@@ -120,6 +124,7 @@
+@@ -122,6 +124,7 @@
  
  	pgm_return_val_if_fail (NULL != gsi, FALSE);
  
@@ -39,7 +50,7 @@
  	int retval = gethostname (hostname, sizeof(hostname));
  	if (0 != retval) {
  		const int save_errno = pgm_get_last_sock_error();
-@@ -150,8 +155,11 @@
+@@ -152,8 +155,11 @@
   */
  	memcpy (gsi, &((struct sockaddr_in*)(res->ai_addr))->sin_addr, sizeof(struct in_addr));
  	freeaddrinfo (res);

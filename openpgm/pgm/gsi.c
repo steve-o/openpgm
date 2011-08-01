@@ -207,10 +207,19 @@ pgm_gsi_equal (
         const void* restrict	p2
         )
 {
+#ifdef __cplusplus
+	union {
+		pgm_gsi_t	gsi;
+		uint16_t	s[3];
+	} _u1, _u2, *u1 = &_u1, *u2 = &_u2;
+	memcpy (&_u1.gsi, p1, sizeof (pgm_gsi_t));
+	memcpy (&_u2.gsi, p2, sizeof (pgm_gsi_t));
+#else
 	const union {
 		pgm_gsi_t	gsi;
 		uint16_t	s[3];
 	} *u1 = p1, *u2 = p2;
+#endif
 
 /* pre-conditions */
 	pgm_assert (NULL != p1);
