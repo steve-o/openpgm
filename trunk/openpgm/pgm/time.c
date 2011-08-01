@@ -411,6 +411,18 @@ pgm_time_init (
 				tsc_khz = dwData * 1000;
 				pgm_minor (_("Registry reports central processor frequency %u MHz"),
 					(unsigned)dwData);
+/* dump processor name for comparison aid of obtained frequency */
+				char szProcessorBrandString[48];
+				dwDataSize = sizeof (szProcessorBrandString);
+				if (ERROR_SUCCESS == RegQueryValueExA (hKey,
+							"ProcessorNameString",
+							NULL,
+							NULL,
+							(LPBYTE)szProcessorBrandString,
+							&dwDataSize))
+				{
+					pgm_minor (_("Processor Brand String \"%s\""), szProcessorBrandString);
+				}
 			}
 			else
 			{
