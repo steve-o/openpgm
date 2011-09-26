@@ -170,7 +170,8 @@ env = Environment(
 # GNU getopt
 			'-DCONFIG_HAVE_GETOPT'
 		],
-	LINKFLAGS = [	'-pipe'
+	LINKFLAGS = [	'-pipe',
+			'-lpthread'
 		],
 	LIBS = [
 # histogram math
