@@ -1,6 +1,6 @@
---- packet_test.c	2011-06-19 07:19:20.000000000 +0800
-+++ packet_test.c89.c	2011-06-19 07:19:32.000000000 +0800
-@@ -63,11 +63,12 @@
+--- packet_test.c	2011-03-12 10:49:51.000000000 +0800
++++ packet_test.c89.c	2011-03-12 10:50:03.000000000 +0800
+@@ -62,11 +62,12 @@
  	if (len < (sizeof(struct pgm_ip) + sizeof(struct pgm_header))) 
  	{
  		printf ("Packet size too small: %" PRIzu " bytes, expecting at least %" PRIzu " bytes.\n",
@@ -14,7 +14,7 @@
  	const struct pgm_ip* ip = (const struct pgm_ip*)data;
  	if (ip->ip_v != 4) 				/* IP version, 4 or 6 */
  	{
-@@ -76,6 +77,7 @@
+@@ -75,6 +76,7 @@
  	}
  	printf ("IP ");
  
@@ -22,7 +22,7 @@
  	const size_t ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
  	if (ip_header_length < sizeof(struct pgm_ip)) 
  	{
-@@ -83,6 +85,7 @@
+@@ -82,6 +84,7 @@
  		return FALSE;
  	}
  
@@ -30,7 +30,7 @@
  	size_t packet_length = ntohs(ip->ip_len);	/* total packet length */
  
  /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
-@@ -105,6 +108,7 @@
+@@ -104,6 +107,7 @@
  		return FALSE;
  	}
  
@@ -38,7 +38,7 @@
  	const uint16_t offset = ntohs(ip->ip_off);
  
  /* 3 bits routing priority, 4 bits type of service: delay, throughput, reliability, cost */
-@@ -131,7 +135,7 @@
+@@ -130,7 +134,7 @@
  		(offset & 0x1fff) * 8,
  		((offset & IP_DF) ? "DF" : ""),
  		((offset & IP_MF) ? "+" : ""));
@@ -47,7 +47,7 @@
  
  /* IP options */
  	if ((ip_header_length - sizeof(struct pgm_ip)) > 0) {
-@@ -142,6 +146,7 @@
+@@ -141,6 +145,7 @@
  
  /* packets that fail checksum will generally not be passed upstream except with rfc3828
   */
@@ -55,7 +55,7 @@
  	const uint16_t ip_sum = pgm_inet_checksum(data, (uint16_t)packet_length, 0);
  	if (ip_sum != 0) {
  		const uint16_t encoded_ip_sum = ntohs(ip->ip_sum);
-@@ -172,6 +177,7 @@
+@@ -171,6 +176,7 @@
   * | Type specific data ...
   * +-+-+-+-+-+-+-+-+-+- ...
   */
@@ -63,7 +63,7 @@
  	const struct pgm_header* pgm_header = (const struct pgm_header*)((const char*)data + ip_header_length);
  	const size_t pgm_length = packet_length - ip_header_length;
  
-@@ -223,6 +229,7 @@
+@@ -222,6 +228,7 @@
  	}
  
  /* now decode PGM packet types */
@@ -71,7 +71,7 @@
  	const void* pgm_data = pgm_header + 1;
  	const size_t pgm_data_length = pgm_length - sizeof(pgm_header);		/* can equal zero for SPMR's */
  
-@@ -242,6 +249,13 @@
+@@ -241,6 +248,13 @@
  	}
  
  	return err;
@@ -85,7 +85,7 @@
  }
  
  /* 8.1.  Source Path Messages (SPM)
-@@ -289,6 +303,7 @@
+@@ -288,6 +302,7 @@
  		return FALSE;
  	}
  
@@ -93,7 +93,7 @@
  	const struct pgm_spm * spm  = (const struct pgm_spm *)data;
  	const struct pgm_spm6* spm6 = (const struct pgm_spm6*)data;
  	const uint16_t spm_nla_afi = ntohs (spm->spm_nla_afi);
-@@ -299,6 +314,7 @@
+@@ -298,6 +313,7 @@
  		ntohl(spm->spm_lead),
  		spm_nla_afi);	/* address family indicator */
  
@@ -101,7 +101,7 @@
  	char s[INET6_ADDRSTRLEN];
  	const void* pgm_opt;
  	size_t pgm_opt_len;
-@@ -336,6 +352,8 @@
+@@ -335,6 +351,8 @@
  
  	printf ("\n");
  	return TRUE;
@@ -110,7 +110,7 @@
  }
  
  /* 14.7.1.  Poll Request
-@@ -385,6 +403,7 @@
+@@ -384,6 +402,7 @@
  		return FALSE;
  	}
  
@@ -118,7 +118,7 @@
  	const struct pgm_poll * poll4 = (const struct pgm_poll *)data;
  	const struct pgm_poll6* poll6 = (const struct pgm_poll6*)data;
  	const uint16_t poll_nla_afi = ntohs (poll4->poll_nla_afi);
-@@ -395,6 +414,7 @@
+@@ -394,6 +413,7 @@
  		ntohs(poll4->poll_s_type),
  		poll_nla_afi);	/* address family indicator */
  
@@ -126,7 +126,7 @@
  	char s[INET6_ADDRSTRLEN];
  	const void* pgm_opt;
  	size_t pgm_opt_len;
-@@ -459,6 +479,8 @@
+@@ -458,6 +478,8 @@
  
  	printf ("\n");
  	return TRUE;
@@ -135,7 +135,7 @@
  }
  
  /* 14.7.2.  Poll Response
-@@ -494,12 +516,14 @@
+@@ -493,12 +515,14 @@
  		return FALSE;
  	}
  
@@ -150,7 +150,7 @@
  	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_polr);
  	size_t pgm_opt_len = len - sizeof(struct pgm_polr);
  
-@@ -512,6 +536,8 @@
+@@ -511,6 +535,8 @@
  
  	printf ("\n");
  	return TRUE;
@@ -159,7 +159,7 @@
  }
  
  /* 8.2.  Data Packet
-@@ -549,6 +575,7 @@
+@@ -548,6 +574,7 @@
  		return FALSE;
  	}
  
@@ -167,7 +167,7 @@
  	const struct pgm_data* odata = (const struct pgm_data*)data;
  
  	printf ("sqn %" PRIu32 " trail %" PRIu32 " [",
-@@ -556,6 +583,7 @@
+@@ -555,6 +582,7 @@
  		ntohl(odata->data_trail));
  
  /* option extensions */
@@ -175,7 +175,7 @@
  	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_data);
  	size_t pgm_opt_len = len - sizeof(struct pgm_data);
  	const char* payload = pgm_opt;
-@@ -568,6 +596,7 @@
+@@ -567,6 +595,7 @@
  	}
  
  /* data */
@@ -183,7 +183,7 @@
  	const char* end = payload + ntohs (header->pgm_tsdu_length);
  	while (payload < end) {
  		if (isprint (*payload))
-@@ -579,6 +608,9 @@
+@@ -578,6 +607,9 @@
  
  	printf ("]\n");
  	return TRUE;
@@ -193,7 +193,7 @@
  }
  
  /* 8.2.  Repair Data
-@@ -604,6 +636,7 @@
+@@ -603,6 +635,7 @@
  		return FALSE;
  	}
  
@@ -201,7 +201,7 @@
  	const struct pgm_data* rdata = (const struct pgm_data*)data;
  
  	printf ("sqn %" PRIu32 " trail %" PRIu32 " [",
-@@ -611,6 +644,7 @@
+@@ -610,6 +643,7 @@
  		ntohl (rdata->data_trail));
  
  /* option extensions */
@@ -209,7 +209,7 @@
  	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_data);
  	size_t pgm_opt_len = len - sizeof(struct pgm_data);
  	const char* payload = pgm_opt;
-@@ -623,6 +657,7 @@
+@@ -622,6 +656,7 @@
  	}
  
  /* data */
@@ -217,7 +217,7 @@
  	const char* end = payload + ntohs (header->pgm_tsdu_length);
  	while (payload < end) {
  		if (isprint (*payload))
-@@ -634,6 +669,9 @@
+@@ -633,6 +668,9 @@
  
  	printf ("]\n");
  	return TRUE;
@@ -227,7 +227,7 @@
  }
  
  /* 8.3.  NAK
-@@ -682,6 +720,7 @@
+@@ -681,6 +719,7 @@
  		return FALSE;
  	}
  
@@ -235,7 +235,7 @@
  	const struct pgm_nak * nak  = (const struct pgm_nak *)data;
  	const struct pgm_nak6* nak6 = (const struct pgm_nak6*)data;
  	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
-@@ -689,6 +728,7 @@
+@@ -688,6 +727,7 @@
  	printf ("sqn %" PRIu32 " src ", 
  		ntohl(nak->nak_sqn));
  
@@ -243,7 +243,7 @@
  	char s[INET6_ADDRSTRLEN];
  	const void* pgm_opt;
  	size_t pgm_opt_len;
-@@ -718,6 +758,7 @@
+@@ -717,6 +757,7 @@
  			return FALSE;
  		}
  
@@ -251,7 +251,7 @@
  		const uint16_t nak_grp_nla_afi = ntohs (nak6->nak6_grp_nla_afi);
  		if (nak_src_nla_afi != nak_grp_nla_afi) {
  			puts ("different source & group afi very wibbly wobbly :(");
-@@ -732,6 +773,7 @@
+@@ -731,6 +772,7 @@
  		pgm_inet_ntop (AF_INET6, &nak6->nak6_grp_nla, s, sizeof(s));
  		printf ("%s", s);
  		break;
@@ -259,7 +259,7 @@
  	}
  
  	default:
-@@ -749,6 +791,8 @@
+@@ -748,6 +790,8 @@
  
  	printf ("\n");
  	return TRUE;
@@ -268,7 +268,7 @@
  }
  
  /* 8.3.  N-NAK
-@@ -870,11 +914,15 @@
+@@ -869,11 +913,15 @@
  
  	printf ("ACK: ");
  
@@ -285,7 +285,7 @@
  	bitmap[32] = '\0';
  
  	printf ("rx_max %" PRIu32 " bitmap [%s] ",
-@@ -889,6 +937,7 @@
+@@ -888,6 +936,7 @@
  
  	printf ("\n");
  	return TRUE;
@@ -293,7 +293,7 @@
  }
  
  
-@@ -914,12 +963,14 @@
+@@ -913,12 +962,14 @@
  		return -1;
  	}
  
@@ -308,7 +308,7 @@
  	uint16_t opt_total_length = ntohs (opt_len->opt_total_length);
  	printf (" total len %u ", opt_total_length);
  	if (opt_total_length < (sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header)) ||
-@@ -931,6 +982,7 @@
+@@ -930,6 +981,7 @@
  
  /* total length includes opt_length option */
  	opt_total_length -= sizeof(struct pgm_opt_length);
@@ -316,7 +316,7 @@
  	const struct pgm_opt_header* opt_header = (const struct pgm_opt_header*)(opt_len + 1);
  
  /* iterate through options (max 16) */
-@@ -1034,6 +1086,9 @@
+@@ -1033,6 +1085,9 @@
  	}
  
  	return ((const uint8_t*)opt_header - (const uint8_t*)data);
@@ -326,7 +326,7 @@
  }
  
  PGM_GNUC_INTERNAL
-@@ -1073,12 +1128,14 @@
+@@ -1072,12 +1127,14 @@
  		services = pgm_hashtable_new (pgm_int_hash, pgm_int_equal);
  	}
  
@@ -341,7 +341,7 @@
  	struct servent* se = getservbyport (port, "udp");
  	if (se == NULL) {
  		char buf[sizeof("00000")];
-@@ -1089,6 +1146,8 @@
+@@ -1088,6 +1145,8 @@
  	}
  	pgm_hashtable_insert (services, &hash_key, service_string);
  	return service_string;
@@ -350,7 +350,7 @@
  }
  
  PGM_GNUC_INTERNAL
-@@ -1103,12 +1162,14 @@
+@@ -1102,12 +1161,14 @@
  		hosts = pgm_hashtable_new (pgm_str_hash, pgm_int_equal);
  	}
  
@@ -365,7 +365,7 @@
  	struct hostent* he = gethostbyaddr((const char*)ap, sizeof(struct in_addr), AF_INET);
  	if (he == NULL) {
  		struct in_addr in;
-@@ -1119,6 +1180,8 @@
+@@ -1118,6 +1179,8 @@
  	}
  	pgm_hashtable_insert (hosts, &hash_key, host_string);
  	return host_string;
@@ -374,7 +374,7 @@
  }
  
  PGM_GNUC_INTERNAL
-@@ -1131,6 +1194,7 @@
+@@ -1130,6 +1193,7 @@
  /* pre-conditions */
  	pgm_assert (NULL != ipopt);
  
@@ -382,7 +382,7 @@
  	const char* op = ipopt;
  
  	while (length)
-@@ -1158,6 +1222,7 @@
+@@ -1157,6 +1221,7 @@
  		op += len;
  		length -= len;
  	}

@@ -104,7 +104,7 @@
 /* Raise compiler warning if caller ignores return value */
 #	define PGM_GNUC_WARN_UNUSED_RESULT	__attribute__((warn_unused_result))
 
-#	ifdef HAVE_DSO_VISIBILITY
+#	ifdef CONFIG_HAVE_DSO_VISIBILITY
 /* Hidden visibility */
 #		define PGM_GNUC_INTERNAL		__attribute__((visibility("hidden")))
 #	else
@@ -112,7 +112,7 @@
 #	endif
 #else /* !__GNUC__ */
 #	define PGM_GNUC_WARN_UNUSED_RESULT
-#	if ((defined(__SUNPRO_C) && (__SUNPRO_C >= 0x550)) || (defined(__SUNPRO_CC) && (__SUNPRO_CC >= 0x550))) && defined(HAVE_DSO_VISIBILITY)
+#	if ((defined(__SUNPRO_C) && (__SUNPRO_C >= 0x550)) || (defined(__SUNPRO_CC) && (__SUNPRO_CC >= 0x550))) && defined(CONFIG_HAVE_DSO_VISIBILITY)
 #		define PGM_GNUC_INTERNAL		__hidden
 #	else
 #		define PGM_GNUC_INTERNAL
@@ -126,7 +126,7 @@
 #define PGM_STATIC_ASSERT(expr) typedef struct { char compile_time_assertion[(expr) ? 1 : -1]; } PGM_PASTE (_pgm_static_assert_, __LINE__)
 
 /* Function declaration wrappers for C++ */
-#if defined(__cplusplus) && !defined(PGM_CPP_COMPILATION)
+#ifdef  __cplusplus
 #	define PGM_BEGIN_DECLS  extern "C" {
 #	define PGM_END_DECLS    }
 #else

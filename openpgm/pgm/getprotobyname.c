@@ -1,9 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Portable implementation of getprotobyname.  Returns the IP protocol
- * number for the provided protocol name.
+ * portable implementation of getprotobyname
  *
- * Copyright (c) 2010-2011 Miru Limited.
+ * Copyright (c) 2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <stdio.h>
 #include <impl/framework.h>
 
@@ -37,10 +33,6 @@ static char line[BUFSIZ+1];
 static char *proto_aliases[MAXALIASES];
 static struct pgm_protoent_t proto;
 
-/* re-entrant system APIs are preferred, unfortunately two different decls
- * are often available.
- */
-
 static
 struct pgm_protoent_t*
 _pgm_native_getprotobyname (
@@ -54,12 +46,12 @@ _pgm_native_getprotobyname (
 	if (NULL == name)
 		return NULL;
 
-#if defined( HAVE_GETPROTOBYNAME_R ) && defined( GETPROTOBYNAME_R_STRUCT_PROTOENT_P )
+#ifdef CONFIG_HAVE_GETPROTOBYNAME_R
 	char buf[BUFSIZ];
 	struct protoent protobuf;
 	if (NULL == (pe = getprotobyname_r (name, &protobuf, buf, BUFSIZ)))
 		return NULL;
-#elif defined( HAVE_GETPROTOBYNAME_R )
+#elif defined(CONFIG_HAVE_GETPROTOBYNAME_R2)
 	char buf[BUFSIZ];
 	struct protoent protobuf;
 	if (0 != getprotobyname_r (name, &protobuf, buf, BUFSIZ, &pe) || NULL == pe)
@@ -67,7 +59,7 @@ _pgm_native_getprotobyname (
 #else
 	if (NULL == (pe = getprotobyname (name)))
 		return NULL;
-#endif /* HAVE_GETPROTOBYNAME_R */
+#endif
 	len = strlen (pe->p_name) + 1;
 	if (len > BUFSIZ)
 		return NULL;

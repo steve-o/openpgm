@@ -24,9 +24,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <impl/framework.h>
 
 
@@ -50,7 +47,7 @@ _pgm_gf_vec_addmul (
 	if (PGM_UNLIKELY(b == 0))
 		return;
 
-#ifdef USE_GALOIS_MUL_LUT
+#ifdef CONFIG_GALOIS_MUL_LUT
         const pgm_gf8_t* gfmul_b = &pgm_gftable[ (uint16_t)b << 8 ];
 #endif
 
@@ -59,7 +56,7 @@ _pgm_gf_vec_addmul (
 	if (count8)
 	{
 		while (count8--) {
-#ifdef USE_GALOIS_MUL_LUT
+#ifdef CONFIG_GALOIS_MUL_LUT
 			d[i  ] ^= gfmul_b[ s[i  ] ];
 			d[i+1] ^= gfmul_b[ s[i+1] ];
 			d[i+2] ^= gfmul_b[ s[i+2] ];
@@ -86,7 +83,7 @@ _pgm_gf_vec_addmul (
 	}
 
 	while (len--) {
-#ifdef USE_GALOIS_MUL_LUT
+#ifdef CONFIG_GALOIS_MUL_LUT
 		d[i] ^= gfmul_b[ s[i] ];
 #else
 		d[i] ^= gfmul( b, s[i] );
@@ -133,7 +130,7 @@ _pgm_matmul (
 /* Generic square matrix inversion
  */
 
-#ifdef USE_XOR_SWAP
+#ifdef CONFIG_XOR_SWAP
 /* whilst cute the xor swap is quite slow */
 #define SWAP(a, b)	(((a) ^= (b)), ((b) ^= (a)), ((a) ^= (b)))
 #else
@@ -363,7 +360,7 @@ pgm_rs_create (
  *
  * Be careful, Harry!
  */
-#ifdef USE_MALLOC_MATRIX
+#ifdef CONFIG_PREFER_MALLOC
 	pgm_gf8_t* V = pgm_new0 (pgm_gf8_t, n * k);
 #else
 	pgm_gf8_t* V = pgm_newa (pgm_gf8_t, n * k);
@@ -401,7 +398,7 @@ pgm_rs_create (
  */
 	_pgm_matmul (V_kn, V_kk, rs->GM + (k * k), n - k, k, k);
 
-#ifdef USE_MALLOC_MATRIX
+#ifdef CONFIG_PREFER_MALLOC
 	pgm_free (V);
 #endif
 
@@ -501,7 +498,7 @@ pgm_rs_decode_parity_inline (
 		if (offsets[ j ] < rs->k)
 			continue;
 
-#ifdef USE_MALLOC_MATRIX
+#ifdef CONFIG_PREFER_MALLOC
 		pgm_gf8_t* erasure = repairs[ j ] = pgm_malloc0 (len);
 #else
 		pgm_gf8_t* erasure = repairs[ j ] = pgm_alloca (len);
@@ -522,7 +519,7 @@ pgm_rs_decode_parity_inline (
 			continue;
 
 		memcpy (block[ j ], repairs[ j ], len * sizeof(pgm_gf8_t));
-#ifdef USE_MALLOC_MATRIX
+#ifdef CONFIG_PREFER_MALLOC
 		pgm_free (repairs[ j ]);
 #endif
 	}

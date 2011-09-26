@@ -37,7 +37,7 @@
 namespace cpgm {
 #define restrict
 #include <pgm/pgm.h>
-}
+};
 
 template <typename Protocol>
 class pgm_socket

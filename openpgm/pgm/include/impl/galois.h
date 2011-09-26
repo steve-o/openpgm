@@ -59,7 +59,7 @@ typedef uint8_t __attribute__((__may_alias__)) pgm_gf8_t;
 extern const pgm_gf8_t pgm_gflog[PGM_GF_NO_ELEMENTS];
 extern const pgm_gf8_t pgm_gfantilog[PGM_GF_NO_ELEMENTS];
 
-#ifdef USE_GALOIS_MUL_LUT
+#ifdef CONFIG_GALOIS_MUL_LUT
 extern const pgm_gf8_t pgm_gftable[PGM_GF_NO_ELEMENTS * PGM_GF_NO_ELEMENTS];
 #endif
 
@@ -117,7 +117,7 @@ pgm_gfmul (
 		return 0;
 	}
 
-#ifdef USE_GALOIS_MUL_LUT
+#ifdef CONFIG_GALOIS_MUL_LUT
 	return pgm_gftable[ (uint16_t)a << 8 | (uint16_t)b ];
 #else
 	const unsigned sum = pgm_gflog[ a ] + pgm_gflog[ b ];

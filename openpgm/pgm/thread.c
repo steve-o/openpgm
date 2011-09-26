@@ -19,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <errno.h>
 #include <impl/framework.h>
 
@@ -35,8 +32,7 @@ bool pgm_smp_system PGM_GNUC_READ_MOSTLY = TRUE;
 
 /* Locals */
 
-#if defined( _WIN32 ) && !( _WIN32_WINNT >= 0x0600 )
-/* Condition variable implementation for Windows XP */
+#if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
 static DWORD cond_event_tls = TLS_OUT_OF_INDEXES;
 #endif
 
@@ -94,6 +90,9 @@ static volatile uint32_t thread_ref_count = 0;
 #endif /* !_WIN32 */
 
 
+/* only needed for Win32 pre-Vista read-write locks
+ */
+
 PGM_GNUC_INTERNAL
 void
 pgm_thread_init (void)
@@ -101,8 +100,7 @@ pgm_thread_init (void)
 	if (pgm_atomic_exchange_and_add32 (&thread_ref_count, 1) > 0)
 		return;
 
-#if defined( _WIN32 ) && !( _WIN32_WINNT >= 0x0600 )
-/* Condition variable implementation for Windows XP */
+#if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
 	win32_check_cmd (TLS_OUT_OF_INDEXES != (cond_event_tls = TlsAlloc ()));
 #endif
 
@@ -119,8 +117,7 @@ pgm_thread_shutdown (void)
 	if (pgm_atomic_exchange_and_add32 (&thread_ref_count, (uint32_t)-1) != 1)
 		return;
 
-#if defined( _WIN32 ) && !( _WIN32_WINNT >= 0x0600 )
-/* Condition variable implementation for Windows XP */
+#if defined(_WIN32) && !defined(CONFIG_HAVE_WIN_COND)
 	TlsFree (cond_event_tls);
 #endif
 }
@@ -150,7 +147,7 @@ pgm_mutex_init (
 	pthread_mutexattr_destroy (&attr);
 #elif !defined( _WIN32 )
 	posix_check_cmd (pthread_mutex_init (&mutex->pthread_mutex, NULL));
-#elif ( _WIN32_WINNT >= 0x0600 )
+#elif defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
 /* reduce memory consumption on mutexes on Vista+ */
 	InitializeCriticalSectionEx (&mutex->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT, CRITICAL_SECTION_NO_DEBUG_INFO);
 #else
@@ -190,9 +187,9 @@ pgm_spinlock_init (
 {
 	pgm_assert (NULL != spinlock);
 
-#ifdef USE_TICKET_SPINLOCK
+#ifdef CONFIG_TICKET_SPINLOCK
 	pgm_ticket_init (&spinlock->ticket_lock);
-#elif defined( HAVE_PTHREAD_SPINLOCK )
+#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
 	posix_check_cmd (pthread_spin_init (&spinlock->pthread_spinlock, PTHREAD_PROCESS_PRIVATE));
 #elif defined( __APPLE__ )
 	spinlock->darwin_spinlock = OS_SPINLOCK_INIT;
@@ -209,12 +206,12 @@ pgm_spinlock_free (
 {
 	pgm_assert (NULL != spinlock);
 
-#ifdef USE_TICKET_SPINLOCK
+#ifdef CONFIG_TICKET_SPINLOCK
 	pgm_ticket_free (&spinlock->ticket_lock);
-#elif defined( HAVE_PTHREAD_SPINLOCK )
+#elif defined( CONFIG_HAVE_POSIX_SPINLOCK )
 /* ignore return value */
 	pthread_spin_destroy (&spinlock->pthread_spinlock);
-#elif defined( __APPLE__ )
+#elif defined(__APPLE__)
 	/* NOP */
 #else	/* Win32/GCC atomics */
 	/* NOP */
@@ -230,19 +227,22 @@ pgm_cond_init (
 	pgm_assert (NULL != cond);
 
 #ifndef _WIN32
-/* POSIX implementation of condition variables */
 	posix_check_cmd (pthread_cond_init (&cond->pthread_cond, NULL));
-#elif ( _WIN32_WINNT >= 0x600 )
-/* Vista+ condition variables */
+#elif defined(CONFIG_HAVE_WIN_COND)
+/* requires Vista+ */
 	InitializeConditionVariable (&cond->win32_cond);
 #else
-/* Condition variable implementation for Windows XP */
 	cond->len = 0;
 	cond->allocated_len = pgm_nearest_power (1, 2 + 1);
 	cond->phandle = pgm_new (HANDLE, cond->allocated_len);
+#	if defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
+/* requires Vista+ */
+	InitializeCriticalSectionEx (&cond->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT, CRITICAL_SECTION_NO_DEBUG_INFO);
+#	else
 	InitializeCriticalSection (&cond->win32_crit);
 	SetCriticalSectionSpinCount (&cond->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT);
-#endif /* ( _WIN32 < 0x600 ) */
+#	endif
+#endif /* !_WIN32 */
 }
 
 PGM_GNUC_INTERNAL
@@ -254,13 +254,10 @@ pgm_cond_signal (
 	pgm_assert (NULL != cond);
 
 #ifndef _WIN32
-/* POSIX implementation of condition variables */
 	pthread_cond_signal (&cond->pthread_cond);
-#elif ( _WIN32_WINNT >= 0x600 )
-/* Vista+ condition variables */
+#elif defined(CONFIG_HAVE_WIN_COND)
 	WakeConditionVariable (&cond->win32_cond);
 #else
-/* Condition variable implementation for Windows XP */
 	EnterCriticalSection (&cond->win32_crit);
 	if (cond->len > 0) {
 		SetEvent (cond->phandle[ 0 ]);
@@ -268,7 +265,7 @@ pgm_cond_signal (
 		cond->len--;
 	}
 	LeaveCriticalSection (&cond->win32_crit);
-#endif /* ( _WIN32 < 0x600 ) */
+#endif /* !_WIN32 */
 }
 
 PGM_GNUC_INTERNAL
@@ -280,23 +277,19 @@ pgm_cond_broadcast (
 	pgm_assert (NULL != cond);
 
 #ifndef _WIN32
-/* POSIX implementation of condition variables */
 	pthread_cond_broadcast (&cond->pthread_cond);
-#elif ( _WIN32_WINNT >= 0x600 )
-/* Vista+ condition variables */
+#elif defined(CONFIG_HAVE_WIN_COND)
 	WakeAllConditionVariable (&cond->win32_cond);
 #else
-/* Condition variable implementation for Windows XP */
 	EnterCriticalSection (&cond->win32_crit);
 	for (unsigned i = 0; i < cond->len; i++)
 		SetEvent (cond->phandle[ i ]);
 	cond->len = 0;
 	LeaveCriticalSection (&cond->win32_crit);
-#endif /* ( _WIN32 < 0x600 ) */
+#endif /* !_WIN32 */
 }
 
 #ifndef _WIN32
-/* POSIX implementation of condition variables */
 PGM_GNUC_INTERNAL
 void
 pgm_cond_wait (
@@ -310,7 +303,6 @@ pgm_cond_wait (
 	pthread_cond_wait (&cond->pthread_cond, mutex);
 }
 #else
-/* Windows implementation of condition variables */
 PGM_GNUC_INTERNAL
 void
 pgm_cond_wait (
@@ -321,11 +313,9 @@ pgm_cond_wait (
 	pgm_assert (NULL != cond);
 	pgm_assert (NULL != spinlock);
 
-#	if ( _WIN32_WINNT >= 0x600 )
-/* Vista+ condition variables */
+#	if defined(CONFIG_HAVE_WIN_COND)
 	SleepConditionVariableCS (&cond->win32_cond, spinlock, INFINITE);
 #	else
-/* Condition variable implementation for Windows XP */
 	DWORD status;
 	HANDLE event = TlsGetValue (cond_event_tls);
 
@@ -360,9 +350,9 @@ pgm_cond_wait (
 		win32_check_cmd (WAIT_FAILED != (status = WaitForSingleObject (event, 0)));
 		LeaveCriticalSection (&cond->win32_crit);
 	}
-#	endif /* ( _WIN32_WINNT < 0x600 ) */
+#	endif /* !CONFIG_HAVE_WIN_COND */
 }
-#endif /* defined( _WIN32 ) */
+#endif /* !_WIN32 */
 
 PGM_GNUC_INTERNAL
 void
@@ -373,16 +363,13 @@ pgm_cond_free (
 	pgm_assert (NULL != cond);
 
 #ifndef _WIN32
-/* POSIX implementation of condition variables */
 	posix_check_cmd (pthread_cond_destroy (&cond->pthread_cond));
-#elif ( _WIN32_WINNT >= 0x600 )
-/* Vista+ condition variables */
+#elif defined(CONFIG_HAVE_WIN_COND)
 	/* nop */
 #else
-/* Condition variable implementation for Windows XP */
 	DeleteCriticalSection (&cond->win32_crit);
 	pgm_free (cond->phandle);
-#endif
+#endif /* !_WIN32 */
 }
 
 PGM_GNUC_INTERNAL
@@ -393,25 +380,28 @@ pgm_rwlock_init (
 {
 	pgm_assert (NULL != rwlock);
 
-#if defined( USE_DUMB_RWSPINLOCK )
+#if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_init (&rwlock->rwspinlock);
-#elif !defined( _WIN32 )
-/* POSIX read/write lock  */
-	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
-#elif ( _WIN32_WINNT >= 0x600 )
-/* slim read/write lock on Vista+ */
+#elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
+/* requires Vista+ */
 	InitializeSRWLock (&rwlock->win32_rwlock);
+#elif !defined( _WIN32 )
+	posix_check_cmd (pthread_rwlock_init (&rwlock->pthread_rwlock, NULL));
 #else
-/* read/write lock implementation for XP */
+#	if defined(CONFIG_HAVE_CRITICAL_SECTION_EX)
+/* requires Vista+ */
+	InitializeCriticalSectionEx (&rwlock->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT, CRITICAL_SECTION_NO_DEBUG_INFO);
+#	else
 	InitializeCriticalSection (&rwlock->win32_crit);
 	SetCriticalSectionSpinCount (&rwlock->win32_crit, PGM_ADAPTIVE_MUTEX_SPINCOUNT);
+#	endif
 	pgm_cond_init (&rwlock->read_cond);
 	pgm_cond_init (&rwlock->write_cond);
 	rwlock->read_counter	= 0;
 	rwlock->have_writer	= FALSE;
 	rwlock->want_to_read	= 0;
 	rwlock->want_to_write	= 0;
-#endif
+#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
 
 PGM_GNUC_INTERNAL
@@ -422,23 +412,20 @@ pgm_rwlock_free (
 {
 	pgm_assert (NULL != rwlock);
 
-#if defined( USE_DUMB_RWSPINLOCK )
+#if defined( CONFIG_DUMB_RWSPINLOCK )
 	pgm_rwspinlock_free (&rwlock->rwspinlock);
-#elif !defined( _WIN32 )
-/* POSIX read/write lock  */
+#elif defined( CONFIG_HAVE_WIN_SRW_LOCK )
+	/* nop */
+#elif !defined(_WIN32)
 	pthread_rwlock_destroy (&rwlock->pthread_rwlock);
-#elif ( _WIN32_WINNT >= 0x600 )
-/* slim read/write lock on Vista+ */
 #else
-/* read/write lock implementation for XP */
 	pgm_cond_free (&rwlock->read_cond);
 	pgm_cond_free (&rwlock->write_cond);
 	DeleteCriticalSection (&rwlock->win32_crit);
-#endif
+#endif /* !CONFIG_HAVE_WIN_SRW_LOCK */
 }
 
-#if defined( _WIN32 ) && !( _WIN32_WINNT >= 0x600 ) && !defined( USE_DUMB_RWSPINLOCK )
-/* read-write lock implementation for Windows XP */
+#if !defined(CONFIG_DUMB_RWSPINLOCK) && !defined(CONFIG_HAVE_WIN_SRW_LOCK) && defined(_WIN32)
 static inline
 void
 _pgm_rwlock_signal (
@@ -553,7 +540,7 @@ pgm_rwlock_writer_unlock (
 	_pgm_rwlock_signal (rwlock);
 	LeaveCriticalSection (&rwlock->win32_crit);
 }
-#endif /* defined( _WIN32 ) && !( _WIN32_WINNT >= 0x600 ) */
+#endif /* !_WIN32 && !CONFIG_HAVE_WIN_SRW_LOCK */
 
 
 /* eof */

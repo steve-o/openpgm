@@ -21,9 +21,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <errno.h>
 #include <stdlib.h>
 #ifdef _WIN32
@@ -70,23 +67,19 @@ static UINT			wTimerRes = 0;
 static void			pgm_time_conv (const pgm_time_t*const restrict, time_t*restrict);
 static void			pgm_time_conv_from_reset (const pgm_time_t*const restrict, time_t*restrict);
 
-#if defined(HAVE_CLOCK_GETTIME)
+#if defined(CONFIG_HAVE_CLOCK_GETTIME)
 #	include <time.h>
 static pgm_time_t		pgm_clock_update (void);
 #endif
-#ifdef HAVE_FTIME
+#ifdef CONFIG_HAVE_FTIME
 #	include <sys/timeb.h>
 static pgm_time_t		pgm_ftime_update (void);
 #endif
-#ifdef HAVE_GETTIMEOFDAY
+#ifdef CONFIG_HAVE_GETTIMEOFDAY
 #	include <sys/time.h>
 static pgm_time_t		pgm_gettimeofday_update (void);
 #endif
-#ifdef _WIN32
-static pgm_time_t		pgm_mmtime_update (void);
-static pgm_time_t		pgm_queryperformancecounter_update (void);
-#endif
-#ifdef HAVE_DEV_HPET
+#ifdef CONFIG_HAVE_HPET
 #	include <fcntl.h>
 #	include <sys/types.h>
 #	include <sys/stat.h>
@@ -146,7 +139,7 @@ static bool			pgm_hpet_init (pgm_error_t**);
 static bool			pgm_hpet_shutdown (void);
 static pgm_time_t		pgm_hpet_update (void);
 #endif
-#ifdef HAVE_DEV_RTC
+#ifdef CONFIG_HAVE_RTC
 #	include <fcntl.h>
 #	include <sys/types.h>
 #	include <sys/stat.h>
@@ -160,19 +153,17 @@ static bool			pgm_rtc_init (pgm_error_t**);
 static bool			pgm_rtc_shutdown (void);
 static pgm_time_t		pgm_rtc_update (void);
 #endif
-#ifdef HAVE_RDTSC
+#ifdef CONFIG_HAVE_TSC
 #	include <stdio.h>
 #	include <string.h>
 #	if defined(__APPLE__) || defined(__FreeBSD__)
 #		include <sys/sysctl.h>
 #	elif defined(__sun)
 #		include <kstat.h>
-#	elif defined(_MSC_VER)
-#		include <intrin.h>
 #	endif
 #	define TSC_NS_SCALE	10 /* 2^10, carefully chosen */
 #	define TSC_US_SCALE	20
-static uint_fast32_t		tsc_khz PGM_GNUC_READ_MOSTLY = 0;
+static uint_fast32_t		tsc_mhz PGM_GNUC_READ_MOSTLY = 0;
 static uint_fast32_t		tsc_ns_mul PGM_GNUC_READ_MOSTLY = 0;
 static uint_fast32_t		tsc_us_mul PGM_GNUC_READ_MOSTLY = 0;
 
@@ -238,7 +229,11 @@ static pgm_time_t		pgm_tsc_update (void);
 PGM_GNUC_INTERNAL
 bool
 pgm_time_init (
+#ifndef _WIN32
 	pgm_error_t**	error
+#else
+	PGM_GNUC_UNUSED pgm_error_t**	error
+#endif
 	)
 {
 	char	*pgm_timer;
@@ -248,15 +243,14 @@ pgm_time_init (
 	if (pgm_atomic_exchange_and_add32 (&time_ref_count, 1) > 0)
 		return TRUE;
 
-/* user preferred time stamp function */
+/* current time */
 	err = pgm_dupenv_s (&pgm_timer, &envlen, "PGM_TIMER");
 	if (0 != err || 0 == envlen) {
 		pgm_timer = pgm_strdup (
-/* default time stamp function */
-#if defined(_WIN32)
-			"MMTIME"
+#ifdef CONFIG_HAVE_TSC
+			"TSC"
 #else
-			"GETTIMEOFDAY"
+			"GTOD"
 #endif
 				);
 	}
@@ -264,73 +258,58 @@ pgm_time_init (
 	pgm_time_since_epoch = pgm_time_conv;
 
 	switch (pgm_timer[0]) {
-#ifdef HAVE_FTIME
+#ifdef CONFIG_HAVE_FTIME
 	case 'F':
 		pgm_minor (_("Using ftime() timer."));
 		pgm_time_update_now	= pgm_ftime_update;
 		break;
 #endif
-#ifdef HAVE_CLOCK_GETTIME
+#ifdef CONFIG_HAVE_CLOCK_GETTIME
 	case 'C':
 		pgm_minor (_("Using clock_gettime() timer."));
 		pgm_time_update_now	= pgm_clock_update;
 		break;
 #endif
-#ifdef HAVE_DEV_RTC
+#ifdef CONFIG_HAVE_RTC
 	case 'R':
 		pgm_minor (_("Using /dev/rtc timer."));
 		pgm_time_update_now	= pgm_rtc_update;
 		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
-#ifdef HAVE_RDTSC
+#ifdef CONFIG_HAVE_TSC
+#	ifdef _WIN32
+	default:
+#	endif
 	case 'T':
 		pgm_minor (_("Using TSC timer."));
 		pgm_time_update_now	= pgm_tsc_update;
 		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
-#ifdef HAVE_DEV_HPET
+#ifdef CONFIG_HAVE_HPET
 	case 'H':
 		pgm_minor (_("Using HPET timer."));
 		pgm_time_update_now	= pgm_hpet_update;
 		pgm_time_since_epoch	= pgm_time_conv_from_reset;
 		break;
 #endif
-#ifdef HAVE_GETTIMEOFDAY
+
+#ifdef CONFIG_HAVE_GETTIMEOFDAY
+#	ifndef _WIN32
+	default:
+#	endif
 	case 'G':
 		pgm_minor (_("Using gettimeofday() timer."));
 		pgm_time_update_now	= pgm_gettimeofday_update;
 		break;
 #endif
-#ifdef _WIN32
-	case 'M':
-		pgm_minor (_("Using multi-media timer."));
-		pgm_time_update_now	= pgm_mmtime_update;
-		pgm_time_since_epoch	= pgm_time_conv_from_reset;
-		break;
-
-	case 'Q':
-		pgm_minor (_("Using QueryPerformanceCounter() timer."));
-		pgm_time_update_now	= pgm_queryperformancecounter_update;
-		pgm_time_since_epoch	= pgm_time_conv_from_reset;
-		break;
-#endif
-
-	default:
-		pgm_set_error (error,
-			       PGM_ERROR_DOMAIN_TIME,
-			       PGM_ERROR_FAILED,
-			       _("Unsupported time stamp function: PGM_TIMER=%s"),
-			       pgm_timer);
-		pgm_free (pgm_timer);
-		goto err_cleanup;
 	}
 
 /* clean environment copy */
 	pgm_free (pgm_timer);
 
-#ifdef HAVE_DEV_RTC
+#ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
 	{
 		pgm_error_t* sub_error = NULL;
@@ -340,39 +319,12 @@ pgm_time_init (
 		}
 	}
 #endif
-#ifdef _WIN32
-	if (pgm_time_update_now == pgm_queryperformancecounter_update)
-	{
-/* MSDN statement: The frequency cannot change while the system is running.
- * http://msdn.microsoft.com/en-us/library/ms644905(v=vs.85).aspx
- */
-		LARGE_INTEGER frequency;
-		if (QueryPerformanceFrequency (&frequency))
-		{
-			tsc_khz = (uint_fast32_t)(frequency.QuadPart / 1000LL);
-			pgm_minor (_("High-resolution performance counter frequency %lld Hz"),
-				frequency.QuadPart);
-		}
-		else
-		{
-			const DWORD save_errno = GetLastError();
-			char winstr[1024];
-			pgm_set_error (error,
-				       PGM_ERROR_DOMAIN_TIME,
-				       PGM_ERROR_FAILED,
-				       _("No supported high-resolution performance counter: %s"),
-				       pgm_win_strerror (winstr, sizeof (winstr), save_errno));
-			goto err_cleanup;
-		}
-		set_tsc_mul (tsc_khz);
-	}
-#endif /* _WIN32 */
-#ifdef HAVE_RDTSC
+#ifdef CONFIG_HAVE_TSC
 	if (pgm_time_update_now == pgm_tsc_update)
 	{
 		char	*rdtsc_frequency;
 
-#ifdef HAVE_PROC_CPUINFO
+#ifdef CONFIG_HAVE_PROC
 /* attempt to parse clock ticks from kernel
  */
 		FILE	*fp = fopen ("/proc/cpuinfo", "r");
@@ -383,55 +335,32 @@ pgm_time_init (
 			{
 				if (strstr (buffer, "cpu MHz")) {
 					const char *p = strchr (buffer, ':');
-					if (p) tsc_khz = atoi (p + 1) * 1000;
+					if (p) tsc_mhz = atoi (p + 1) * 1000;
 					break;
 				}
 			}
 			fclose (fp);
 		}
 #elif defined(_WIN32)
-/* core frequency HKLM/Hardware/Description/System/CentralProcessor/0/~Mhz
+/* iff reading TSC we could use HKLM/Hardware/Description/System/CentralProcessor/0/~Mhz
+ *
+ * MSDN statement: The frequency cannot change while the system is running.
+ * http://msdn.microsoft.com/en-us/library/ms644905(v=vs.85).aspx
  */
-		HKEY hKey;
-		if (ERROR_SUCCESS == RegOpenKeyExA (HKEY_LOCAL_MACHINE,
-					"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
-					0,
-					KEY_QUERY_VALUE,
-					&hKey))
+		LARGE_INTEGER frequency;
+		if (QueryPerformanceFrequency (&frequency))
 		{
-			DWORD dwData = 0;
-			DWORD dwDataSize = sizeof (dwData);
-			if (ERROR_SUCCESS == RegQueryValueExA (hKey,
-						"~MHz",
-						NULL,
-						NULL,
-						(LPBYTE)&dwData,
-						&dwDataSize))
-			{
-				tsc_khz = dwData * 1000;
-				pgm_minor (_("Registry reports central processor frequency %u MHz"),
-					(unsigned)dwData);
-/* dump processor name for comparison aid of obtained frequency */
-				char szProcessorBrandString[48];
-				dwDataSize = sizeof (szProcessorBrandString);
-				if (ERROR_SUCCESS == RegQueryValueExA (hKey,
-							"ProcessorNameString",
-							NULL,
-							NULL,
-							(LPBYTE)szProcessorBrandString,
-							&dwDataSize))
-				{
-					pgm_minor (_("Processor Brand String \"%s\""), szProcessorBrandString);
-				}
-			}
-			else
-			{
-				const DWORD save_errno = GetLastError();
-				char winstr[1024];
-				pgm_warn (_("Registry query on HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0\\~MHz failed: %s"),
-					pgm_win_strerror (winstr, sizeof (winstr), save_errno));
-			}
-			RegCloseKey (hKey);
+			tsc_mhz = (uint_fast32_t)(frequency.QuadPart / 1000);
+		}
+		else
+		{
+			const DWORD save_errno = GetLastError();
+			char winstr[1024];
+			pgm_set_error (error,
+				       PGM_ERROR_DOMAIN_TIME,
+				       PGM_ERROR_FAILED,
+				       _("No supported high-resolution performance counter: %s"),
+				       pgm_win_strerror (winstr, sizeof (winstr), save_errno));
 		}
 #elif defined(__APPLE__)
 /* nb: RDTSC is non-functional on Darwin */
@@ -439,15 +368,14 @@ pgm_time_init (
 		size_t len;
 		len = sizeof (cpufrequency);
 		if (0 == sysctlbyname ("hw.cpufrequency", &cpufrequency, &len, NULL, 0)) {
-			tsc_khz = (uint_fast32_t)(cpufrequency / 1000);
+			tsc_mhz = (uint_fast32_t)(cpufrequency / 1000);
 		}
 #elif defined(__FreeBSD__)
-/* frequency in Mhz */
 		unsigned long clockrate;
 		size_t len;
 		len = sizeof (clockrate);
 		if (0 == sysctlbyname ("hw.clockrate", &clockrate, &len, NULL, 0)) {
-			tsc_khz = (uint_fast32_t)(clockrate * 1000);
+			tsc_mhz = (uint_fast32_t)(clockrate * 1000);
 		}
 #elif defined(KSTAT_DATA_INT32)
 /* ref: http://developers.sun.com/solaris/articles/kstatc.html */
@@ -461,7 +389,7 @@ pgm_time_init (
 			NULL != (kdata = kstat_data_lookup (ksp, "clock_MHz")) &&
 			KSTAT_DATA_INT32 == kdata->data_type)
 		{
-			tsc_khz = (uint_fast32_t)(kdata->value.i32 * 1000);
+			tsc_mhz = (uint_fast32_t)(kdata->value.i32 * 1000);
 			kstat_close (kc);
 		}
 #endif /* !_WIN32 */
@@ -472,13 +400,13 @@ pgm_time_init (
  */
 		err = pgm_dupenv_s (&rdtsc_frequency, &envlen, "RDTSC_FREQUENCY");
 		if (0 == err && envlen > 0) {
-			tsc_khz = atoi (rdtsc_frequency) * 1000;
+			tsc_mhz = atoi (rdtsc_frequency) * 1000;
 			pgm_free (rdtsc_frequency);
 		}
 
 #ifndef _WIN32
 /* calibrate */
-		if (0 >= tsc_khz) {
+		if (0 >= tsc_mhz) {
 			pgm_error_t* sub_error = NULL;
 			if (!pgm_tsc_init (&sub_error)) {
 				pgm_propagate_error (error, sub_error);
@@ -486,12 +414,12 @@ pgm_time_init (
 			}
 		}
 #endif
-		pgm_minor (_("TSC frequency set at %u KHz"), (unsigned)(tsc_khz));
-		set_tsc_mul (tsc_khz);
+		pgm_minor (_("TSC frequency set to %u MHz"), (unsigned)(tsc_mhz / 1000));
+		set_tsc_mul (tsc_mhz);
 	}
-#endif /* HAVE_RDTSC */
+#endif /* CONFIG_HAVE_TSC */
 
-#ifdef HAVE_DEV_HPET
+#ifdef CONFIG_HAVE_HPET
 	if (pgm_time_update_now == pgm_hpet_update)
 	{
 		pgm_error_t* sub_error = NULL;
@@ -505,26 +433,19 @@ pgm_time_init (
 	pgm_time_update_now();
 
 /* calculate relative time offset */
-#if defined(HAVE_DEV_RTC) || defined(HAVE_RDTSC) || defined(HAVE_DEV_HPET) || defined(_WIN32)
+#if defined(CONFIG_HAVE_RTC) || defined(CONFIG_HAVE_TSC)
 	if (	0
-#	ifdef HAVE_DEV_RTC
+#	ifdef CONFIG_HAVE_RTC
 		|| pgm_time_update_now == pgm_rtc_update
 #	endif
-#	ifdef HAVE_RDTSC
+#	ifdef CONFIG_HAVE_TSC
 		|| pgm_time_update_now == pgm_tsc_update
-#	endif
-#	ifdef HAVE_DEV_HPET
-		|| pgm_time_update_now == pgm_hpet_update
-#	endif
-#	ifdef _WIN32
-		|| pgm_time_update_now == pgm_mmtime_update
-		|| pgm_time_update_now == pgm_queryperformancecounter_update
 #	endif
 	   )
 	{
-#	if defined( HAVE_GETTIMEOFDAY )
+#	if defined( CONFIG_HAVE_GETTIMEOFDAY )
 		rel_offset = pgm_gettimeofday_update() - pgm_time_update_now();
-#	elif defined( HAVE_FTIME )
+#	elif defined( CONFIG_HAVE_FTIME )
 		rel_offset = pgm_ftime_update() - pgm_time_update_now();
 #	else
 #		error "gettimeofday() or ftime() required to calculate counter offset"
@@ -550,9 +471,15 @@ pgm_time_init (
 #endif
 
 	return TRUE;
+#if defined(CONFIG_HAVE_RTC) || (defined(CONFIG_HAVE_TSC) && !defined(_WIN32)) || defined(CONFIG_HAVE_HPET)
 err_cleanup:
 	pgm_atomic_dec32 (&time_ref_count);
 	return FALSE;
+#endif
+#if !defined(CONFIG_HAVE_RTC) && !defined(CONFIG_HAVE_TSC) && !defined(CONFIG_HAVE_HPET)
+/* unused parameters */
+	(void)error;
+#endif
 }
 
 /* returns TRUE if shutdown succeeded, returns FALSE on error.
@@ -573,18 +500,18 @@ pgm_time_shutdown (void)
 	timeEndPeriod (wTimerRes);
 #endif
 
-#ifdef HAVE_DEV_RTC
+#ifdef CONFIG_HAVE_RTC
 	if (pgm_time_update_now == pgm_rtc_update)
 		retval = pgm_rtc_shutdown ();
 #endif
-#ifdef HAVE_DEV_HPET
+#ifdef CONFIG_HAVE_HPET
 	if (pgm_time_update_now == pgm_hpet_update)
 		retval = pgm_hpet_shutdown ();
 #endif
 	return retval;
 }
 
-#ifdef HAVE_GETTIMEOFDAY
+#ifdef CONFIG_HAVE_GETTIMEOFDAY
 static
 pgm_time_t
 pgm_gettimeofday_update (void)
@@ -600,9 +527,9 @@ pgm_gettimeofday_update (void)
 	else
 		return last = now;
 }
-#endif /* HAVE_GETTIMEOFDAY */
+#endif /* CONFIG_HAVE_GETTIMEOFDAY */
 
-#ifdef HAVE_CLOCK_GETTIME
+#ifdef CONFIG_HAVE_CLOCK_GETTIME
 static
 pgm_time_t
 pgm_clock_update (void)
@@ -618,9 +545,9 @@ pgm_clock_update (void)
 	else
 		return last = now;
 }
-#endif /* HAVE_CLOCK_GETTIME */
+#endif /* CONFIG_HAVE_CLOCK_GETTIME */
 
-#ifdef HAVE_FTIME
+#ifdef CONFIG_HAVE_FTIME
 static
 pgm_time_t
 pgm_ftime_update (void)
@@ -642,9 +569,9 @@ pgm_ftime_update (void)
 	else
 		return last = now;
 }
-#endif /* HAVE_FTIME */
+#endif /* CONFIG_HAVE_FTIME */
 
-#ifdef HAVE_DEV_RTC
+#ifdef CONFIG_HAVE_RTC
 /* Old PC/AT-Compatible driver:  /dev/rtc
  *
  * Not so speedy 8192 Hz timer, thats 122us resolution.
@@ -722,69 +649,33 @@ pgm_rtc_update (void)
 	rtc_count += data >> 8;
 	return rtc_count * 1000000UL / rtc_frequency;
 }
-#endif /* HAVE_DEV_RTC */
+#endif /* CONFIG_HAVE_RTC */
 
-#ifdef _WIN32
-/* Multi-media like timer API, returns 100-nanoseconds intervals.
- *
- * Faster than QueryPerformanceCounter and hence deployed for SQL Server.
- * http://blogs.msdn.com/b/psssql/archive/2008/12/16/how-it-works-sql-server-no-longer-uses-rdtsc-for-timings-in-sql-2008-and-sql-2005-service-pack-3-sp3.aspx
- */
-static
-pgm_time_t
-pgm_mmtime_update (void)
-{
-	FILETIME ft;
-	int64_t aligned_ft;
-
-	GetSystemTimeAsFileTime (&ft);
-	memcpy (&aligned_ft, &ft, sizeof (int64_t));
-	return (pgm_time_t)( aligned_ft / 10 );
-}
-
-/* High-resolution performance counter.
- *
- * Microsoft performance note on API cost:
- * http://blogs.msdn.com/b/psssql/archive/2006/11/27/sql-server-2005-sp2-will-introduce-new-messages-to-the-error-log-related-to-timing-activities.aspx
- * "QueryPerformanceCounter is a more stable counter but very costly when called lots of times like SQL Server would do."
- *
- * Microsoft note on TSC drift affect on this API.
- * http://support.microsoft.com/kb/895980
- */
-static
-pgm_time_t
-pgm_queryperformancecounter_update (void)
-{
-	LARGE_INTEGER counter;
-
-	QueryPerformanceCounter (&counter);
-	return (pgm_time_t)counter.QuadPart;
-}
-#endif /* _WIN32 */
-
-#ifdef HAVE_RDTSC
+#ifdef CONFIG_HAVE_TSC
 /* read time stamp counter (TSC), count of ticks from processor reset.
  *
- * Microsoft notes on TSC drift:
- * http://support.microsoft.com/kb/931279
- * http://support.microsoft.com/kb/938448
+ * NB: On Windows this will usually be HPET or PIC timer interpolated with TSC.
  */
 
 static inline
 pgm_time_t
-pgm_rdtsc (void)
+rdtsc (void)
 {
-#	ifndef _MSC_VER
+#	ifndef _WIN32
 
 	uint32_t lo, hi;
 
 /* We cannot use "=A", since this would use %rax on x86_64 */
 	__asm volatile ("rdtsc" : "=a" (lo), "=d" (hi));
+
 	return (pgm_time_t)hi << 32 | lo;
 
 #	else
 
-	return (pgm_time_t)__rdtsc ();
+	LARGE_INTEGER counter;
+
+	QueryPerformanceCounter (&counter);
+	return (pgm_time_t)counter.QuadPart;
 
 #	endif
 }
@@ -802,7 +693,7 @@ pgm_tsc_init (
 	PGM_GNUC_UNUSED pgm_error_t**	error
 	)
 {
-#		ifdef HAVE_PROC_CPUINFO
+#		ifdef CONFIG_HAVE_PROC
 /* Test for constant TSC from kernel
  */
 	FILE	*fp = fopen ("/proc/cpuinfo", "r");
@@ -830,7 +721,7 @@ pgm_tsc_init (
 		pgm_time_update_now	= pgm_gettimeofday_update;
 		return TRUE;
 	}
-#		endif /* HAVE_PROC_CPUINFO */
+#		endif /* CONFIG_HAVE_PROC */
 
 	pgm_time_t		start, stop, elapsed;
 	const pgm_time_t	calibration_usec = secs_to_usecs (4);
@@ -860,17 +751,17 @@ pgm_tsc_init (
 	elapsed = stop - start;
 	if (elapsed > calibration_usec) {
 /* cpu > 1 Ghz */
-		tsc_khz = (elapsed * 1000) / calibration_usec;
+		tsc_mhz = (elapsed * 1000) / calibration_usec;
 	} else {
 /* cpu < 1 Ghz */
-		tsc_khz = -( (calibration_usec * 1000) / elapsed );
+		tsc_mhz = -( (calibration_usec * 1000) / elapsed );
 	}
 
 	pgm_info (_("Finished RDTSC test. To prevent the startup delay from this benchmark, "
 		   "set the environment variable RDTSC_FREQUENCY to %" PRIuFAST32 " on this "
 		   "system. This value is dependent upon the CPU clock speed and "
 		   "architecture and should be determined separately for each server."),
-		   tsc_khz);
+		   tsc_mhz / 1000);
 	return TRUE;
 }
 #	endif
@@ -885,16 +776,16 @@ pgm_time_t
 pgm_tsc_update (void)
 {
 	static pgm_time_t	last = 0;
-	const pgm_time_t	now = tsc_to_us (pgm_rdtsc());
+	const pgm_time_t	now = tsc_to_us (rdtsc());
 
 	if (PGM_UNLIKELY(now < last))
 		return last;
 	else
 		return last = now;
 }
-#endif /* HAVE_RDTSC */
+#endif
 
-#ifdef HAVE_DEV_HPET
+#ifdef CONFIG_HAVE_HPET
 /* High Precision Event Timer (HPET) created as a system wide stable high resolution timer
  * to replace dependency on core specific counters (TSC).
  *
@@ -969,7 +860,7 @@ pgm_hpet_update (void)
 	hpet_last = hpet_count;
 	return hpet_to_us (hpet_offset + hpet_count);
 }
-#endif /* HAVE_DEV_HPET */
+#endif /* CONFIG_HAVE_HPET */
 
 /* convert from pgm_time_t to time_t with pgm_time_t in microseconds since the epoch.
  */

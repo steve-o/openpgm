@@ -1,6 +1,6 @@
---- string.c	2011-06-27 22:58:17.000000000 +0800
-+++ string.c89.c	2011-06-27 23:08:39.000000000 +0800
-@@ -104,10 +104,12 @@
+--- string.c	2011-03-29 20:39:06.000000000 +0800
++++ string.c89.c	2011-03-29 20:40:06.000000000 +0800
+@@ -98,17 +98,20 @@
  		free (strp);
  	}
  #else
@@ -13,16 +13,19 @@
  	va_list args2;
  	va_copy (args2, args);
  #	endif
-@@ -115,6 +117,7 @@
- 	*string = pgm_malloc (len);
- 	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
+-	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
+-/* NB: must be able to handle NULL args, fails on GCC */
+-	len = vsprintf (*string, format, args2);
++	len = pgm_printf_string_upper_bound (format, args);
++	*string = pgm_malloc (len);
++	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
  	va_end (args2);
 +	}
  #endif
  	return len;
  }
-@@ -145,13 +148,14 @@
- #ifdef HAVE_STPCPY
+@@ -139,13 +142,14 @@
+ #ifdef CONFIG_HAVE_STPCPY
  	return stpcpy (dest, src);
  #else
 +	{
@@ -37,7 +40,7 @@
  #endif
  }
  
-@@ -260,8 +264,11 @@
+@@ -254,8 +258,11 @@
  {
  	if (PGM_LIKELY (NULL != str_array))
  	{

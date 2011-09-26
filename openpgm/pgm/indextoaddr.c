@@ -1,8 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Portable interface index to socket address function.  The underlying
- * socket implementation may manage separate numerical spaces for each
- * address family.
+ * portable interface index to socket address function.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *
@@ -21,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
 

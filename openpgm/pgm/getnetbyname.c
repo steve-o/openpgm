@@ -1,13 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Portable implementation of getnetbyname, returns a network address
- * from a given name.  On Unix systems the mapping is managed by a
- * system service and may be sourced from a network service, cached 
- * locally, or read directly from a local file.  On systems without
- * such a service or when IPv6 is required a local file is supported
- * with compatible parsing of the network-name mapping format.
+ * portable implementation of getnetbyname
  *
- * Copyright (c) 2010-2011 Miru Limited.
+ * Copyright (c) 2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <stdio.h>
 #include <impl/framework.h>
 
@@ -207,7 +199,7 @@ found:
 	return p;
 }
 
-#ifdef HAVE_GETNETENT
+#ifdef CONFIG_HAVE_GETNETENT
 static
 struct pgm_netent_t*
 _pgm_native_getnetbyname (
@@ -278,7 +270,7 @@ pgm_getnetbyname (
 	const char*	name
 	)
 {
-#ifdef HAVE_GETNETENT
+#ifdef CONFIG_HAVE_GETNETENT
 	char*   netdb;
 	size_t  envlen;
 	errno_t err;

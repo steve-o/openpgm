@@ -25,7 +25,7 @@
 #ifndef __PGM_MEM_H__
 #define __PGM_MEM_H__
 
-#ifdef HAVE_ALLOCA_H
+#ifdef CONFIG_HAVE_ALLOCA_H
 #	include <alloca.h>
 #elif defined(_WIN32)
 #	include <malloc.h>

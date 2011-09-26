@@ -66,7 +66,7 @@ PGM_BEGIN_DECLS
 /* Byte alignment for packet memory maps.
  * NB: Solaris and OpenSolaris don't support #pragma pack(push) even on x86.
  */
-#if defined( __GNUC__ ) && !defined( __sun ) && !defined( __CYGWIN__ )
+#if defined( __GNUC__ ) && !defined( __sun )
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -142,7 +142,7 @@ struct pgm_udphdr
 
 PGM_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 
-#if defined( __GNUC__ ) && !defined( __sun ) && !defined( __CYGWIN__ )
+#if defined( __GNUC__ ) && !defined( __sun )
 #	pragma pack(pop)
 #else
 #	pragma pack()

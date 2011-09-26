@@ -1,6 +1,6 @@
---- receiver.c	2011-06-19 07:17:50.000000000 +0800
-+++ receiver.c89.c	2011-06-19 07:18:03.000000000 +0800
-@@ -167,6 +167,7 @@
+--- receiver.c	2011-03-12 10:55:40.000000000 +0800
++++ receiver.c89.c	2011-03-12 10:55:33.000000000 +0800
+@@ -166,6 +166,7 @@
  
  	pgm_trace (PGM_LOG_ROLE_RX_WINDOW, _("Lost data #%u due to cancellation."), skb->sequence);
  
@@ -8,7 +8,7 @@
  	const uint32_t fail_time = (uint32_t)(now - skb->tstamp);
  	if (!peer->max_fail_time)
  		peer->max_fail_time = peer->min_fail_time = fail_time;
-@@ -177,6 +178,7 @@
+@@ -176,6 +177,7 @@
  
  	pgm_rxw_lost (peer->window, skb->sequence);
  	PGM_HISTOGRAM_TIMES("Rx.FailTime", fail_time);
@@ -16,7 +16,7 @@
  
  /* mark receiver window for flushing on next recv() */
  	pgm_peer_set_pending (sock, peer);
-@@ -216,6 +218,7 @@
+@@ -215,6 +217,7 @@
  	pgm_assert (NULL != skb);
  	pgm_assert (NULL != skb->pgm_opt_pgmcc_data);
  
@@ -24,7 +24,7 @@
  	const unsigned acker_afi = ntohs (skb->pgm_opt_pgmcc_data->opt_nla_afi);
  	switch (acker_afi) {
  	case AFI_IP:
-@@ -232,6 +235,7 @@
+@@ -231,6 +234,7 @@
  	}
  
  	return FALSE;
@@ -32,7 +32,7 @@
  }
  
  /* add state for an ACK on a data packet.
-@@ -391,11 +395,13 @@
+@@ -390,11 +394,13 @@
  	pgm_assert (dst_addrlen > 0);
  
  #ifdef PGM_DEBUG
@@ -46,7 +46,7 @@
  #endif
  
  	peer = pgm_new0 (pgm_peer_t, 1);
-@@ -464,6 +470,7 @@
+@@ -463,6 +469,7 @@
  		pgm_peer_t* peer = sock->peers_pending->data;
  		if (peer->last_commit && peer->last_commit < sock->last_commit)
  			pgm_rxw_remove_commit (peer->window);
@@ -54,7 +54,7 @@
  		const ssize_t peer_bytes = pgm_rxw_readv (peer->window, pmsg, (unsigned)(msg_end - *pmsg + 1));
  
  		if (peer->last_cumulative_losses != ((pgm_rxw_t*)peer->window)->cumulative_losses)
-@@ -490,6 +497,7 @@
+@@ -489,6 +496,7 @@
  		}
  /* clear this reference and move to next */
  		sock->peers_pending = pgm_slist_remove_first (sock->peers_pending);
@@ -62,7 +62,7 @@
  	}
  
  	return retval;
-@@ -593,6 +601,7 @@
+@@ -592,6 +600,7 @@
  
  	spm  = (struct pgm_spm *)skb->data;
  	spm6 = (struct pgm_spm6*)skb->data;
@@ -70,7 +70,7 @@
  	const uint32_t spm_sqn = ntohl (spm->spm_sqn);
  
  /* check for advancing sequence number, or first SPM */
-@@ -605,6 +614,7 @@
+@@ -604,6 +613,7 @@
  		source->spm_sqn = spm_sqn;
  
  /* update receive window */
@@ -78,7 +78,7 @@
  		const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl (sock);
  		const unsigned naks = pgm_rxw_update (source->window,
  						      ntohl (spm->spm_lead),
-@@ -627,6 +637,7 @@
+@@ -626,6 +636,7 @@
  			source->last_cumulative_losses = source->window->cumulative_losses;
  			pgm_peer_set_pending (sock, source);
  		}
@@ -86,7 +86,7 @@
  	}
  	else
  	{	/* does not advance SPM sequence number */
-@@ -672,6 +683,7 @@
+@@ -671,6 +682,7 @@
  					return FALSE;
  				}
  
@@ -94,7 +94,7 @@
  				const uint32_t parity_prm_tgs = ntohl (opt_parity_prm->parity_prm_tgs);
  				if (PGM_UNLIKELY(parity_prm_tgs < 2 || parity_prm_tgs > 128))
  				{
-@@ -686,6 +698,7 @@
+@@ -685,6 +697,7 @@
  					source->is_fec_enabled = 1;
  					pgm_rxw_update_fec (source->window, parity_prm_tgs);
  				}
@@ -102,7 +102,7 @@
  			}
  		} while (!(opt_header->opt_type & PGM_OPT_END));
  	}
-@@ -698,6 +711,7 @@
+@@ -697,6 +710,7 @@
  		source->spmr_tstamp = 0;
  	}
  	return TRUE;
@@ -110,7 +110,7 @@
  }
  
  /* Multicast peer-to-peer NAK handling, pretty much the same as a NCF but different direction
-@@ -747,7 +761,10 @@
+@@ -746,7 +760,10 @@
  
  /* NAK_GRP_NLA contains one of our sock receive multicast groups: the sources send multicast group */ 
  	pgm_nla_to_sockaddr ((AF_INET6 == nak_src_nla.ss_family) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
@@ -122,7 +122,7 @@
  	{
  		if (pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&sock->recv_gsr[i].gsr_group) == 0)
  		{
-@@ -755,6 +772,7 @@
+@@ -754,6 +771,7 @@
  			break;
  		}
  	}
@@ -130,7 +130,7 @@
  
  	if (PGM_UNLIKELY(!found_nak_grp)) {
  		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded multicast NAK on multicast group mismatch."));
-@@ -887,6 +905,7 @@
+@@ -886,6 +904,7 @@
  		return FALSE;
  	}
  
@@ -138,7 +138,7 @@
  	const pgm_time_t ncf_rdata_ivl = skb->tstamp + sock->nak_rdata_ivl;
  	const pgm_time_t ncf_rb_ivl    = skb->tstamp + nak_rb_ivl(sock);
  	ncf_status = pgm_rxw_confirm (source->window,
-@@ -965,6 +984,7 @@
+@@ -964,6 +983,7 @@
  		pgm_peer_set_pending (sock, source);
  	}
  	return TRUE;
@@ -146,7 +146,7 @@
  }
  
  /* send SPM-request to a new peer, this packet type has no contents
-@@ -991,6 +1011,7 @@
+@@ -990,6 +1010,7 @@
  	pgm_debug ("send_spmr (sock:%p source:%p)",
  		(const void*)sock, (const void*)source);
  
@@ -154,7 +154,7 @@
  	const size_t tpdu_length = sizeof(struct pgm_header);
  	buf = pgm_alloca (tpdu_length);
  	header = (struct pgm_header*)buf;
-@@ -1005,17 +1026,20 @@
+@@ -1004,17 +1025,20 @@
  	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
  
  /* send multicast SPMR TTL 1 to our peers listening on the same groups */
@@ -178,7 +178,7 @@
  
  /* send unicast SPMR with regular TTL */
  	sent = pgm_sendto (sock,
-@@ -1029,8 +1053,9 @@
+@@ -1028,8 +1052,9 @@
  	if (sent < 0 && PGM_LIKELY(PGM_SOCK_EAGAIN == pgm_get_last_sock_error()))
  		return FALSE;
  
@@ -189,7 +189,7 @@
  }
  
  /* send selective NAK for one sequence number.
-@@ -1213,15 +1238,20 @@
+@@ -1212,15 +1237,20 @@
  	pgm_assert_cmpuint (sqn_list->len, <=, 63);
  
  #ifdef RECEIVER_DEBUG
@@ -211,7 +211,7 @@
  #endif
  
  	tpdu_length = sizeof(struct pgm_header) +
-@@ -1275,8 +1305,11 @@
+@@ -1274,8 +1304,11 @@
  	opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
  	opt_nak_list->opt_reserved = 0;
  
@@ -224,7 +224,7 @@
  
          header->pgm_checksum    = 0;
          header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
-@@ -1324,8 +1357,8 @@
+@@ -1323,8 +1356,8 @@
  	pgm_assert (NULL != source);
  	pgm_assert (sock->use_pgmcc);
  
@@ -235,7 +235,7 @@
  
  	tpdu_length = sizeof(struct pgm_header) +
  			     sizeof(struct pgm_ack) +
-@@ -1370,8 +1403,10 @@
+@@ -1369,8 +1402,10 @@
  	opt_pgmcc_feedback = (struct pgm_opt_pgmcc_feedback*)(opt_header + 1);
  	opt_pgmcc_feedback->opt_reserved = 0;
  
@@ -246,7 +246,7 @@
  	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
  	opt_pgmcc_feedback->opt_loss_rate = htons ((uint16_t)source->window->data_loss);
  
-@@ -1427,9 +1462,12 @@
+@@ -1426,9 +1461,12 @@
  	}
  
  /* have not learned this peers NLA */
@@ -260,7 +260,7 @@
  	     NULL != it;
  	     it = prev)
  	{
-@@ -1456,6 +1494,8 @@
+@@ -1455,6 +1493,8 @@
  			break;
  		}
  	}
@@ -269,7 +269,7 @@
  
  	if (ack_backoff_queue->length == 0)
  	{
-@@ -1524,6 +1564,7 @@
+@@ -1523,6 +1563,7 @@
  	}
  
  /* have not learned this peers NLA */
@@ -277,7 +277,7 @@
  	const bool is_valid_nla = 0 != peer->nla.ss_family;
  
  /* TODO: process BOTH selective and parity NAKs? */
-@@ -1541,7 +1582,9 @@
+@@ -1540,7 +1581,9 @@
  
  /* parity NAK generation */
  
@@ -288,7 +288,7 @@
  		     NULL != it;
  		     it = prev)
  		{
-@@ -1562,6 +1605,7 @@
+@@ -1561,6 +1604,7 @@
  				}
  
  /* TODO: parity nak lists */
@@ -296,7 +296,7 @@
  				const uint32_t tg_sqn = skb->sequence & tg_sqn_mask;
  				if (	(  nak_pkt_cnt && tg_sqn == nak_tg_sqn ) ||
  					( !nak_pkt_cnt && tg_sqn != current_tg_sqn )	)
-@@ -1590,23 +1634,28 @@
+@@ -1589,23 +1633,28 @@
  				{	/* different transmission group */
  					break;
  				}
@@ -327,7 +327,7 @@
  		     NULL != it;
  		     it = prev)
  		{
-@@ -1661,6 +1710,7 @@
+@@ -1660,6 +1709,7 @@
  				break;
  			}
  		}
@@ -335,7 +335,7 @@
  
  		if (sock->can_send_nak && nak_list.len)
  		{
-@@ -1671,6 +1721,7 @@
+@@ -1670,6 +1720,7 @@
  		}
  
  	}
@@ -343,7 +343,7 @@
  
  	if (PGM_UNLIKELY(dropped_invalid))
  	{
-@@ -1732,7 +1783,9 @@
+@@ -1731,7 +1782,9 @@
  	if (!sock->peers_list)
  		return TRUE;
  
@@ -354,7 +354,7 @@
  	     NULL != it;
  	     it = next)
  	{
-@@ -1809,6 +1862,7 @@
+@@ -1808,6 +1861,7 @@
  		}
  
  	}
@@ -362,7 +362,7 @@
  
  /* check for waiting contiguous packets */
  	if (sock->peers_pending && !sock->is_pending_read)
-@@ -1842,7 +1896,9 @@
+@@ -1841,7 +1895,9 @@
  	if (!sock->peers_list)
  		return expiration;
  
@@ -373,7 +373,7 @@
  	     NULL != it;
  	     it = next)
  	{
-@@ -1882,6 +1938,7 @@
+@@ -1881,6 +1937,7 @@
  		}
  
  	}
@@ -381,7 +381,7 @@
  
  	return expiration;
  }
-@@ -1913,14 +1970,18 @@
+@@ -1912,14 +1969,18 @@
  	wait_ncf_queue = &peer->window->wait_ncf_queue;
  
  /* have not learned this peers NLA */
@@ -401,7 +401,7 @@
  		pgm_rxw_state_t* state		= (pgm_rxw_state_t*)&skb->cb;
  
  		prev = it->prev;
-@@ -1958,6 +2019,8 @@
+@@ -1957,6 +2018,8 @@
  				skb->sequence, pgm_to_secsf (state->timer_expiry - now));
  			break;
  		}
@@ -410,7 +410,7 @@
  	}
  
  	if (wait_ncf_queue->length == 0)
-@@ -2017,6 +2080,7 @@
+@@ -2016,6 +2079,7 @@
  	{
  		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Wait ncf queue empty."));
  	}
@@ -418,7 +418,7 @@
  }
  
  /* check WAIT_DATA_STATE, on expiration move back to BACK-OFF_STATE, on exceeding NAK_DATA_RETRIES
-@@ -2046,14 +2110,18 @@
+@@ -2045,14 +2109,18 @@
  	wait_data_queue = &peer->window->wait_data_queue;
  
  /* have not learned this peers NLA */
@@ -438,7 +438,7 @@
  		pgm_rxw_state_t* rdata_state	= (pgm_rxw_state_t*)&rdata_skb->cb;
  
  		prev = it->prev;
-@@ -2089,6 +2157,8 @@
+@@ -2088,6 +2156,8 @@
  			break;
  		}
  		
@@ -447,7 +447,7 @@
  	}
  
  	if (wait_data_queue->length == 0)
-@@ -2126,6 +2196,7 @@
+@@ -2125,6 +2195,7 @@
  	} else {
  		pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Wait data queue empty."));
  	}
@@ -455,7 +455,7 @@
  }
  
  /* ODATA or RDATA packet with any of the following options:
-@@ -2157,11 +2228,13 @@
+@@ -2156,11 +2227,13 @@
  	pgm_debug ("pgm_on_data (sock:%p source:%p skb:%p)",
  		(void*)sock, (void*)source, (void*)skb);
  
@@ -469,7 +469,7 @@
  	const uint_fast16_t opt_total_length = (skb->pgm_header->pgm_options & PGM_OPT_PRESENT) ?
  		ntohs(*(uint16_t*)( (char*)( skb->pgm_data + 1 ) + sizeof(uint16_t))) :
  		0;
-@@ -2178,6 +2251,7 @@
+@@ -2177,6 +2250,7 @@
  		ack_rb_expiry = skb->tstamp + ack_rb_ivl (sock);
  	}
  
@@ -477,7 +477,7 @@
  	const int add_status = pgm_rxw_add (source->window, skb, skb->tstamp, nak_rb_expiry);
  
  /* skb reference is now invalid */
-@@ -2255,6 +2329,9 @@
+@@ -2254,6 +2328,9 @@
  		pgm_timer_unlock (sock);
  	}
  	return TRUE;
@@ -487,7 +487,7 @@
  }
  
  /* POLLs are generated by PGM Parents (Sources or Network Elements).
-@@ -2292,6 +2369,7 @@
+@@ -2291,6 +2368,7 @@
  	memcpy (&poll_rand, (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
  		poll6->poll6_rand :
  		poll4->poll_rand, sizeof(poll_rand));
@@ -495,7 +495,7 @@
  	const uint32_t poll_mask = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
  		ntohl (poll6->poll6_mask) :
  		ntohl (poll4->poll_mask);
-@@ -2307,6 +2385,7 @@
+@@ -2306,6 +2384,7 @@
  /* scoped per path nla
   * TODO: manage list of pollers per peer
   */
@@ -503,7 +503,7 @@
  	const uint32_t poll_sqn   = ntohl (poll4->poll_sqn);
  	const uint16_t poll_round = ntohs (poll4->poll_round);
  
-@@ -2321,6 +2400,7 @@
+@@ -2320,6 +2399,7 @@
  	source->last_poll_sqn   = poll_sqn;
  	source->last_poll_round = poll_round;
  
@@ -511,7 +511,7 @@
  	const uint16_t poll_s_type = ntohs (poll4->poll_s_type);
  
  /* Check poll type */
-@@ -2337,6 +2417,9 @@
+@@ -2336,6 +2416,9 @@
  	}
  
  	return FALSE;

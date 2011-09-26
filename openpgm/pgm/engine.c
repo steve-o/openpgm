@@ -1,16 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * PGM engine environment, i.e. bare minimum to get anything running.
- * - WinSock on Windows,
- * - Thread API to detect #cores,
- * - Logging API for global lock and debug flags,
- * - Memory API for debug flags,
- * - PRNG API for global lock on global generator,
- * - Timing API for calibration, device locking as appropriate,
- * - PGM protocol# resolution,
- * - Lock on global list of PGM sockets.
+ * PGM engine.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,12 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
-
+/* getprotobyname_r */
 #ifndef _BSD_SOURCE
-#	define _BSD_SOURCE	1	/* getprotobyname_r */
+#	define _BSD_SOURCE	1
 #endif
 
 #ifndef _WIN32
@@ -124,8 +113,8 @@ pgm_init (
 		goto err_shutdown;
 	}
 
-/* Find WSARecvMsg API.  Available in Windows XP and Wine 1.3.
- */
+#	ifndef CONFIG_TARGET_WINE
+/* find WSARecvMsg API */
 	if (NULL == pgm_WSARecvMsg) {
 		GUID WSARecvMsg_GUID = WSAID_WSARECVMSG;
 		DWORD cbBytesReturned;
@@ -151,12 +140,13 @@ pgm_init (
 			pgm_set_error (error,
 				       PGM_ERROR_DOMAIN_ENGINE,
 				       PGM_ERROR_FAILED,
-				       _("WSARecvMsg function not found, available in Windows XP or Wine 1.3."));
+				       _("WSARecvMsg function not found."));
 			goto err_shutdown;
 		}
 		pgm_debug ("Retrieved address of WSARecvMsg.");
 		closesocket (sock);
 	}
+#	endif
 #endif /* _WIN32 */
 
 /* find PGM protocol id overriding default value, use first value from NIS */

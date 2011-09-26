@@ -1,8 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Portable fail fast memory allocation.
- *
- * Run with PGM_DEBUG=gc-friendly to appease most memory profilers.
+ * portable fail fast memory allocation.
  *
  * Copyright (c) 2010-2011 Miru Limited.
  *
@@ -21,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>

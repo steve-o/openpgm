@@ -33,9 +33,6 @@
 #else
 #	include "getopt.h"
 #endif
-#ifdef __APPLE__
-#	include <pgm/in.h>
-#endif
 #include <pgm/pgm.hh>
 
 
@@ -295,7 +292,7 @@ on_startup (void)
 	sa_family_t sa_family = AF_UNSPEC;
 
 /* parse network parameter into PGM socket address structure */
-	if (!cpgm::pgm_getaddrinfo (network, NULL, &res, &pgm_err)) {
+	if (!pgm_getaddrinfo (network, NULL, &res, &pgm_err)) {
 		std::cerr << "Parsing network parameter: " << pgm_err->message << std::endl;
 		goto err_abort;
 	}
@@ -375,7 +372,7 @@ on_startup (void)
 	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
 		sock->set_option (IPPROTO_PGM, cpgm::PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
 	sock->set_option (IPPROTO_PGM, cpgm::PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
-	cpgm::pgm_freeaddrinfo (res);
+	pgm_freeaddrinfo (res);
 
 	{
 /* set IP parameters */
