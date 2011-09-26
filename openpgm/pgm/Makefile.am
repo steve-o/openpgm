@@ -80,10 +80,10 @@ libinclude_HEADERS = \
 
 # nb: Solaris make does not understand $<
 version.c: version_generator.py
-	$(AM_V_GEN)$(PYTHON) version_generator.py > $@
+	$(AM_V_GEN)$(PYTHON) $(srcdir)/version_generator.py > $@
 
 galois_tables.c: galois_generator.pl
-	$(AM_V_GEN)$(PERL) galois_generator.pl > $@
+	$(AM_V_GEN)$(PERL) $(srcdir)/galois_generator.pl > $@
 
 libpgm_noinst_la_CFLAGS = \
 	-I$(top_srcdir)/include \

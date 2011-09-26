@@ -905,7 +905,7 @@ pgm_sockaddr_msfilter (
 #	elif defined(IP_MSFILTER) || defined(SIO_SET_MULTICAST_FILTER)
 /* IPv4-only filter API */
 	if (AF_INET == sa_family) {
-		const socklen_t len = IP_MSFILTER_SIZE(gf_list->gr_numsrc);
+		const socklen_t len = IP_MSFILTER_SIZE(gf_list->gf_numsrc);
 		struct ip_msfilter* filter = pgm_alloca (len);
 		struct sockaddr_in sa4;
 		unsigned i;
