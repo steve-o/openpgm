@@ -1,0 +1,13 @@
+#!/bin/sh
+
+G_SLICE=always-malloc \
+G_DEBUG=gc-friendly \
+	valgrind \
+		-v \
+		--tool=memcheck \
+		--leak-check=full \
+		--num-callers=40 \
+		--gen-suppressions=no \
+		--show-reachable=yes \
+		--suppressions=valgrind.supp \
+		$*

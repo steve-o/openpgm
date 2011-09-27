@@ -1,0 +1,77 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+Import('env')
+
+e = env.Clone()
+e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm-snmp"\'');
+
+e.MergeFlags(e['SNMP_FLAGS']);
+
+src = Split("""
+		snmp.c
+		pgmMIB.c
+""")
+
+e.StaticLibrary('libpgmsnmp', src);
+e.StaticSharedLibrary('libpgmsnmp-pic', src);
+
+#-----------------------------------------------------------------------------
+# unit testing
+
+if env['WITH_CHECK'] == 'true':
+	te = e.Clone();
+# add new suffix so we can re-use libpgm objects
+  	te['SHOBJSUFFIX'] = '.snmp' + te['SHOBJSUFFIX'];
+ 	te['OBJSUFFIX']   = '.snmp' + te['OBJSUFFIX'];
+
+	te.MergeFlags(env['GLIB_FLAGS']);
+	te.MergeFlags(env['CHECK_FLAGS']);
+	newCCFLAGS = [];
+	for flag in te['CCFLAGS']:
+		if ("-W" != flag[:2]) and ("-pedantic" != flag[:9]):
+			newCCFLAGS.append(flag);
+	te['CCFLAGS'] = newCCFLAGS;
+# collate
+	tframework = [	te.Object('checksum.c'),
+			te.Object('error.c'),
+			te.Object('galois_tables.c'),
+			te.Object('getifaddrs.c'),
+			te.Object('getnodeaddr.c'),
+			te.Object('hashtable.c'),
+			te.Object('histogram.c'),
+			te.Object('indextoaddr.c'),
+			te.Object('indextoname.c'),
+			te.Object('inet_network.c'),
+			te.Object('list.c'),
+			te.Object('math.c'),
+			te.Object('md5.c'),
+			te.Object('mem.c'),
+			te.Object('messages.c'),
+			te.Object('nametoindex.c'),
+			te.Object('queue.c'),
+			te.Object('rand.c'),
+			te.Object('rate_control.c'),
+			te.Object('reed_solomon.c'),
+			te.Object('slist.c'),
+			te.Object('sockaddr.c'),
+			te.Object('string.c'),
+			te.Object('thread.c'),
+			te.Object('time.c'),
+			te.Object('wsastrerror.c')
+		];
+# snmp
+	te.Program (['snmp_unittest.c',
+# sunpro linking
+			te.Object('skbuff.c')
+		] + tframework);
+	te.Program (['pgmMIB_unittest.c',
+			te.Object('snmp.c'),
+			te.Object('gsi.c'),
+# sunpro linking
+			te.Object('skbuff.c')
+		] + tframework);
+
+
+# end of file
