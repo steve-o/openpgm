@@ -19,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <errno.h>
 #include <impl/i18n.h>
 #include <impl/framework.h>
@@ -59,9 +56,6 @@ _pgm_popcount (
 {
 #if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
 	return __builtin_popcount (n);
-#elif defined(_MSC_VER)
-#	include <intrin.h>
-	return __popcnt (n);
 #else
 /* MIT HAKMEM 169 */
 	const uint32_t t = n - ((n >> 1) & 033333333333)

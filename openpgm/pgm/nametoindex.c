@@ -1,7 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Interface name to interface index function.  Defined as part of RFC2553
- * for IPv6 basic socket extensions.
+ * Windows interface name to interface index function.
  *
  * Copyright (c) 2006-2011 Miru Limited.
  *
@@ -20,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #ifdef _WIN32
 #	include <ws2tcpip.h>
 #	include <iphlpapi.h>
@@ -44,7 +40,7 @@ _pgm_heap_alloc (
 	const size_t	n_bytes
 	)
 {
-#       ifdef USE_HEAPALLOC
+#       ifdef CONFIG_USE_HEAPALLOC
 	return HeapAlloc (GetProcessHeap(), HEAP_GENERATE_EXCEPTIONS, n_bytes);
 #	else
 	return pgm_malloc (n_bytes);
@@ -57,7 +53,7 @@ _pgm_heap_free (
 	void*		mem
 	)
 {
-#       ifdef USE_HEAPALLOC
+#       ifdef CONFIG_USE_HEAPALLOC
 	HeapFree (GetProcessHeap(), 0, mem);
 #	else
 	pgm_free (mem);
@@ -69,8 +65,6 @@ _pgm_heap_free (
  * adapters via GetAdaptersInfo().
  *
  * On error returns zero, no errors are defined.
- *
- * Requires Windows 2000 or Wine 1.0.
  */
 
 static
@@ -150,8 +144,6 @@ _pgm_getadaptersinfo_nametoindex (
  * adapters via GetAdaptersAddresses().
  *
  * On error returns zero, no errors are defined.
- *
- * Requires Windows XP or Wine 1.3.
  */
 
 static
@@ -249,8 +241,9 @@ pgm_if_nametoindex (
 	pgm_return_val_if_fail (NULL != ifname, 0);
 
 #ifndef _WIN32
-/* Vista+ implements if_nametoindex for IPv6 */
 	return if_nametoindex (ifname);
+#elif defined(CONFIG_TARGET_WINE)
+	return _pgm_getadaptersinfo_nametoindex (iffamily, ifname);
 #else
 	return _pgm_getadaptersaddresses_nametoindex (iffamily, ifname);
 #endif

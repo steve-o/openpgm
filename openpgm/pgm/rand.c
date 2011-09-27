@@ -1,7 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Portable weak pseudo-random generator.  Performance is explicitly
- * chosen in preference to randomness.
+ * portable weak pseudo-random generator.
  *
  * Copyright (c) 2010-2011 Miru Limited.
  *
@@ -20,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #ifndef _WIN32
 #	include <errno.h>
 #	include <stdio.h>

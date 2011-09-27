@@ -19,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <errno.h>
 #ifndef _WIN32
 #	include <sys/socket.h>
@@ -31,34 +28,23 @@
 
 
 /* FreeBSD */
-#if !defined( IPV6_ADD_MEMBERSHIP )
-#	if defined( IPV6_JOIN_GROUP )
-#		define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP
-#		define IPV6_DROP_MEMBERSHIP	IPV6_LEAVE_GROUP
-#	else
-#		error "Neither IPV6_ADD_MEMBERSHIP or IPV6_JOIN_GROUP defined."
-#	endif
+#ifndef IPV6_ADD_MEMBERSHIP
+#	define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP
+#	define IPV6_DROP_MEMBERSHIP	IPV6_LEAVE_GROUP
 #endif
 /* OpenSolaris differences */
-#if !defined( _WIN32 ) && !defined( MCAST_MSFILTER )
+#if !defined(_WIN32) && !defined(MCAST_MSFILTER)
 #	include <sys/ioctl.h>
 #endif
-#if !defined( SOL_IP )
-/* IPPROTO_IP is often an enum value whilst SOL_IP is a pre-processor definition */
+#ifndef SOL_IP
 #	define SOL_IP			IPPROTO_IP
 #endif
-#if !defined( SOL_IPV6 )
+#ifndef SOL_IPV6
 #	define SOL_IPV6			IPPROTO_IPV6
 #endif
 #ifndef IP_MAX_MEMBERSHIPS
-/* NB: New platforms may have very high membership limit but not exported for evaluation. */
 #	define IP_MAX_MEMBERSHIPS	20
 #endif
-
-static uint8_t pgm_in_mask2len (const struct in_addr*);
-static uint8_t pgm_in6_mask2len (const struct in6_addr*);
-static void pgm_in_len2mask (const uint8_t, struct in_addr*);
-
 
 PGM_GNUC_INTERNAL
 sa_family_t
@@ -126,89 +112,6 @@ pgm_sockaddr_storage_len (
 	default:	ss_len = 0; break;
 	}
 	return ss_len;
-}
-
-static
-uint8_t
-pgm_in_mask2len (
-	const struct in_addr*	mask
-	)
-{
-	unsigned x, y;
-	const uint8_t* p;
-
-	p = (const uint8_t*)mask;
-	for (x = 0; x < sizeof (*mask); x++) {
-		if (p[x] != 0xff)
-			break;
-	}
-	y = 0;
-	if (x < sizeof (*mask)) {
-		for (y = 0; y < 8; y++) {
-			if ((p[x] & (0x80 >> y)) == 0)
-				break;
-		}
-	}
-	return x * 8 + y;
-}
-
-static
-uint8_t
-pgm_in6_mask2len (
-	const struct in6_addr*	mask
-	)
-{
-	unsigned x, y;
-	const uint8_t* p;
-
-	p = (const uint8_t*)mask;
-	for (x = 0; x < sizeof (*mask); x++) {
-		if (p[x] != 0xff)
-			break;
-	}
-	y = 0;
-	if (x < sizeof (*mask)) {
-		for (y = 0; y < 8; y++) {
-			if ((p[x] & (0x80 >> y)) == 0)
-				break;
-		}
-	}
-	return x * 8 + y;
-}
-
-PGM_GNUC_INTERNAL
-uint8_t
-pgm_sockaddr_prefixlen (
-	const struct sockaddr*	sa
-	)
-{
-	if (AF_INET6 == sa->sa_family) {
-		struct sockaddr_in6 s6;
-		memcpy (&s6, sa, sizeof(s6));
-		return pgm_in6_mask2len (&s6.sin6_addr);
-	} else {
-		struct sockaddr_in s4;
-		memcpy (&s4, sa, sizeof(s4));
-		return pgm_in_mask2len (&s4.sin_addr);
-	}
-}
-
-static
-void
-pgm_in_len2mask (
-	const uint8_t		prefixlen,
-	struct in_addr*		mask
-	)
-{
-	unsigned i;
-	uint8_t* p;
-
-	p = (uint8_t*)mask;
-	memset (mask, sizeof (*mask), 0);
-	for (i = 0; i < prefixlen / 8; i++)
-		p[i] = 0xff;
-	if (prefixlen % 8)
-		p[i] = (0xff00 >> (prefixlen % 8)) & 0xff;
 }
 
 PGM_GNUC_INTERNAL
@@ -496,10 +399,6 @@ pgm_sockaddr_pktinfo (
  * If no error occurs, pgm_sockaddr_router_alert returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_get_last_sock_error().
- *
- * The IP_ROUTER_ALERT option is not applicable here despite the name, it is
- * for signaling a locally running router and does not alter the IP header of
- * transmitted packets.
  */
 
 PGM_GNUC_INTERNAL
@@ -511,8 +410,28 @@ pgm_sockaddr_router_alert (
 	)
 {
 	int retval = SOCKET_ERROR;
+#ifdef CONFIG_IP_ROUTER_ALERT
+/* Linux:ip(7) "A boolean integer flag is zero when it is false, otherwise
+ * true.  Expects an integer flag."
+ * Linux:ipv6(7) "Argument is a pointer to an integer."
+ *
+ * Sent on special queue to rsvpd on Linux and so best avoided.
+ */
+	const int optval = v ? 1 : 0;
 
-#if defined( HAVE_STRUCT_IPOPTION )
+	switch (sa_family) {
+	case AF_INET:
+		retval = setsockopt (s, IPPROTO_IP, IP_ROUTER_ALERT, (const char*)&optval, sizeof (optval));
+		break;
+
+	case AF_INET6:
+		retval = setsockopt (s, IPPROTO_IPV6, IPV6_ROUTER_ALERT, (const char*)&optval, sizeof (optval));
+		break;
+
+	default: break;
+	}
+#else
+#	if defined(CONFIG_HAVE_IPOPTION)
 /* NB: struct ipoption is not very portable and requires a lot of additional headers.
  */
 	const struct ipoption router_alert = {
@@ -520,17 +439,17 @@ pgm_sockaddr_router_alert (
 		.ipopt_list = { PGM_IPOPT_RA, 0x04, 0x00, 0x00 }
 	};
 	const int optlen = v ? sizeof (router_alert) : 0;
-#else
+#	else
 /* manually set the IP option */
-#	ifndef _WIN32
+#		ifndef _WIN32
 	const int ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
 	const int router_alert = htonl (ipopt_ra);
-#	else
+#		else
 	const DWORD ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
 	const DWORD router_alert = htonl (ipopt_ra);
-#	endif
+#		endif
 	const int optlen = v ? sizeof (router_alert) : 0;
-#endif
+#	endif
 
 	switch (sa_family) {
 	case AF_INET:
@@ -543,6 +462,7 @@ pgm_sockaddr_router_alert (
 
 	default: break;
 	}
+#endif
 	return retval;
 }
 
@@ -612,7 +532,7 @@ pgm_sockaddr_join_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
+#ifdef CONFIG_HAVE_MCAST_JOIN
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."  Presumably with source field zeroed out.
  * Solaris:ip6(7P) "Takes a struct group_req as the parameter."
@@ -626,12 +546,9 @@ pgm_sockaddr_join_group (
  * Stevens: "MCAST_JOIN_GROUP has datatype group_req{}."
  *
  * RFC3678: Argument type struct group_req
- *
- * Note that not all platforms with MCAST_JOIN_GROUP defined actually support the
- * socket option, such that testing is deferred to Autoconf.
  */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	retval = setsockopt (s, recv_level, MCAST_JOIN_GROUP, (const char*)gr, sizeof(struct group_req));
+	retval = setsockopt (s, recv_level, MCAST_JOIN_GROUP, gr, sizeof(struct group_req));
 #else
 	switch (sa_family) {
 	case AF_INET: {
@@ -650,7 +567,7 @@ pgm_sockaddr_join_group (
  *
  * RFC3678: Argument type struct ip_mreq
  */
-#	ifdef HAVE_STRUCT_IP_MREQN
+#ifdef CONFIG_HAVE_IP_MREQN
 		struct ip_mreqn mreqn;
 		struct sockaddr_in ifaddr;
 		memset (&mreqn, 0, sizeof(mreqn));
@@ -660,7 +577,7 @@ pgm_sockaddr_join_group (
 		mreqn.imr_address.s_addr = ifaddr.sin_addr.s_addr;
 		mreqn.imr_ifindex = gr->gr_interface;
 		retval = setsockopt (s, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreqn, sizeof(mreqn));
-#	else
+#else
 		struct ip_mreq mreq;
 		struct sockaddr_in ifaddr;
 		memset (&mreq, 0, sizeof(mreq));
@@ -669,7 +586,7 @@ pgm_sockaddr_join_group (
 			return -1;
 		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
 		retval = setsockopt (s, SOL_IP, IP_ADD_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
-#	endif /* !HAVE_STRUCT_IP_MREQN */
+#endif /* !CONFIG_HAVE_IP_MREQN */
 		break;
 	}
 
@@ -694,7 +611,7 @@ pgm_sockaddr_join_group (
 
 	default: break;
 	}
-#endif /* HAVE_STRUCT_GROUP_REQ */
+#endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
 
@@ -710,13 +627,13 @@ pgm_sockaddr_leave_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	retval = setsockopt (s, recv_level, MCAST_LEAVE_GROUP, (const char*)gr, sizeof(struct group_req));
+	retval = setsockopt (s, recv_level, MCAST_LEAVE_GROUP, gr, sizeof(struct group_req));
 #else
 	switch (sa_family) {
 	case AF_INET: {
-#	ifdef HAVE_STRUCT_IP_MREQN
+#ifdef CONFIG_HAVE_IP_MREQN
 		struct ip_mreqn mreqn;
 		struct sockaddr_in ifaddr;
 		memset (&mreqn, 0, sizeof(mreqn));
@@ -726,7 +643,7 @@ pgm_sockaddr_leave_group (
 		mreqn.imr_address.s_addr = ifaddr.sin_addr.s_addr;
 		mreqn.imr_ifindex = gr->gr_interface;
 		retval = setsockopt (s, SOL_IP, IP_DROP_MEMBERSHIP, (const char*)&mreqn, sizeof(mreqn));
-#	else
+#else
 		struct ip_mreq mreq;
 		struct sockaddr_in ifaddr;
 		memset (&mreq, 0, sizeof(mreq));
@@ -735,7 +652,7 @@ pgm_sockaddr_leave_group (
 			return -1;
 		mreq.imr_interface.s_addr = ifaddr.sin_addr.s_addr;
 		retval = setsockopt (s, SOL_IP, IP_DROP_MEMBERSHIP, (const char*)&mreq, sizeof(mreq));
-#	endif /* !HAVE_STRUCT_IP_MREQN */
+#endif /* !CONFIG_HAVE_IP_MREQN */
 		break;
 	}
 
@@ -750,7 +667,7 @@ pgm_sockaddr_leave_group (
 
 	default: break;
 	}
-#endif /* HAVE_STRUCT_GROUP_REQ */
+#endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
 
@@ -766,10 +683,10 @@ pgm_sockaddr_block_source (
 	)
 {
 	int retval = SOCKET_ERROR;
-#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	retval = setsockopt (s, recv_level, MCAST_BLOCK_SOURCE, (const char*)gsr, sizeof(struct group_source_req));
-#elif defined( IP_BLOCK_SOURCE )
+	retval = setsockopt (s, recv_level, MCAST_BLOCK_SOURCE, gsr, sizeof(struct group_source_req));
+#elif defined(IP_BLOCK_SOURCE)
 	switch (sa_family) {
 	case AF_INET: {
 		struct ip_mreq_source mreqs;
@@ -791,11 +708,11 @@ pgm_sockaddr_block_source (
 	default: break;
 	}
 #else
-/* unused parameters, operation not supported on this platform. */
+/* unused parameters */
 	(void)s;
 	(void)sa_family;
 	(void)gsr;
-#endif /* HAVE_STRUCT_GROUP_REQ */
+#endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
 
@@ -811,10 +728,10 @@ pgm_sockaddr_unblock_source (
 	)
 {
 	int retval = SOCKET_ERROR;
-#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	retval = setsockopt (s, recv_level, MCAST_UNBLOCK_SOURCE, (const char*)gsr, sizeof(struct group_source_req));
-#elif defined( IP_UNBLOCK_SOURCE )
+	retval = setsockopt (s, recv_level, MCAST_UNBLOCK_SOURCE, gsr, sizeof(struct group_source_req));
+#elif defined(IP_UNBLOCK_SOURCE)
 	switch (sa_family) {
 	case AF_INET: {
 		struct ip_mreq_source mreqs;
@@ -840,7 +757,7 @@ pgm_sockaddr_unblock_source (
 	(void)s;
 	(void)sa_family;
 	(void)gsr;
-#endif /* HAVE_STRUCT_GROUP_REQ */
+#endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
 
@@ -861,7 +778,7 @@ pgm_sockaddr_join_source_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
+#ifdef CONFIG_HAVE_MCAST_JOIN
 /* Solaris:ip(7P) "The following options take a struct ip_mreq_source as the
  * parameter."
  * Solaris:ip6(7P) "Takes a struct group_source_req as the parameter."
@@ -877,8 +794,8 @@ pgm_sockaddr_join_source_group (
  * RFC3678: Argument type struct group_source_req
  */
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	retval = setsockopt (s, recv_level, MCAST_JOIN_SOURCE_GROUP, (const char*)gsr, sizeof(struct group_source_req));
-#elif defined( IP_ADD_SOURCE_MEMBERSHIP )
+	retval = setsockopt (s, recv_level, MCAST_JOIN_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
+#elif defined(IP_ADD_SOURCE_MEMBERSHIP)
 	switch (sa_family) {
 	case AF_INET: {
 /* Solaris:ip(7P) "The following options take a struct ip_mreq as the
@@ -915,7 +832,7 @@ pgm_sockaddr_join_source_group (
 	}
 #else
 	retval = pgm_sockaddr_join_group (s, sa_family, (const struct group_req*)gsr);	
-#endif /* HAVE_STRUCT_GROUP_REQ */
+#endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
 
@@ -931,10 +848,10 @@ pgm_sockaddr_leave_source_group (
 	)
 {
 	int retval = SOCKET_ERROR;
-#if defined( HAVE_STRUCT_GROUP_REQ ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
+#ifdef CONFIG_HAVE_MCAST_JOIN
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
-	retval = setsockopt (s, recv_level, MCAST_LEAVE_SOURCE_GROUP, (const char*)gsr, sizeof(struct group_source_req));
-#elif defined( IP_ADD_SOURCE_MEMBERSHIP )
+	retval = setsockopt (s, recv_level, MCAST_LEAVE_SOURCE_GROUP, gsr, sizeof(struct group_source_req));
+#elif defined(IP_ADD_SOURCE_MEMBERSHIP)
 	switch (sa_family) {
 	case AF_INET: {
 		struct ip_mreq_source mreqs;
@@ -958,10 +875,11 @@ pgm_sockaddr_leave_source_group (
 	}
 #else
 	retval = pgm_sockaddr_leave_group (s, sa_family, (const struct group_req*)gsr);	
-#endif /* HAVE_STRUCT_GROUP_REQ */
+#endif /* CONFIG_HAVE_MCAST_JOIN */
 	return retval;
 }
 
+#if defined(MCAST_MSFILTER) || defined(SIOCSMSFILTER)
 /* Batch block and unblock sources.
  */
 
@@ -974,24 +892,18 @@ pgm_sockaddr_msfilter (
 	)
 {
 	int retval = SOCKET_ERROR;
-#if defined( MCAST_MSFILTER )
-/* Linux 2.6 API pre-empting RFC3678 naming scheme */
+#	ifdef MCAST_MSFILTER
 	const int recv_level = (AF_INET == sa_family) ? SOL_IP : SOL_IPV6;
 	const socklen_t len = GROUP_FILTER_SIZE(gf_list->gf_numsrc);
 	retval = setsockopt (s, recv_level, MCAST_MSFILTER, (const char*)gf_list, len);
-#elif defined( _WIN32 ) && ( _WIN32_WINNT >= 0x600 )
-/* Windows Server 2008+, note MSDN(GROUP_FILTER Structure) does not list
- * desktop support.  This contrasts to MSDN(Final-State-Based Multicast Programming)
- * which does list support for Vista+.
- *
- * RFC3678 API for struct group_filter.
- */
+#	elif defined(SIOCSMSFILTER)
+/* Windows Vista and later */
 	const socklen_t len = GROUP_FILTER_SIZE(gf_list->gf_numsrc);
 	u_long* filter = pgm_alloca (len);
 	memcpy (filter, gf_list, len);
 	retval = ioctlsocket (s, SIOCSMSFILTER, filter);
-#elif defined( HAVE_STRUCT_IP_MSFILTER )
-/* IPv4-only filter API alternative */
+#	elif defined(IP_MSFILTER) || defined(SIO_SET_MULTICAST_FILTER)
+/* IPv4-only filter API */
 	if (AF_INET == sa_family) {
 		const socklen_t len = IP_MSFILTER_SIZE(gf_list->gf_numsrc);
 		struct ip_msfilter* filter = pgm_alloca (len);
@@ -1007,22 +919,16 @@ pgm_sockaddr_msfilter (
 			memcpy (&sa4, &gf_list->gf_slist[i], sizeof (sa4));
 			filter->imsf_slist[i].s_addr = sa4.sin_addr.s_addr;
 		}
-#	if defined( SIO_SET_MULTICAST_FILTER )
-/* Windows XP */
+#		ifdef IP_MSFILTER
+		retval = ioctlsocket (s, IP_MSFILTER, (char*)filter);
+#		else
 		retval = ioctlsocket (s, SIO_SET_MULTICAST_FILTER, (u_long*)filter);
-#	elif defined( SIOCSIPMSFILTER )
-/* RFC3678 API for struct ip_msfilter */
-		retval = ioctlsocket (s, SIOCSIPMSFILTER, (const char*)filter);
-#	elif defined( IP_MSFILTER )
-/* NB: Windows SDK for Vista+ defines a typedef IP_MSFILTER */
-		retval = ioctlsocket (s, IP_MSFILTER, (const char*)filter);
-#	else
-/* Cygwin has no socket option defined */
-#	endif
+#		endif
 	}
-#endif
+#	endif
 	return retval;
 }
+#endif /* MCAST_MSFILTER || SIOCSMSFILTER */
 
 /* Specify outgoing interface.
  *
@@ -1166,8 +1072,6 @@ pgm_sockaddr_multicast_loop (
  * If no error occurs, pgm_sockaddr_multicast_hops returns zero.  Otherwise, a
  * value of SOCKET_ERROR is returned, and a specific error code can be
  * retrieved by calling pgm_get_last_sock_error().
- *
- * Requires Wine 1.3, supported in Windows 9x/Me.
  */
 
 PGM_GNUC_INTERNAL

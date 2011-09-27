@@ -2,7 +2,7 @@
  *
  * PGM checksum routines
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <impl/framework.h>
 
 
@@ -826,15 +823,15 @@ do_csum (
 	uint32_t	csum
 	)
 {
-#if   defined( USE_8BIT_CHECKSUM )
+#if defined(CONFIG_8BIT_CHECKSUM)
 	return do_csum_8bit (addr, len, csum);
-#elif defined( USE_16BIT_CHECKSUM )
+#elif defined(CONFIG_16BIT_CHECKSUM)
 	return do_csum_16bit (addr, len, csum);
-#elif defined( USE_32BIT_CHECKSUM )
+#elif defined(CONFIG_32BIT_CHECKSUM)
 	return do_csum_32bit (addr, len, csum);
-#elif defined( USE_64BIT_CHECKSUM )
+#elif defined(CONFIG_64BIT_CHECKSUM)
 	return do_csum_64bit (addr, len, csum);
-#elif defined( USE_VECTOR_CHECKSUM )
+#elif defined(CONFIG_VECTOR_CHECKSUM)
 	return do_csum_vector (addr, len, csum);
 #else
 #	error "checksum routine undefined"
@@ -899,15 +896,15 @@ pgm_compat_csum_partial_copy (
 	memcpy (dst, src, len);
 	return pgm_csum_partial (dst, len, csum);
 #else
-#	if   defined( USE_8BIT_CHECKSUM )
+#	if   defined(CONFIG_8BIT_CHECKSUM)
 	return do_csumcpy_8bit (src, dst, len, csum);
-#	elif defined( USE_16BIT_CHECKSUM )
+#	elif defined(CONFIG_16BIT_CHECKSUM)
 	return do_csumcpy_16bit (src, dst, len, csum);
-#	elif defined( USE_32BIT_CHECKSUM )
+#	elif defined(CONFIG_32BIT_CHECKSUM)
 	return do_csumcpy_32bit (src, dst, len, csum);
-#	elif defined( USE_64BIT_CHECKSUM )
+#	elif defined(CONFIG_64BIT_CHECKSUM)
 	return do_csumcpy_64bit (src, dst, len, csum);
-#	elif defined( USE_VECTOR_CHECKSUM )
+#	elif defined(CONFIG_VECTOR_CHECKSUM)
 	return do_csumcpy_vector (src, dst, len, csum);
 #	else
 	memcpy (dst, src, len);

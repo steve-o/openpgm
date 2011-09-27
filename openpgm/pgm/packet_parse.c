@@ -19,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
 #include <impl/packet_parse.h>
@@ -155,7 +152,7 @@ pgm_parse_raw (
 		return FALSE;
 	}
 
-#ifndef HAVE_HOST_ORDER_IP_LEN
+#ifndef CONFIG_HOST_ORDER_IP_LEN
 	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
 #else
 	size_t packet_length = ip->ip_len;		/* total packet length */
@@ -196,7 +193,7 @@ pgm_parse_raw (
 #endif
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
-#ifndef HAVE_HOST_ORDER_IP_OFF
+#ifndef CONFIG_HOST_ORDER_IP_OFF
 	const uint16_t offset = ntohs (ip->ip_off);
 #else
 	const uint16_t offset = ip->ip_off;

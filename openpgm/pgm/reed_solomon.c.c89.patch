@@ -1,25 +1,25 @@
---- reed_solomon.c	2011-06-25 22:34:24.000000000 +0800
-+++ reed_solomon.c89.c	2011-06-26 08:39:57.000000000 +0800
-@@ -49,6 +49,7 @@
+--- reed_solomon.c	2011-03-23 14:18:08.000000000 +0800
++++ reed_solomon.c89.c	2011-03-23 14:18:30.000000000 +0800
+@@ -48,6 +48,7 @@
  		return;
  
- #ifdef USE_GALOIS_MUL_LUT
+ #ifdef CONFIG_GALOIS_MUL_LUT
 +	{
          const pgm_gf8_t* gfmul_b = &pgm_gftable[ (uint16_t)b << 8 ];
  #endif
  
-@@ -91,6 +92,10 @@
+@@ -90,6 +91,10 @@
  #endif
  		i++;
  	}
 +
-+#ifdef USE_GALOIS_MUL_LUT
++#ifdef CONFIG_GALOIS_MUL_LUT
 +	}
 +#endif
  }
  
  /* Basic matrix multiplication.
-@@ -112,19 +117,28 @@
+@@ -111,19 +116,28 @@
  	const uint16_t		  p
  	)
  {
@@ -51,7 +51,7 @@
  	}
  }
  
-@@ -145,15 +159,16 @@
+@@ -144,15 +158,16 @@
  	const uint8_t		n
  	)
  {
@@ -74,7 +74,7 @@
  	{
  		uint_fast8_t row = 0, col = 0;
  
-@@ -164,11 +179,15 @@
+@@ -163,11 +178,15 @@
  		}
  		else
  		{
@@ -92,7 +92,7 @@
  				{
  					if (!pivots[ x ] && M[ (j * n) + x ])
  					{
-@@ -177,6 +196,8 @@
+@@ -176,6 +195,8 @@
  						goto found;
  					}
  				}
@@ -101,7 +101,7 @@
  			}
  		}
  
-@@ -186,12 +207,15 @@
+@@ -185,12 +206,15 @@
  /* pivot */
  		if (row != col)
  		{
@@ -118,7 +118,7 @@
  		}
  
  /* save location */
-@@ -204,44 +228,59 @@
+@@ -203,44 +227,59 @@
  			const pgm_gf8_t c = M[ (col * n) + col ];
  			                    M[ (col * n) + col ] = 1;
  
@@ -182,7 +182,7 @@
  }
  
  /* Gauss–Jordan elimination optimised for Vandermonde matrices
-@@ -279,49 +318,73 @@
+@@ -278,49 +317,73 @@
   * 1: Work out coefficients.
   */
  
@@ -265,12 +265,12 @@
  	}
  }
  
-@@ -361,23 +424,31 @@
+@@ -360,23 +423,31 @@
   *
   * Be careful, Harry!
   */
 +	{
- #ifdef USE_MALLOC_MATRIX
+ #ifdef CONFIG_PREFER_MALLOC
  	pgm_gf8_t* V = pgm_new0 (pgm_gf8_t, n * k);
  #else
  	pgm_gf8_t* V = pgm_newa (pgm_gf8_t, n * k);
@@ -299,7 +299,7 @@
  	}
  
  /* This generator matrix would create a Maximum Distance Separable (MDS)
-@@ -388,6 +459,7 @@
+@@ -387,6 +458,7 @@
   *
   * 1: matrix V_{k,k} formed by the first k columns of V_{k,n}
   */
@@ -307,7 +307,7 @@
  	pgm_gf8_t* V_kk = V;
  	pgm_gf8_t* V_kn = V + (k * k);
  
-@@ -405,10 +477,16 @@
+@@ -404,10 +476,16 @@
  
  /* 4: set identity matrix for original data
   */
@@ -325,7 +325,7 @@
  }
  
  PGM_GNUC_INTERNAL
-@@ -451,11 +529,14 @@
+@@ -450,11 +528,14 @@
  	pgm_assert (len > 0);
  
  	memset (dst, 0, len);
@@ -341,7 +341,7 @@
  }
  
  /* original data block of packets with missing packet entries replaced
-@@ -478,7 +559,9 @@
+@@ -477,7 +558,9 @@
  
  /* create new recovery matrix from generator
   */
@@ -352,7 +352,7 @@
  	{
  		if (offsets[i] < rs->k) {
  			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
-@@ -487,34 +570,46 @@
+@@ -486,34 +569,46 @@
  		}
  		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
  	}
@@ -375,7 +375,7 @@
  			continue;
  
 +		{
- #ifdef USE_MALLOC_MATRIX
+ #ifdef CONFIG_PREFER_MALLOC
  		pgm_gf8_t* erasure = repairs[ j ] = pgm_malloc0 (len);
  #else
  		pgm_gf8_t* erasure = repairs[ j ] = pgm_alloca (len);
@@ -403,7 +403,7 @@
  	{
  		if (offsets[ j ] < rs->k)
  			continue;
-@@ -524,6 +619,8 @@
+@@ -523,6 +618,8 @@
  		pgm_free (repairs[ j ]);
  #endif
  	}
@@ -412,7 +412,7 @@
  }
  
  /* entire FEC block of original data and parity packets.
-@@ -547,7 +644,9 @@
+@@ -546,7 +643,9 @@
  
  /* create new recovery matrix from generator
   */
@@ -423,7 +423,7 @@
  	{
  		if (offsets[i] < rs->k) {
  			memset (&rs->RM[ i * rs->k ], 0, rs->k * sizeof(pgm_gf8_t));
-@@ -556,28 +655,39 @@
+@@ -555,28 +654,39 @@
  		}
  		memcpy (&rs->RM[ i * rs->k ], &rs->GM[ offsets[ i ] * rs->k ], rs->k * sizeof(pgm_gf8_t));
  	}

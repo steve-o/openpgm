@@ -19,17 +19,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
+#if defined(CONFIG_HAVE_VASPRINTF) && !defined(_GNU_SOURCE)
+#	define _GNU_SOURCE
 #endif
-
-#if ( defined( HAVE_VASPRINTF ) || defined( HAVE_STPCPY ) ) && !defined( _GNU_SOURCE )
-#	define _GNU_SOURCE	/* vasprintf, stpcpy */
-#endif
-
 #include <limits.h>
 #include <stdarg.h>
-#include <stdio.h>
+#include <stdio.h>	/* _GNU_SOURCE for vasprintf */
 #include <string.h>
 #include <impl/framework.h>
 
@@ -70,7 +65,6 @@ pgm_printf_string_upper_bound (
 	va_list		args
 	)
 {
-/* MinGW family supports vsnprintf and so limit platform separation to MSVC. */
 #ifdef _MSC_VER
 	return _vscprintf (format, args) + 1;
 #else
@@ -94,7 +88,7 @@ pgm_vasprintf (
 
 	pgm_return_val_if_fail (string != NULL, -1);
 
-#ifdef HAVE_VASPRINTF
+#ifdef CONFIG_HAVE_VASPRINTF
 	char *strp;
 	len = vasprintf (&strp, format, args);
 	if (len < 0) {
@@ -111,9 +105,9 @@ pgm_vasprintf (
 	va_list args2;
 	va_copy (args2, args);
 #	endif
-	len = pgm_printf_string_upper_bound (format, args);
-	*string = pgm_malloc (len);
-	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
+	*string = pgm_malloc (pgm_printf_string_upper_bound (format, args));
+/* NB: must be able to handle NULL args, fails on GCC */
+	len = vsprintf (*string, format, args2);
 	va_end (args2);
 #endif
 	return len;
@@ -142,7 +136,7 @@ pgm_stpcpy (
 	pgm_return_val_if_fail (dest != NULL, NULL);
 	pgm_return_val_if_fail (src != NULL, NULL);
 
-#ifdef HAVE_STPCPY
+#ifdef CONFIG_HAVE_STPCPY
 	return stpcpy (dest, src);
 #else
 	char		*d = dest;

@@ -60,7 +60,7 @@
 #	define SHUT_WR		SD_SEND
 #endif
 
-#ifdef HAVE_SPRINTF_GROUPING
+#ifdef CONFIG_HAVE_SPRINTF_GROUPING
 #	define GROUP_FORMAT			"'"
 #else
 #	define GROUP_FORMAT			""
@@ -135,7 +135,7 @@ static struct {
 	{ "/",			index_callback },
 	{ "/interfaces",	interfaces_callback },
 	{ "/transports",	transports_callback }
-#ifdef USE_HISTOGRAMS
+#ifdef CONFIG_HISTOGRAMS
        ,{ "/histograms",	histograms_callback }
 #endif
 };
@@ -826,7 +826,7 @@ http_create_response (
 						"<a href=\"/\"><span class=\"tab\" id=\"tab%s\">General Information</span></a>"
 						"<a href=\"/interfaces\"><span class=\"tab\" id=\"tab%s\">Interfaces</span></a>"
 						"<a href=\"/transports\"><span class=\"tab\" id=\"tab%s\">Transports</span></a>"
-#ifdef USE_HISTOGRAMS
+#ifdef CONFIG_HISTOGRAMS
 						"<a href=\"/histograms\"><span class=\"tab\" id=\"tab%s\">Histograms</span></a>"
 #endif
 						"<div id=\"tabline\"></div>"
@@ -840,7 +840,7 @@ http_create_response (
 				tab == HTTP_TAB_GENERAL_INFORMATION ? "top" : "bottom",
 				tab == HTTP_TAB_INTERFACES ? "top" : "bottom",
 				tab == HTTP_TAB_TRANSPORTS ? "top" : "bottom"
-#ifdef USE_HISTOGRAMS
+#ifdef CONFIG_HISTOGRAMS
 			       ,tab == HTTP_TAB_HISTOGRAMS ? "top" : "bottom"
 #endif
 	);

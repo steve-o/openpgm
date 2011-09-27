@@ -1,6 +1,6 @@
---- mem.c	2011-06-26 03:23:33.000000000 +0800
-+++ mem.c89.c	2011-06-26 07:19:50.000000000 +0800
-@@ -82,16 +82,24 @@
+--- mem.c	2011-03-29 20:36:18.000000000 +0800
++++ mem.c89.c	2011-03-29 20:36:24.000000000 +0800
+@@ -79,16 +79,24 @@
  	if (NULL == string)
  		return result;
  
@@ -27,7 +27,7 @@
  		fprintf (stderr, "\n");
  	}
  	else
-@@ -100,14 +108,18 @@
+@@ -97,14 +105,18 @@
  			const char* q = strpbrk (string, ":;, \t");
  			if (!q)
  				q = string + strlen (string);
@@ -47,7 +47,7 @@
  	return result;
  }
  
-@@ -125,11 +137,13 @@
+@@ -122,11 +134,13 @@
  	if (pgm_atomic_exchange_and_add32 (&mem_ref_count, 1) > 0)
  		return;
  
@@ -61,7 +61,7 @@
  
  	if (flags & 1)
  		pgm_mem_gc_friendly = TRUE;
-@@ -162,11 +176,11 @@
+@@ -159,11 +173,11 @@
  #ifdef __GNUC__
  		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
@@ -75,7 +75,7 @@
  #endif
  		abort ();
  	}
-@@ -185,11 +199,11 @@
+@@ -182,11 +196,11 @@
  #ifdef __GNUC__
  		pgm_fatal ("file %s: line %d (%s): overflow allocating %" PRIzu "*%" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
@@ -89,7 +89,7 @@
  #endif
  	}
  	return pgm_malloc (n_blocks * block_bytes);
-@@ -209,11 +223,11 @@
+@@ -206,11 +220,11 @@
  #ifdef __GNUC__
  		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,
@@ -103,7 +103,7 @@
  #endif
  		abort ();
  	}
-@@ -235,11 +249,11 @@
+@@ -232,11 +246,11 @@
  #ifdef __GNUC__
  		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu "*%" PRIzu " bytes",
  			__FILE__, __LINE__, __PRETTY_FUNCTION__,

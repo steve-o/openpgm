@@ -53,8 +53,8 @@ libpgm_noinst_la_SOURCES = \
 	histogram.c \
 	version.c
 
-share_includedir = $(includedir)/pgm-@RELEASE_INFO@/pgm
-share_include_HEADERS = \
+libincludedir = $(includedir)/pgm-@RELEASE_INFO@/pgm
+libinclude_HEADERS = \
 	include/pgm/atomic.h \
 	include/pgm/engine.h \
 	include/pgm/error.h \
@@ -87,8 +87,8 @@ galois_tables.c: galois_generator.pl
 
 libpgm_noinst_la_CFLAGS = \
 	-I$(top_srcdir)/include \
-	-DUSE_16BIT_CHECKSUM \
-	-DUSE_GALOIS_MUL_LUT \
+	-DCONFIG_16BIT_CHECKSUM \
+	-DCONFIG_GALOIS_MUL_LUT \
 	-DGETTEXT_PACKAGE='"pgm"'
 
 lib_LTLIBRARIES   = libpgm.la

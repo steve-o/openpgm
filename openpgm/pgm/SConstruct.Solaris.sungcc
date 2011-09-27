@@ -154,7 +154,6 @@ env = Environment(
 # multicast
 			'-DCONFIG_HAVE_MCAST_JOIN',
 #			'-DCONFIG_HAVE_IP_MREQN',
-			'-DCONFIG_HAVE_IP_MSFILTER',
 # sprintf
 #			'-DCONFIG_HAVE_SPRINTF_GROUPING',
 #			'-DCONFIG_HAVE_VASPRINTF',
@@ -171,6 +170,8 @@ env = Environment(
 			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
 			'-DCONFIG_GALOIS_MUL_LUT',
+# Wine limited API support
+#			'-DCONFIG_TARGET_WINE',
 # GNU getopt
 			'-DCONFIG_HAVE_GETOPT'
 		 ],

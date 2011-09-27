@@ -19,11 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <errno.h>
-#ifdef HAVE_POLL
+#ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
 #ifndef _WIN32
@@ -116,7 +113,7 @@ pgm_sendto_hops (
 		 		 save_errno != PGM_SOCK_EHOSTUNREACH &&	/* No route to host */
 		    		 save_errno != PGM_SOCK_EAGAIN))	/* would block on non-blocking send */
 		{
-#ifdef HAVE_POLL
+#ifdef CONFIG_HAVE_POLL
 /* poll for cleared socket */
 			struct pollfd p = {
 				.fd		= send_sock,
@@ -138,7 +135,7 @@ pgm_sendto_hops (
 				.tv_usec = 500 /* ms */ * 1000
 			};
 			const int ready = select (n_fds, NULL, &writefds, NULL, &tv);
-#endif /* HAVE_POLL */
+#endif /* CONFIG_HAVE_POLL */
 			if (ready > 0)
 			{
 				sent = sendto (send_sock, buf, len, 0, to, (socklen_t)tolen);

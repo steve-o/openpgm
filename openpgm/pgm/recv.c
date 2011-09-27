@@ -2,7 +2,7 @@
  *
  * Transport recv API.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,10 +18,6 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 
 #ifndef _GNU_SOURCE
 #	define _GNU_SOURCE
@@ -64,7 +60,7 @@
 #	define PGM_CMSG_LEN(len)		WSA_CMSG_LEN(len)
 #endif
 
-#ifdef HAVE_WSACMSGHDR
+#ifdef CONFIG_HAVE_WSACMSGHDR
 #	ifdef __GNU__
 /* as listed in MSDN */
 #		define pgm_cmsghdr			wsacmsghdr
@@ -107,12 +103,18 @@ recvskb (
 	if (PGM_UNLIKELY(sock->is_destroyed))
 		return 0;
 
+#ifdef CONFIG_TARGET_WINE
+	socklen_t fromlen = src_addrlen;
+	const ssize_t len = recvfrom (sock->recv_sock, skb->head, sock->max_tpdu, 0, src_addr, &fromlen);
+	if (len <= 0)
+		return len;
+#else
 	struct pgm_iovec iov = {
 		.iov_base	= skb->head,
 		.iov_len	= sock->max_tpdu
 	};
 	char aux[ 1024 ];
-#ifndef _WIN32
+#	ifndef _WIN32
 	struct msghdr msg = {
 		.msg_name	= src_addr,
 		.msg_namelen	= src_addrlen,
@@ -125,7 +127,7 @@ recvskb (
 	ssize_t len = recvmsg (sock->recv_sock, &msg, flags);
 	if (len <= 0)
 		return len;
-#else /* !_WIN32 */
+#	else /* !_WIN32 */
 	WSAMSG msg = {
 		.name		= (LPSOCKADDR)src_addr,
 		.namelen	= src_addrlen,
@@ -139,7 +141,8 @@ recvskb (
 	if (SOCKET_ERROR == pgm_WSARecvMsg (sock->recv_sock, &msg, &len, NULL, NULL)) {
 		return SOCKET_ERROR;
 	}
-#endif /* !_WIN32 */
+#	endif /* !_WIN32 */
+#endif /* !CONFIG_TARGET_WINE */
 
 #ifdef PGM_DEBUG
 	if (PGM_UNLIKELY(pgm_loss_rate > 0)) {
@@ -159,6 +162,10 @@ recvskb (
 	skb->zero_padded	= 0;
 	skb->tail		= (char*)skb->data + len;
 
+#ifdef CONFIG_TARGET_WINE
+	pgm_assert (pgm_sockaddr_len (&sock->recv_gsr[0].gsr_group) <= dst_addrlen);
+	memcpy (dst_addr, &sock->recv_gsr[0].gsr_group, pgm_sockaddr_len (&sock->recv_gsr[0].gsr_group));
+#else
 	if (sock->udp_encap_ucast_port ||
 	    AF_INET6 == pgm_sockaddr_family (src_addr))
 	{
@@ -233,6 +240,7 @@ recvskb (
 			}
 		}
 	}
+#endif
 	return len;
 }
 
@@ -485,7 +493,7 @@ on_downstream (
 			memcpy (&(*source)->group_nla, dst_addr, pgm_sockaddr_len(dst_addr));
 		break;
 
-#ifdef USE_PGM_PROTOCOL_POLL
+#ifdef CONFIG_PGM_POLLING
 	case PGM_POLL:
 		if (PGM_UNLIKELY(!pgm_on_poll (sock, *source, skb)))
 			goto out_discarded;
@@ -580,7 +588,7 @@ wait_for_event (
 /* tight loop on blocked send */
 			pgm_on_deferred_nak (sock);
 
-#ifdef HAVE_POLL
+#ifdef CONFIG_HAVE_POLL
 		struct pollfd fds[ n_fds ];
 		memset (fds, 0, sizeof(fds));
 		const int status = pgm_poll_info (sock, fds, &n_fds, POLLIN);
@@ -590,7 +598,7 @@ wait_for_event (
 		FD_ZERO(&readfds);
 		const int status = pgm_select_info (sock, &readfds, NULL, &n_fds);
 		pgm_assert (-1 != status);
-#endif /* HAVE_POLL */
+#endif /* CONFIG_HAVE_POLL */
 
 /* flush any waiting notifications */
 		if (sock->is_pending_read) {
@@ -604,7 +612,7 @@ wait_for_event (
 		else
 			timeout = (int)pgm_timer_expiration (sock);
 		
-#ifdef HAVE_POLL
+#ifdef CONFIG_HAVE_POLL
 		const int ready = poll (fds, n_fds, timeout /* μs */ / 1000 /* to ms */);
 #else
 		struct timeval tv_timeout = {
@@ -612,7 +620,7 @@ wait_for_event (
 			.tv_usec	= timeout > 1000000L ? (timeout % 1000000L) : timeout
 		};
 		const int ready = select (n_fds, &readfds, NULL, NULL, &tv_timeout);
-#endif /* HAVE_POLL */
+#endif
 		if (PGM_UNLIKELY(SOCKET_ERROR == ready)) {
 			pgm_debug ("block returned errno=%i",errno);
 			return EFAULT;

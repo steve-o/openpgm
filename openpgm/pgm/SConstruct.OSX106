@@ -42,6 +42,40 @@ vars.AddVariables (
 )
 
 #-----------------------------------------------------------------------------
+# Dependencies
+
+env = Environment();
+
+def CheckPKGConfig(context, version):
+	context.Message( 'Checking for pkg-config... ' )
+	ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+	context.Result( ret )
+	return ret
+
+def CheckPKG(context, name):
+	context.Message( 'Checking for %s... ' % name )
+	ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
+	context.Result( ret )
+	return ret
+
+conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
+				       'CheckPKG' : CheckPKG })
+
+if not conf.CheckPKGConfig('0.15.0'):
+	print 'pkg-config >= 0.15.0 not found.'
+#	Exit(1)
+
+if not conf.CheckPKG('glib-2.0 >= 2.10'):
+	print 'glib-2.0 >= 2.10 not found.'
+#	Exit(1)
+
+if not conf.CheckPKG('gthread-2.0'):
+	print 'gthread-2.0 not found.'
+#	Exit(1)
+
+env = conf.Finish();
+
+#-----------------------------------------------------------------------------
 # Platform specifics
 
 env = Environment(
@@ -76,65 +110,63 @@ env = Environment(
 # re-entrant libc
 			'-D_REENTRANT',
 # POSIX spinlocks
-#			'-DHAVE_PTHREAD_SPINLOCK',
+#			'-DCONFIG_HAVE_POSIX_SPINLOCK',
 # NSS protocol lookup
-#			'-DHAVE_GETPROTOBYNAME_R',
-#			'-DGETPROTOBYNAME_R_STRUCT_PROTOENT_P',
+#			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
+#			'-DCONFIG_HAVE_GETPROTOBYNAME_R2',
 # NSS networks lookup, IPv4 only
- 			'-DHAVE_GETNETENT',
+ 			'-DCONFIG_HAVE_GETNETENT',
 # variadic macros
-			'-DHAVE_ISO_VARARGS',
-#			'-DHAVE_GNUC_VARARGS',
+			'-DCONFIG_HAVE_ISO_VARARGS',
+#			'-DCONFIG_HAVE_GNUC_VARARGS',
 # stack memory api header
-#			'-DHAVE_ALLOCA_H',
+#			'-DCONFIG_HAVE_ALLOCA_H',
 # optimium checksum implementation
-#			'-DUSE_8BIT_CHECKSUM',
-			'-DUSE_16BIT_CHECKSUM',
-#			'-DUSE_32BIT_CHECKSUM',
-#			'-DUSE_64BIT_CHECKSUM',
-#			'-DUSE_VECTOR_CHECKSUM',
+#			'-DCONFIG_8BIT_CHECKSUM',
+			'-DCONFIG_16BIT_CHECKSUM',
+#			'-DCONFIG_32BIT_CHECKSUM',
+#			'-DCONFIG_64BIT_CHECKSUM',
+#			'-DCONFIG_VECTOR_CHECKSUM',
 # useful /proc system
-#			'-DHAVE_PROC_CPUINFO',
+#			'-DCONFIG_HAVE_PROC',
 # example: crash handling
-#			'-DHAVE_BACKTRACE',
+#			'-DCONFIG_HAVE_BACKTRACE',
 # timing
-			'-DHAVE_FTIME',
-			'-DHAVE_GETTIMEOFDAY',
-			'-DHAVE_CLOCKGETTIME',
-			'-DHAVE_PSELECT',
-#			'-DHAVE_DEV_RTC',
-#			'-DHAVE_RDTSC',
-#			'-DHAVE_DEV_HPET',
+			'-DCONFIG_HAVE_PSELECT',
+#			'-DCONFIG_HAVE_RTC',
+#			'-DCONFIG_HAVE_TSC',
+#			'-DCONFIG_HAVE_HPET',
 # event handling
-			'-DHAVE_POLL',
-#			'-DHAVE_EPOLL_CTL',
+			'-DCONFIG_HAVE_POLL',
+#			'-DCONFIG_HAVE_EPOLL',
 # interface enumeration
-			'-DHAVE_GETIFADDRS',
-			'-DHAVE_STRUCT_IFADDRS_IFR_NETMASK',
+			'-DCONFIG_HAVE_GETIFADDRS',
+			'-DCONFIG_HAVE_IFR_NETMASK',
 # win32 cmsg
-#			'-DHAVE_WSACMSGHDR',
+#			'-DCONFIG_HAVE_WSACMSGHDR',
 # multicast
-#			'-DHAVE_STRUCT_GROUP_REQ',
-#			'-DHAVE_STRUCT_IP_MREQN',
-#			'-DHAVE_STRUCT_IP_MSFILTER',
+#			'-DCONFIG_HAVE_MCAST_JOIN',
+#			'-DCONFIG_HAVE_IP_MREQN',
 # sprintf
-			'-DHAVE_SPRINTF_GROUPING',
-			'-DHAVE_VASPRINTF',
+			'-DCONFIG_HAVE_SPRINTF_GROUPING',
+			'-DCONFIG_HAVE_VASPRINTF',
 # symbol linking scope
-			'-DHAVE_DSO_VISIBILITY',
+			'-DCONFIG_HAVE_DSO_VISIBILITY',
 # socket binding
-			'-DUSE_BIND_INADDR_ANY',
+			'-DCONFIG_BIND_INADDR_ANY',
 # IP header order as per IP(4) on FreeBSD
-			'-DHAVE_HOST_ORDER_IP_LEN',
-			'-DHAVE_HOST_ORDER_IP_OFF',
+			'-DCONFIG_HOST_ORDER_IP_LEN',
+			'-DCONFIG_HOST_ORDER_IP_OFF',
 # ticket based spinlocks
-			'-DUSE_TICKET_SPINLOCK',
+			'-DCONFIG_TICKET_SPINLOCK',
 # dumb read-write spinlock
-			'-DUSE_DUMB_RWSPINLOCK',
+			'-DCONFIG_DUMB_RWSPINLOCK',
 # optimum galois field multiplication
-			'-DUSE_GALOIS_MUL_LUT',
+			'-DCONFIG_GALOIS_MUL_LUT',
+# Wine limited API support
+#			'-DCONFIG_TARGET_WINE',
 # GNU getopt
-			'-DHAVE_GETOPT'
+			'-DCONFIG_HAVE_GETOPT'
 		],
 	LINKFLAGS = [	'-pipe'
 		],
@@ -200,11 +232,11 @@ else:
 
 # l10n
 if env['WITH_GETTEXT'] == 'true':
-	env.Append(CCFLAGS = '-DHAVE_GETTEXT');
+	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
-	env.Append(CCFLAGS = '-DUSE_HISTOGRAMS');
+	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
 if env['WITH_SNMP'] == 'true':
@@ -290,7 +322,7 @@ else:
 
 if conf.CheckEventFD():
 	print 'Enabling kernel eventfd notification mechanism.';
-	conf.env.Append(CCFLAGS = '-DHAVE_EVENTFD');
+	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
 
 env = conf.Finish();
 

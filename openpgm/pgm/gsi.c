@@ -2,7 +2,7 @@
  *
  * global session ID helper functions.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <errno.h>
 #include <stdio.h>
 #ifndef _WIN32
@@ -50,12 +47,20 @@ pgm_gsi_create_from_data (
 	pgm_return_val_if_fail (NULL != data, FALSE);
 	pgm_return_val_if_fail (length > 1, FALSE);
 
+#ifdef CONFIG_HAVE_GLIB_CHECKSUM
+	GChecksum* checksum = g_checksum_new (G_CHECKSUM_MD5);
+	pgm_return_val_if_fail (NULL != checksum, FALSE);
+	g_checksum_update (checksum, data, length);
+	memcpy (gsi, g_checksum_get_string (checksum) + 10, 6);
+	g_checksum_free (checksum);
+#else
 	struct pgm_md5_t ctx;
 	char resblock[16];
 	pgm_md5_init_ctx (&ctx);
 	pgm_md5_process_bytes (&ctx, data, length);
 	pgm_md5_finish_ctx (&ctx, resblock);
 	memcpy (gsi, resblock + 10, 6);
+#endif
 	return TRUE;
 }
 
@@ -207,19 +212,10 @@ pgm_gsi_equal (
         const void* restrict	p2
         )
 {
-#ifdef __cplusplus
-	union {
-		pgm_gsi_t	gsi;
-		uint16_t	s[3];
-	} _u1, _u2, *u1 = &_u1, *u2 = &_u2;
-	memcpy (&_u1.gsi, p1, sizeof (pgm_gsi_t));
-	memcpy (&_u2.gsi, p2, sizeof (pgm_gsi_t));
-#else
 	const union {
 		pgm_gsi_t	gsi;
 		uint16_t	s[3];
 	} *u1 = p1, *u2 = p2;
-#endif
 
 /* pre-conditions */
 	pgm_assert (NULL != p1);

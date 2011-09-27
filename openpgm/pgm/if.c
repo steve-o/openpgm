@@ -2,7 +2,7 @@
  *
  * network interface handling.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,10 +18,6 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 
 #ifndef _GNU_SOURCE
 #	define _GNU_SOURCE
@@ -103,69 +99,48 @@ pgm_if_print_all (void)
 	if (!pgm_getifaddrs (&ifap, NULL))
 		return;
 
-	pgm_info (_("IP Configuration"));
-
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
 	{
-/* no address */
+		const unsigned int i = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
+		char rname[IF_NAMESIZE * 2 + 3];
+		char buf[IF_NAMESIZE * 2 + 3];
+
+		pgm_if_indextoname (i, rname);
+		pgm_snprintf_s (buf, sizeof (buf), _TRUNCATE, "%s (%s)",
+			ifa->ifa_name ? ifa->ifa_name : "(null)", rname);
+
 		if (NULL == ifa->ifa_addr ||
 		     (ifa->ifa_addr->sa_family != AF_INET && 
 		      ifa->ifa_addr->sa_family != AF_INET6) )
 		{
+			pgm_info (_("#%d name %-15.15s ---- %-46.46s scope 0 status %s loop %s b/c %s m/c %s"),
+				i,
+				buf,
+				"",
+			ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
+			ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
+			ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
+			ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
+			);
 			continue;
 		}
 
-/* interface index */
-		const unsigned int idx = NULL == ifa->ifa_addr ? 0 : pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
-
-/* decode flags */
-		char flags[1024];
-		if (ifa->ifa_flags & IFF_UP)
-			strcpy (flags, "UP");
-		else
-			flags[0] = '\0';
-		if (ifa->ifa_flags & IFF_LOOPBACK) {
-			if (flags[0])
-				strcat (flags, ",LOOPBACK");
-			else
-				strcpy (flags, "LOOPBACK");
-		}
-		if (ifa->ifa_flags & IFF_BROADCAST) {
-			if (flags[0])
-				strcat (flags, ",BROADCAST");
-			else
-				strcpy (flags, "BROADCAST");
-		}
-		if (ifa->ifa_flags & IFF_MULTICAST) {
-			if (flags[0])
-				strcat (flags, ",MULTICAST");
-			else
-				strcpy (flags, "MULTICAST");
-		}
-		pgm_info (_("%s: index=%u flags=%u<%s>"),
-			ifa->ifa_name ? ifa->ifa_name : "(null)", idx, ifa->ifa_flags, flags);
-
-		char addr[INET6_ADDRSTRLEN];
-		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr),
-			     addr, sizeof (addr),
+		char saddr[INET6_ADDRSTRLEN];
+		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len(ifa->ifa_addr),
+			     saddr, sizeof(saddr),
 			     NULL, 0,
 			     NI_NUMERICHOST);
-
-		if (AF_INET6 == ifa->ifa_addr->sa_family) {
-			pgm_info (_("\tinet6 %s prefixlen %u scopeid 0x%x"),
-				addr,
-				(unsigned)pgm_sockaddr_prefixlen (ifa->ifa_netmask),
-				(unsigned)pgm_sockaddr_scope_id (ifa->ifa_addr));
-		} else {
-			char netmask[INET_ADDRSTRLEN];
-			getnameinfo (ifa->ifa_netmask, pgm_sockaddr_len (ifa->ifa_netmask),
-				     netmask, sizeof (netmask),
-				     NULL, 0,
-				     NI_NUMERICHOST);
-			pgm_info (_("\tinet %s netmask %s"),
-				addr,
-				netmask);
-		}
+		pgm_info (_("#%d name %-15.15s IPv%i %-46.46s scope %u status %s loop %s b/c %s m/c %s"),
+			i,
+			buf,
+			ifa->ifa_addr->sa_family == AF_INET ? 4 : 6,
+			saddr,
+			(unsigned)pgm_sockaddr_scope_id(ifa->ifa_addr),
+			ifa->ifa_flags & IFF_UP ? "UP  " : "DOWN",
+			ifa->ifa_flags & IFF_LOOPBACK ? "YES" : "NO ",
+			ifa->ifa_flags & IFF_BROADCAST ? "YES" : "NO ",
+			ifa->ifa_flags & IFF_MULTICAST ? "YES" : "NO "
+			);
 	}
 
 	pgm_freeifaddrs (ifap);
@@ -503,7 +478,7 @@ parse_interface (
 				break;
 			}
 			case AF_INET6: {
-#ifdef HAVE_GETNETENT
+#ifdef CONFIG_HAVE_GETNETENT
 				pgm_set_error (error,
 					       PGM_ERROR_DOMAIN_IF,
 					       PGM_ERROR_NODEV,
@@ -531,7 +506,7 @@ parse_interface (
 				check_inet6_network = TRUE;
 				check_addr = TRUE;
 				break;
-#endif /* HAVE_GETNETENT */
+#endif
 			}
 			default:
 				pgm_set_error (error,
@@ -587,6 +562,7 @@ parse_interface (
 						memcpy (&addr[i++], res->ai_addr, pgm_sockaddr_len (res->ai_addr));
 					}
 					freeaddrinfo (result);
+/* address list complete */
 					check_addr = TRUE;
 					break;
 				}
@@ -599,12 +575,20 @@ parse_interface (
 							continue;
 						break;
 					}
+/* verify entry was found */
+					pgm_assert (NULL != res);
 				}
 				else /* addr_cnt == 0 ∴  use last entry */
 				{
 					for (res = result; NULL != res->ai_next; res = res->ai_next);
 					addr_cnt++;
+/* verify entry is valid */
+					pgm_assert (NULL != res);
 				}
+			}
+			else
+			{
+				res = result;	/* only one result */
 			}
 
 			if (AF_INET == res->ai_family &&
@@ -940,7 +924,7 @@ parse_group (
 			return FALSE;
 		}
 		case AF_INET6: {
-#ifdef HAVE_GETNETENT
+#ifdef CONFIG_HAVE_GETNETENT
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
 				     PGM_ERROR_NODEV,
@@ -968,7 +952,7 @@ parse_group (
 				     _("IP address class conflict when resolving network name %s%s%s, expected IPv6 multicast."),
 				     group ? "\"" : "", group ? group : "(null)", group ? "\"" : "");
 			return FALSE;
-#endif /* HAVE_GETNETENT */
+#endif /* CONFIG_HAVE_GETNETENT */
 		}
 		default:
 			pgm_set_error (error,

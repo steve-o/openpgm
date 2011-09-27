@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_BACKTRACE
+#ifdef CONFIG_HAVE_BACKTRACE
 #	include <stdio.h>
 #	include <execinfo.h>
 #	include <sys/types.h>
@@ -35,7 +35,7 @@ on_sigsegv (
 	G_GNUC_UNUSED int	signum
 	)
 {
-#ifdef HAVE_BACKTRACE
+#ifdef CONFIG_HAVE_BACKTRACE
 	void* array[256];
 	char** names;
 	char cmd[1024];
@@ -60,7 +60,7 @@ on_sigsegv (
 		fprintf (stderr, "======= GDB Backtrace: =========\n");
 		fprintf (stderr, "%s\n", out);
 	}
-#endif /* HAVE_BACKTRACE */
+#endif /* CONFIG_HAVE_BACKTRACE */
 
 	abort ();
 }

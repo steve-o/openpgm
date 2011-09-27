@@ -1,6 +1,6 @@
---- txw.c	2011-06-19 07:30:21.000000000 +0800
-+++ txw.c89.c	2011-06-19 07:30:33.000000000 +0800
-@@ -194,12 +194,13 @@
+--- txw.c	2011-03-12 10:37:12.000000000 +0800
++++ txw.c89.c	2011-03-12 11:15:05.000000000 +0800
+@@ -193,12 +193,13 @@
  
  	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %" PRIzd " use-fec:%s rs(n):%u rs(k):%u)",
  		pgm_tsi_print (tsi),
@@ -15,7 +15,7 @@
  	const unsigned alloc_sqns = sqns ? sqns : (unsigned)( (secs * max_rte) / tpdu_size );
  	window = pgm_malloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
  	window->tsi = tsi;
-@@ -231,6 +232,7 @@
+@@ -230,6 +231,7 @@
  	pgm_assert (!pgm_txw_retransmit_can_peek (window));
  
  	return window;
@@ -23,7 +23,7 @@
  }
  
  /* destructor for transmit window.  must not be called more than once for same window.
-@@ -318,8 +320,10 @@
+@@ -317,8 +319,10 @@
  	skb->sequence = window->lead;
  
  /* add skb to window */
@@ -34,7 +34,7 @@
  
  /* statistics */
  	window->size += skb->len;
-@@ -456,6 +460,7 @@
+@@ -455,6 +459,7 @@
  	pgm_assert (NULL != window);
  	pgm_assert_cmpuint (tg_sqn_shift, <, 8 * sizeof(uint32_t));
  
@@ -42,7 +42,7 @@
  	const uint32_t tg_sqn_mask = 0xffffffff << tg_sqn_shift;
  	const uint32_t nak_tg_sqn  = sequence &  tg_sqn_mask;	/* left unshifted */
  	const uint32_t nak_pkt_cnt = sequence & ~tg_sqn_mask;
-@@ -494,6 +499,7 @@
+@@ -493,6 +498,7 @@
  	pgm_assert (!pgm_queue_is_empty (&window->retransmit_queue));
  	state->waiting_retransmit = 1;
  	return TRUE;
@@ -50,7 +50,7 @@
  }
  
  static
-@@ -586,10 +592,13 @@
+@@ -585,10 +591,13 @@
  	}
  
  /* generate parity packet to satisify request */	
@@ -65,7 +65,7 @@
  	{
  		const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
  		const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
-@@ -609,6 +618,7 @@
+@@ -608,6 +617,7 @@
  			is_op_encoded = TRUE;
  		}
  	}
@@ -73,7 +73,7 @@
  
  /* construct basic PGM header to be completed by send_rdata() */
  	skb = window->parity_buffer;
-@@ -628,7 +638,9 @@
+@@ -627,7 +637,9 @@
  	{
  		skb->pgm_header->pgm_options |= PGM_OPT_VAR_PKTLEN;
  
@@ -84,7 +84,7 @@
  		{
  			struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
  			const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
-@@ -642,6 +654,7 @@
+@@ -641,6 +653,7 @@
  				odata_skb->zero_padded = 1;
  			}
  		}
@@ -92,7 +92,7 @@
  		parity_length += 2;
  	}
  
-@@ -658,17 +671,21 @@
+@@ -657,17 +670,21 @@
   */
  	if (is_op_encoded)
  	{
@@ -119,7 +119,7 @@
  		{
  			const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
  
-@@ -683,8 +700,10 @@
+@@ -682,8 +699,10 @@
  				opt_src[i] = (pgm_gf8_t*)&null_opt_fragment;
  			}
  		}
@@ -130,7 +130,7 @@
  		const uint16_t opt_total_length = sizeof(struct pgm_opt_length) +
  						 sizeof(struct pgm_opt_header) +
  						 sizeof(struct pgm_opt_fragment);
-@@ -696,6 +715,7 @@
+@@ -695,6 +714,7 @@
  		opt_len->opt_type			= PGM_OPT_LENGTH;
  		opt_len->opt_length			= sizeof(struct pgm_opt_length);
  		opt_len->opt_total_length		= htons ( opt_total_length );
@@ -138,7 +138,7 @@
  		opt_header			 	= (struct pgm_opt_header*)(opt_len + 1);
  		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
  		opt_header->opt_length			= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
-@@ -724,9 +744,12 @@
+@@ -723,9 +743,12 @@
  			parity_length);
  
  /* calculate partial checksum */

@@ -40,34 +40,30 @@
 
 PGM_BEGIN_DECLS
 
-#ifdef HAVE_FTIME
+#ifdef CONFIG_HAVE_FTIME
 static inline
 errno_t
-#	if   !defined( _WIN32 )
+#	ifndef _WIN32
 pgm_ftime_s (struct timeb *timeptr)
 #	elif !defined( _MSC_VER )
 pgm_ftime_s (struct _timeb *timeptr)
 #	else
-/* force 64-bit structure in case _USE_32BIT_TIME_T is defined */
 pgm_ftime_s (struct __timeb64 *timeptr)
 #	endif
 {
-#	if   !defined( _WIN32 )
+#	ifndef _WIN32
 	return ftime (timeptr);
 #	elif !defined( _MSC_VER )
-/* MinGW does not export a 32-bit or 64-bit specific API */
 	_ftime (timeptr);
 	return 0;
-#	elif  defined( _CRT_SECURE_NO_WARNINGS )
-/* validates timeptr is not NULL, otherwise returns EINVAL */
+#	elif  defined( CONFIG_HAVE_SECURITY_ENHANCED_CRT )
 	return _ftime64_s (timeptr);
 #	else
-/* no return value, but errno is set to EINVAL if timeptr is NULL */
 	_ftime64 (timeptr);
 	return 0;
 #	endif
 }
-#endif /* HAVE_FTIME */
+#endif /* CONFIG_HAVE_FTIME */
 
 #ifndef _TRUNCATE
 #	define _TRUNCATE	(size_t)-1
@@ -77,7 +73,7 @@ static inline
 errno_t
 pgm_strncpy_s (char *dest, size_t size, const char *src, size_t count)
 {
-#ifndef _CRT_SECURE_NO_WARNINGS
+#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	if (_TRUNCATE == count) {
 		strncpy (dest, src, size);
 		if (size > 0)
@@ -98,7 +94,7 @@ static inline
 int
 pgm_vsnprintf_s (char *str, size_t size, size_t count, const char *format, va_list ap)
 {
-#if !defined( _WIN32 )
+#ifndef _WIN32
 	if (_TRUNCATE == count) {
 		const int retval = vsnprintf (str, size, format, ap);
 		if (size > 0)
@@ -108,7 +104,7 @@ pgm_vsnprintf_s (char *str, size_t size, size_t count, const char *format, va_li
 	const int retval = vsnprintf (str, count + 1, format, ap);
 	str[count] = 0;
 	return retval;
-#elif !defined( _CRT_SECURE_NO_WARNINGS )
+#elif !defined( CONFIG_HAVE_SECURITY_ENHANCED_CRT )
 	if (_TRUNCATE == count) {
 		const int retval = _vsnprintf (str, size, format, ap);
 		if (size > 0)
@@ -123,8 +119,7 @@ pgm_vsnprintf_s (char *str, size_t size, size_t count, const char *format, va_li
 #endif
 }
 
-#ifndef _CRT_SECURE_NO_WARNINGS
-/* decl required for defining attributes */
+#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 static inline int pgm_snprintf_s (char*, size_t, size_t, const char*, ...) PGM_GNUC_PRINTF(4, 5);
 static inline int pgm_sscanf_s (const char*, const char*, ...) PGM_GNUC_SCANF(2, 3);
 
@@ -156,20 +151,20 @@ pgm_sscanf_s (const char *buffer, const char *format, ...)
 #else
 #	define pgm_snprintf_s		_snprintf_s
 #	define pgm_sscanf_s		sscanf_s
-#endif /* _CRT_SECURE_NO_WARNINGS */
+#endif /* CONFIG_HAVE_SECURITY_ENHANCED_CRT */
 
 static inline
 char*
 pgm_strerror_s (char *buffer, size_t size, int errnum)
 {
-#if   defined( _CRT_SECURE_NO_WARNINGS )
+#ifdef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	if (0 != strerror_s (buffer, size, errnum))
 		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error %d"), errnum);
 	return buffer;
 #elif defined( _WIN32 )
 	pgm_strncpy_s (buffer, size, strerror (errnum), _TRUNCATE);
 	return buffer;
-#elif defined( HAVE_GNU_STRERROR_R ) && defined( STRERROR_R_CHAR_P )
+#elif defined( CONFIG_HAVE_GNU_STRERROR_R )
 /* GNU-specific, failure is noted within buffer contents */
 	return strerror_r (errnum, buffer, size);
 #else
@@ -184,7 +179,7 @@ static inline
 errno_t
 pgm_fopen_s (FILE **pFile, const char *filename, const char *mode)
 {
-#ifndef _CRT_SECURE_NO_WARNINGS
+#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	FILE* stream;
 
 	if (NULL == (stream = fopen (filename, mode)))
@@ -202,7 +197,7 @@ static inline
 errno_t
 pgm_dupenv_s (char **buffer, size_t *count, const char* name)
 {
-#ifndef _CRT_SECURE_NO_WARNINGS
+#ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	const char *val = getenv (name);
 /* not found */
 	if (NULL == val) {
@@ -226,7 +221,7 @@ pgm_dupenv_s (char **buffer, size_t *count, const char* name)
 	*buffer = pgm_strdup (pValue);
 	free (pValue);
 	return err;
-#endif /* _CRT_SECURE_NO_WARNINGS */
+#endif
 }
 
 /* Win32 specific APIs */
@@ -236,7 +231,7 @@ static inline
 errno_t
 pgm_wcstombs_s (size_t *retval, char *dest, size_t size, const wchar_t *src, size_t count)
 {
-#	ifndef _CRT_SECURE_NO_WARNINGS
+#	ifndef CONFIG_HAVE_SECURITY_ENHANCED_CRT
 	size_t characters;
 	if (_TRUNCATE == count) {
 		characters = wcstombs (dest, src, size);
@@ -255,7 +250,7 @@ pgm_wcstombs_s (size_t *retval, char *dest, size_t size, const wchar_t *src, siz
 	return 0;
 #	else
 	return wcstombs_s (retval, dest, size, src, count);
-#	endif /* _CRT_SECURE_NO_WARNINGS */
+#	endif
 }
 
 #endif /* _WIN32 */

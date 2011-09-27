@@ -1,12 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Portable advanced error reporting.  In addition to a basic error code
- * this module provides a domain code and a textual description of the error.
- * Text is localised per gettext() configuration and hence is generally
- * limited to one language per process and an application restart is required
- * to read updated catalogue translations.
+ * portable error reporting.
  *
- * Copyright (c) 2010-2011 Miru Limited.
+ * Copyright (c) 2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,9 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #ifndef _WIN32
 #	include <netdb.h>
 #endif

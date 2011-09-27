@@ -3,7 +3,7 @@
  * PGM socket: manage incoming & outgoing sockets with ambient SPMs, 
  * transmit & receive windows.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2010 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,14 +20,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#	include <config.h>
-#endif
 #include <errno.h>
-#ifdef HAVE_POLL
+#ifdef CONFIG_HAVE_POLL
 #	include <poll.h>
 #endif
-#ifdef HAVE_EPOLL_CTL
+#ifdef CONFIG_HAVE_EPOLL
 #	include <sys/epoll.h>
 #endif
 #include <stdio.h>
@@ -509,10 +506,8 @@ pgm_socket (
 		}
 #endif
 
-/* Request extra packet information to determine destination address on each packet
- * 
- * Requires Windows XP or Wine 1.3.
- */
+/* request extra packet information to determine destination address on each packet */
+#ifndef CONFIG_TARGET_WINE
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Request socket packet-info."));
 		const sa_family_t recv_family = new_sock->family;
 		if (SOCKET_ERROR == pgm_sockaddr_pktinfo (new_sock->recv_sock, recv_family, TRUE))
@@ -526,6 +521,7 @@ pgm_socket (
 				       pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 			goto err_destroy;
 		}
+#endif
 	}
 	else
 	{
@@ -1165,6 +1161,7 @@ pgm_setsockopt (
 /* 0 < hops < 256, hops == -1 use kernel default (ignored).
  */
 	case PGM_MULTICAST_HOPS:
+#ifndef CONFIG_TARGET_WINE
 		if (PGM_UNLIKELY(optlen != sizeof (int)))
 			break;
 		if (PGM_UNLIKELY(*(const int*)optval <= 0))
@@ -1177,6 +1174,7 @@ pgm_setsockopt (
 			    SOCKET_ERROR == pgm_sockaddr_multicast_hops (sock->send_with_router_alert_sock, sock->family, sock->hops))
 				break;
 		}
+#endif
 		status = TRUE;
 		break;
 
@@ -2150,7 +2148,7 @@ pgm_bind3 (
 		struct sockaddr_storage	ss;
 	} recv_addr, recv_addr2, send_addr, send_with_router_alert_addr;
 
-#ifdef USE_BIND_INADDR_ANY
+#ifdef CONFIG_BIND_INADDR_ANY
 /* force default interface for bind-only, source address is still valid for multicast membership.
  * effectively same as running getaddrinfo(hints = {ai_flags = AI_PASSIVE})
  */
@@ -2177,7 +2175,7 @@ pgm_bind3 (
 	}
 	else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 	{
-		if (AF_INET6 == sock->family)
+		if (AF_INET6 == sock_family)
 			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to interface index %u scope %u"),
 				   recv_req->ir_interface,
 				   recv_req->ir_scope_id);
@@ -2186,7 +2184,7 @@ pgm_bind3 (
 				   recv_req->ir_interface);
 	}
 
-#endif /* USE_BIND_INADDR_ANY */
+#endif /* CONFIG_BIND_INADDR_ANY */
 
 	memcpy (&recv_addr2.sa, &recv_addr.sa, pgm_sockaddr_len (&recv_addr.sa));
 
@@ -2358,7 +2356,9 @@ pgm_connect (
 {
 	pgm_return_val_if_fail (sock != NULL, FALSE);
 	pgm_return_val_if_fail (sock->recv_gsr_len > 0, FALSE);
+#ifdef CONFIG_TARGET_WINE
 	pgm_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
+#endif
 	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
 	{
 		pgm_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
@@ -2526,9 +2526,7 @@ pgm_select_info (
 #endif
 }
 
-#if defined( HAVE_POLL ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) )
-/* Windows Vista supports WSAPoll() interface for compatibility with poll(). */
-
+#if defined(CONFIG_HAVE_POLL) || defined(CONFIG_HAVE_WSAPOLL)
 /* add poll parameters for the receive socket(s)
  *
  * returns number of pollfd structures filled.
@@ -2542,23 +2540,18 @@ pgm_select_info (
 #	define PGM_POLLOUT		POLLWRNORM
 #endif
 
-#ifndef _WIN32
 int
 pgm_poll_info (
 	pgm_sock_t*	 const restrict	sock,
+#ifndef _WIN32
 	struct pollfd*   const restrict	fds,
 	int*		 const restrict	n_fds,		/* in: #fds, out: used #fds */
-	const short			events		/* POLLIN, POLLOUT */
-	)
 #else
-int
-pgm_wsapoll_info (
-	pgm_sock_t*	 const restrict	sock,
 	WSAPOLLFD*	 const restrict	fds,
 	ULONG*		 const restrict	n_fds,
+#endif
 	const short			events		/* POLLIN, POLLOUT */
 	)
-#endif
 {
 #ifndef _WIN32
 	int nfds = 0;
@@ -2613,7 +2606,7 @@ pgm_wsapoll_info (
 
 	return *n_fds = nfds;
 }
-#endif /* defined( HAVE_POLL ) || ( defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) ) */
+#endif /* CONFIG_HAVE_POLL */
 
 /* add epoll parameters for the recieve socket(s), events should
  * be set to EPOLLIN to wait for incoming events (data), and EPOLLOUT to wait
@@ -2621,7 +2614,7 @@ pgm_wsapoll_info (
  *
  * returns 0 on success, -1 on failure and sets errno appropriately.
  */
-#ifdef HAVE_EPOLL_CTL
+#ifdef CONFIG_HAVE_EPOLL
 int
 pgm_epoll_ctl (
 	pgm_sock_t* const	sock,
@@ -2699,7 +2692,7 @@ pgm_epoll_ctl (
 out:
 	return retval;
 }
-#endif /* HAVE_EPOLL_CTL */
+#endif
 
 static
 const char*

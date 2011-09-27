@@ -1,6 +1,6 @@
---- rand.c	2011-06-26 03:38:03.000000000 +0800
-+++ rand.c89.c	2011-06-26 07:57:06.000000000 +0800
-@@ -33,7 +33,7 @@
+--- rand.c	2011-03-12 10:20:31.000000000 +0800
++++ rand.c89.c	2011-03-12 10:50:48.000000000 +0800
+@@ -31,7 +31,7 @@
  
  /* locals */
  
@@ -9,7 +9,7 @@
  static volatile uint32_t	rand_ref_count = 0;
  static pgm_mutex_t		rand_mutex;
  
-@@ -85,8 +85,10 @@
+@@ -83,8 +83,10 @@
  			return;
  	}
  #endif /* !_WIN32 */
@@ -20,7 +20,7 @@
  }
  
  /* derived from POSIX.1-2001 example implementation of rand()
-@@ -126,9 +128,11 @@
+@@ -124,9 +126,11 @@
  	pgm_mutex_lock (&rand_mutex);
  	if (PGM_UNLIKELY(!global_rand.seed))
  		pgm_rand_create (&global_rand);
