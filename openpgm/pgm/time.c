@@ -841,9 +841,9 @@ pgm_tsc_init (
 
 	pgm_info (_("Running a benchmark to measure system clock frequency..."));
 
-	start = rdtsc();
+	start = pgm_rdtsc();
 	while (-1 == nanosleep (&req, &req) && EINTR == errno);
-	stop = rdtsc();
+	stop = pgm_rdtsc();
 
 	if (stop < start)
 	{
