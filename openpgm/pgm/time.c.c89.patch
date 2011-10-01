@@ -1,5 +1,5 @@
---- time.c	2011-08-01 14:33:14.000000000 +0800
-+++ time.c89.c	2011-08-01 14:35:49.000000000 +0800
+--- time.c	2011-08-15 10:53:20.000000000 +0800
++++ time.c89.c	2011-10-02 07:37:20.000000000 +0800
 @@ -392,6 +392,7 @@
  #elif defined(_WIN32)
  /* core frequency HKLM/Hardware/Description/System/CentralProcessor/0/~Mhz
