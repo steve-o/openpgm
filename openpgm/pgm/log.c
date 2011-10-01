@@ -44,7 +44,7 @@
 #define TIME_FORMAT		"%Y-%m-%d %H:%M:%S "
 
 static int log_timezone PGM_GNUC_READ_MOSTLY = 0;
-static char log_hostname[NI_MAXHOST + 1] PGM_GNUC_READ_MOSTLY;
+static char log_hostname[NI_MAXHOST] PGM_GNUC_READ_MOSTLY;
 
 static void glib_log_handler (const gchar*, GLogLevelFlags, const gchar*, gpointer);
 static void pgm_log_handler (const int, const char*restrict, void*restrict);
@@ -70,7 +70,8 @@ log_init ( void )
 	if (!dir) dir = loc->tm_yday - gmt->tm_yday;
 	log_timezone += dir * 24 * 60 * 60;
 //	printf ("timezone offset %u seconds.\n", log_timezone);
-	gethostname (log_hostname, sizeof(log_hostname));
+	gethostname (log_hostname, sizeof (log_hostname));
+	log_hostname[NI_MAXHOST - 1] = '\0';
 	g_log_set_handler ("Pgm",		G_LOG_LEVEL_MASK, glib_log_handler, NULL);
 	g_log_set_handler ("Pgm-Http",		G_LOG_LEVEL_MASK, glib_log_handler, NULL);
 	g_log_set_handler ("Pgm-Snmp",		G_LOG_LEVEL_MASK, glib_log_handler, NULL);
