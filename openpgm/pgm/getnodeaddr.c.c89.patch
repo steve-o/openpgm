@@ -1,16 +1,16 @@
---- getnodeaddr.c	2011-06-26 02:38:14.000000000 +0800
-+++ getnodeaddr.c89.c	2011-06-26 07:47:51.000000000 +0800
-@@ -61,6 +61,7 @@
+--- getnodeaddr.c	2011-08-02 13:24:08.000000000 +0800
++++ getnodeaddr.c89.c	2011-10-02 08:04:00.000000000 +0800
+@@ -63,6 +63,7 @@
  	pgm_debug ("pgm_getnodeaddr (family:%s res:%p error:%p)",
  		pgm_family_string (family), (const void*)res, (const void*)error);
  
 +	{
- 	char hostname[NI_MAXHOST + 1];
+ 	char hostname[NI_MAXHOST];
  	struct hostent* he;
  
-@@ -76,14 +77,16 @@
- 		return FALSE;
+@@ -79,14 +80,16 @@
  	}
+ 	hostname[NI_MAXHOST - 1] = '\0';
  
 -	struct addrinfo hints = {
 -		.ai_family	= family,
@@ -32,7 +32,7 @@
  	if (0 == e) {
  /* NB: getaddrinfo may return multiple addresses, the sorting order of the
   * list defined by RFC 3484 and /etc/gai.conf
-@@ -98,6 +101,7 @@
+@@ -101,6 +104,7 @@
  		}
  
  		na = pgm_malloc0 (na_len);
@@ -40,7 +40,7 @@
  		char* p = (char*)na + na_len;	/* point to end of block */
  		struct addrinfo* prev = NULL;
  
-@@ -109,14 +113,17 @@
+@@ -112,14 +116,17 @@
  				continue;
  			p -= ai->ai_addrlen;
  			memcpy (p, ai->ai_addr, ai->ai_addrlen);
@@ -58,7 +58,7 @@
  		freeaddrinfo (result);
  		*res = na;
  		return TRUE;
-@@ -157,7 +164,9 @@
+@@ -160,7 +167,9 @@
  				);
  		return FALSE;
  	}
@@ -68,7 +68,7 @@
  	struct pgm_ifaddrs_t *ifap, *ifa, *ifa6;
  	if (!pgm_getifaddrs (&ifap, error)) {
  		pgm_prefix_error (error,
-@@ -210,6 +219,8 @@
+@@ -213,6 +222,8 @@
  	memcpy (na->ai_addr, ifa6->ifa_addr, na->ai_addrlen);
  	pgm_freeifaddrs (ifap);
  	*res = na;
