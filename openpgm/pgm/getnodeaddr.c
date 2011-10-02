@@ -63,10 +63,10 @@ pgm_getnodeaddr (
 	pgm_debug ("pgm_getnodeaddr (family:%s res:%p error:%p)",
 		pgm_family_string (family), (const void*)res, (const void*)error);
 
-	char hostname[NI_MAXHOST + 1];
+	char hostname[NI_MAXHOST];
 	struct hostent* he;
 
-	if (0 != gethostname (hostname, sizeof(hostname))) {
+	if (0 != gethostname (hostname, sizeof (hostname))) {
 		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
@@ -77,6 +77,7 @@ pgm_getnodeaddr (
 				);
 		return FALSE;
 	}
+	hostname[NI_MAXHOST - 1] = '\0';
 
 	struct addrinfo hints = {
 		.ai_family	= family,
