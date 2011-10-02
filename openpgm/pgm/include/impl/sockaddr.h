@@ -34,7 +34,8 @@
 #	include <sys/socket.h>
 #	include <netdb.h>
 #endif
-#ifdef __APPLE__
+#if defined( __APPLE__ ) || defined( __FreeBSD__ )
+/* incomplete RFC 3678 API support */
 #	include <pgm/in.h>
 #endif
 #include <pgm/types.h>

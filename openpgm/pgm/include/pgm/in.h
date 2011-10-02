@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * Sections 5 and 8.2 of RFC 3768: Multicast group request
+ * Sections 5 and 8.2 of RFC 3678: Multicast group request
  *
  * Copyright (c) 2010 Miru Limited.
  *
@@ -29,7 +29,13 @@
 #include <sys/socket.h>
 #include <pgm/types.h>
 
-/* sections 5 and 8.2 of RFC 3768: Multicast group request */
+#if (!defined( __FreeBSD__ ) && !defined( __APPLE__ )) \
+	|| (defined( __APPLE__ ) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070)
+/* section 5.1 of RFC 3678: basic (delta-based) protocol-independent multicast
+ * source filter APIs.
+ *
+ * required for OSX 10.6 and earlier.
+ */
 struct group_req
 {
 	uint32_t		gr_interface;	/* interface index */
@@ -43,6 +49,12 @@ struct group_source_req
 	struct sockaddr_storage	gsr_source;	/* group source */
 };
 
+#endif /* section 5.1 of RFC 3678 */
+
+/* section 8.2 of RFC 3678: protocol-independent full-state operations.
+ *
+ * required for OSX and FreeBSD.
+ */
 struct group_filter
 {
 	uint32_t		gf_interface;	/* interface index */
