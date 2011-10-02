@@ -94,7 +94,7 @@ enum {
 	HTTP_MEMORY_TAKE
 };
 
-static char		http_hostname[NI_MAXHOST + 1];
+static char		http_hostname[NI_MAXHOST];
 static char		http_address[INET6_ADDRSTRLEN];
 static char		http_username[LOGIN_NAME_MAX + 1];
 static int		http_pid;
@@ -189,7 +189,7 @@ pgm_http_init (
 		return TRUE;
 
 /* resolve and store relatively constant runtime information */
-	if (0 != gethostname (http_hostname, sizeof(http_hostname))) {
+	if (0 != gethostname (http_hostname, sizeof (http_hostname))) {
 		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
 		pgm_set_error (error,
@@ -199,6 +199,7 @@ pgm_http_init (
 			     pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno));
 		goto err_cleanup;
 	}
+	http_hostname[NI_MAXHOST - 1] = '\0';
 	struct addrinfo hints = {
 		.ai_family	= AF_UNSPEC,
 		.ai_socktype	= SOCK_STREAM,
