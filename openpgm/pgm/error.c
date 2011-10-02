@@ -79,20 +79,20 @@ pgm_set_error (
 	...
 	)
 {
-	pgm_error_t *new;
+	pgm_error_t *new_err;
 	va_list args;
 
 	if (NULL == err)
 		return;
 
 	va_start (args, format);
-	new = pgm_error_new_valist (error_domain, error_code, format, args);
+	new_err = pgm_error_new_valist (error_domain, error_code, format, args);
 	va_end (args);
 
 	if (NULL == *err)
-		*err = new;
+		*err = new_err;
 	else
-		pgm_warn (_(ERROR_OVERWRITTEN_WARNING), new->message); 
+		pgm_warn (_(ERROR_OVERWRITTEN_WARNING), new_err->message); 
 }
 
 void
