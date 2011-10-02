@@ -89,8 +89,18 @@ pgm_gsi_create_from_hostname (
 {
 	pgm_return_val_if_fail (NULL != gsi, FALSE);
 
+/* POSIX gethostname silently fails if the buffer is too short.  We use NI_MAXHOST
+ * as the highest common denominator, at 1025 bytes including terminating null byte.
+ *
+ * WinSock namespace providers have a 256 byte limit (MSDN), DNS names are limited to
+ * 63 bytes per component, and 15 bytes for NetBIOS names (MAX_COMPUTERNAME_LENGTH).
+ *   http://msdn.microsoft.com/en-us/library/ms738527(v=VS.85).aspx
+ *   http://msdn.microsoft.com/en-us/library/ms724220(VS.85).aspx
+ * SUSv2 guarantees 255 bytes (excluding terminating null byte).
+ * POSIX.1-2001 guarantees HOST_NAME_MAX, on Linux is defined to 64.
+ */
 	char hostname[NI_MAXHOST];
-	int retval = gethostname (hostname, sizeof(hostname));
+	int retval = gethostname (hostname, sizeof (hostname));
 	if (0 != retval) {
 		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
@@ -102,6 +112,9 @@ pgm_gsi_create_from_hostname (
 				);
 		return FALSE;
 	}
+
+/* force a trailing null byte */
+	hostname[NI_MAXHOST - 1] = '\0';
 
 	return pgm_gsi_create_from_string (gsi, hostname, -1);
 }
