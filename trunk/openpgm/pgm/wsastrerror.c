@@ -23,16 +23,46 @@
 #include <impl/i18n.h>
 #include <impl/framework.h>
 
-#ifdef _WIN32
-#	include <ws2tcpip.h>
+#ifndef _WIN32
 
+/* compatibility stubs */
+
+char *
+pgm_wsastrerror (
+	const int	wsa_errnum
+	)
+{
+	return _("Unknown.");
+}
+
+char*
+pgm_adapter_strerror (
+	const int	adapter_errnum
+	)
+{
+	return _("Unknown.");
+}
+
+char*
+pgm_win_strerror (
+	char*		buf,
+	size_t		buflen,
+	const int	win_errnum
+	)
+{
+	pgm_strncpy_s (buf, buflen, _("Unknown."), _TRUNCATE);
+	return buf;
+}
+
+#else
+#	include <ws2tcpip.h>
 
 char*
 pgm_wsastrerror (
-	const int	wsa_errno
+	const int	wsa_errnum
 	)
 {
-	switch (wsa_errno) {
+	switch (wsa_errnum) {
 #ifdef WSA_INVALID_HANDLE
 	case WSA_INVALID_HANDLE: return _("Specified event object handle is invalid.");
 #endif
@@ -324,10 +354,10 @@ pgm_wsastrerror (
 
 char*
 pgm_adapter_strerror (
-	const int	adapter_errno
+	const int	adapter_errnum
 	)
 {
-	switch (adapter_errno) {
+	switch (adapter_errnum) {
 #ifdef ERROR_ADDRESS_NOT_ASSOCIATED
 	case ERROR_ADDRESS_NOT_ASSOCIATED: return _("DHCP lease information was available.");
 #endif
@@ -357,19 +387,20 @@ char*
 pgm_win_strerror (
 	char*		buf,
 	size_t		buflen,
-	const int	win_errno
+	const int	win_errnum
 	)
 {
 	const DWORD nSize = (DWORD)buflen;
 	FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM,
 		       NULL,		/* source */
-		       win_errno,	/* message id */
+		       win_errnum,	/* message id */
 		       MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),	/* language id */
 		       (LPTSTR)buf,
 		       nSize,
 		       NULL);		/* arguments */
 	return buf;
 }
+
 #endif /* _WIN32 */
 
 /* eof */
