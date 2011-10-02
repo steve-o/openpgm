@@ -978,6 +978,7 @@ _pgm_getadaptersaddresses (
 				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( Mask );
 				}
 #else
+/* NB: left-shift of full bit-width is undefined in C standard. */
 				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( 0xffffffffU << ( 32 - prefixLength ) );
 #endif
 				break;
