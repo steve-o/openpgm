@@ -19,31 +19,25 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "testing.hh"
+#ifdef HAVE_CONFIG_H
+#	include "config.h"
+#endif
 #include "mock-error.hh"
 #include "mock-md5.hh"
 #include "mock-messages.hh"
 #include "mock-rand.hh"
+#include "mock-runtime.hh"
+#include "mock-wsastrerror.hh"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 
 /* mock state */
 
-static const char* mock_localhost = "localhost";
-static const char* mock_invalid = "invalid.invalid";		/* RFC 2606 */
-static const char* mock_toolong = "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij12345"; /* 65 */
+static const char* hostname_localhost = "localhost";
+static const char* hostname_invalid = "invalid.invalid";		/* RFC 2606 */
+static const char* hostname_toolong = "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij12345"; /* 65 */
 
-class Runtime {
-public:
-	virtual ~Runtime() {}
-	virtual int gethostname (char *name, size_t len) = 0;
-};
-
-class MockRuntime : public Runtime {
-public:
-	MOCK_METHOD2 (gethostname, int (char *name, size_t len));
-};
 
 namespace under_test
 {
@@ -57,13 +51,17 @@ namespace under_test
 		return crt->gethostname (name, len);
 	}
 
-	void pgm_set_error (struct pgm_error_t** err, int error_domain, int error_code, const char* format, ...) {
+	void pgm_set_error (struct pgm_error_t** err, int error_domain, int error_code, const char* format, va_list args) {
+		return error->pgm_set_error (reinterpret_cast<struct ::pgm_error_t**>( err ), error_domain, error_code, format, args);
 	}
-	int pgm_error_from_errno (int from_errno) {
-		return error->pgm_error_from_errno (from_errno);
+	int pgm_error_from_errno (int errnum) {
+		return error->pgm_error_from_errno (errnum);
 	}
-	int pgm_error_from_eai_errno (int from_eai_errno, int from_errno) {
-		return error->pgm_error_from_eai_errno (from_eai_errno, from_errno);
+	int pgm_error_from_eai_errno (int eai_errnum, int errnum) {
+		return error->pgm_error_from_eai_errno (eai_errnum, errnum);
+	}
+	int pgm_error_from_wsa_errno (int wsa_errnum) {
+		return error->pgm_error_from_wsa_errno (wsa_errnum);
 	}
 
 	void pgm_md5_init_ctx (struct pgm_md5_t* ctx) {
@@ -76,13 +74,10 @@ namespace under_test
 		return md5->pgm_md5_finish_ctx (reinterpret_cast<Pgm::internal::pgm_md5_t*>( ctx ), resbuf);
 	}
 
-// A fake or real messages module is required to debug failures.
-#include <stdarg.h>
 	void pgm__logv (int log_level, const char* format, va_list args) {
-		vprintf (format, args);
-		putchar ('\n');
-//		return messages->pgm__logv (log_level, format, args);
+		return messages->pgm__logv (log_level, format, args);
 	}
+// Route onto va_list API
 	void pgm__log (int log_level, const char* format, ...) {
 		va_list args;
 		va_start (args, format);
@@ -94,6 +89,11 @@ namespace under_test
 		return rand->pgm_random_int_range (begin, end);
 	}
 
+// Route direct to real API
+	char* pgm_wsastrerror (int wsa_errnum) {
+		return ::pgm_wsastrerror (wsa_errnum);
+	}
+
 #define GSI_DEBUG
 #include "gsi.c"
 
@@ -103,6 +103,8 @@ namespace under_test
 using ::testing::_;
 using ::testing::AtLeast;
 using ::testing::Return;
+using ::testing::NotNull;
+using ::testing::NiceMock;
 using namespace ::under_test;
 
 std::ostream& operator << (std::ostream& os, const pgm_error_t*& err)
@@ -115,8 +117,33 @@ std::ostream& operator << (std::ostream& os, const pgm_error_t*& err)
 	os << " }";
 }
 
-ACTION_P(ReturnHostname, hostname)
+/* Set the hostname returned by mocked gethostname() API.
+ *
+ * glibc 2.2 truncates and returns -1/ENAMETOOLONG.
+ * glibc 2.1 returns -1/ENAMETOOLONG only.
+ * glibc 2.0 returns -1/EINVAL only.
+ * POSIX no error is returned, name is silently truncated.
+ * WinSock returns -1/WSAEFAULT only.
+ *
+ * Worst case is POSIX but lets be nice and return an error if the buffer
+ * is sufficient per RFC1034 host name limit of 63 bytes.
+ *
+ * Note no guarantees are provided on trailing null byte.
+ */
+
+ACTION_P(SetHostname, hostname)
 {
+	if (strlen (hostname) > 63) /* HOST_NAME_MAX */
+	{
+#ifndef _WIN32
+		errno = ENAMETOOLONG;
+#else
+		WSASetLastError (WSAEFAULT);
+#endif
+		return -1;
+	}
+
+/* silent truncation for short buffers */
 	strncpy (arg0, hostname, arg1);
 	return 0;
 }
@@ -132,25 +159,15 @@ ACTION_P(ReturnHostname, hostname)
 TEST (GsiFromHostnameTest, HandlesValidInput)
 {
 	MockRuntime crt;
-	Pgm::internal::MockError error;
-	Pgm::internal::MockMd5 md5;
-	Pgm::internal::MockMessages messages;
-	Pgm::internal::MockRand rand;
+	NiceMock<Pgm::internal::MockError>	nice_error;
+	NiceMock<Pgm::internal::MockMd5>	nice_md5;
+	Pgm::internal::FakeMessages		messages;
+
 	EXPECT_CALL (crt, gethostname (_, _))
 		.Times (2)
-		.WillRepeatedly (ReturnHostname (mock_localhost));
-	EXPECT_CALL (md5, pgm_md5_init_ctx (_))
-		.Times (2);
-	EXPECT_CALL (md5, pgm_md5_process_bytes (_, _, _))
-		.Times (AtLeast (2));
-	EXPECT_CALL (md5, pgm_md5_finish_ctx (_, _))
-		.Times (2);
+		.WillRepeatedly (SetHostname (hostname_localhost));
 
-	under_test::crt		= &crt;
-	under_test::error	= &error;
-	under_test::md5		= &md5;
-	under_test::messages	= &messages;
-	under_test::rand	= &rand;
+	::crt = &crt; ::error = &nice_error; ::md5 = &nice_md5; ::messages = &messages;
 
 	pgm_gsi_t gsi;
 	pgm_error_t* err = NULL;
@@ -159,23 +176,39 @@ TEST (GsiFromHostnameTest, HandlesValidInput)
 	EXPECT_PRED2 (pgm_gsi_create_from_hostname, &gsi, (pgm_error_t**)NULL);
 }
 
-#if 0
 TEST (GsiFromHostnameTest, HandlesNullInput)
 {
+	MockRuntime crt;
+	NiceMock<Pgm::internal::MockError>	nice_error;
+	NiceMock<Pgm::internal::MockMd5>	nice_md5;
+	NiceMock<Pgm::internal::MockMessages>	nice_messages;
+
+	::crt = &crt; ::error = &nice_error; ::md5 = &nice_md5; ::messages = &nice_messages;
+
 	pgm_error_t* err = NULL;
-	ASSERT_FALSE (pgm_gsi_create_from_hostname (NULL, &err)) << "Ignored null input";
-	EXPECT_EQ (NULL, err) << "Error object returned from null input: " << err->message;
+	ASSERT_FALSE (pgm_gsi_create_from_hostname (NULL, &err)) << "err=" << err;
+	EXPECT_EQ (NULL, err);
 	EXPECT_FALSE (pgm_gsi_create_from_hostname (NULL, NULL));
 }
 
 TEST (GsiFromHostnameTest, HandlesHostnameTooLong)
 {
+	MockRuntime crt;
+	Pgm::internal::RealError		real_error;
+	NiceMock<Pgm::internal::MockMd5>	nice_md5;
+	NiceMock<Pgm::internal::MockMessages>	nice_messages;
+
+	EXPECT_CALL (crt, gethostname (_, _))
+		.Times (2)
+		.WillRepeatedly (SetHostname (hostname_toolong));
+
+	::crt = &crt; ::error = &real_error; ::md5 = &nice_md5; ::messages = &nice_messages;
+
 	pgm_gsi_t gsi;
 	pgm_error_t* err = NULL;
-	ASSERT_FALSE (pgm_gsi_create_from_hostname (&gsi, &err)) << "Ignored long hostname";
-	ASSERT_NE (NULL, err);
-	ASSERT_NE (NULL, err->message);
-	g_debug ("pgm_error_t: %s", err->message);
+	ASSERT_FALSE (pgm_gsi_create_from_hostname (&gsi, &err)) << "err=" << err;
+	ASSERT_THAT (err, NotNull());
+	ASSERT_THAT (err->message, NotNull());
 	EXPECT_FALSE (pgm_gsi_create_from_hostname (&gsi, NULL));
 }
 
@@ -187,6 +220,7 @@ TEST (GsiFromHostnameTest, HandlesHostnameTooLong)
  *	)
  */
 
+#if 0
 TEST (GsiFromAddressTest, HandlesValidInput)
 {
 	pgm_gsi_t gsi;
@@ -297,7 +331,7 @@ TEST (GsiEqualTest, HandlesNullInput)
 
 #ifdef _WIN32
 class WinSockEnvironment : public testing::Environment {
-	virtual ~Environment() {}
+	virtual ~WinSockEnvironment() {}
 
 	virtual void SetUp() {
 		WORD wVersionRequested = MAKEWORD (2, 2);
@@ -313,13 +347,27 @@ class WinSockEnvironment : public testing::Environment {
 #endif
 
 class Environment : public testing::Environment {
+protected:
+	MockRuntime			crt;
+	Pgm::internal::MockError	error;
+	Pgm::internal::MockMd5		md5;
+	Pgm::internal::FakeMessages	messages;
+
 public:
 	virtual ~Environment() {}
 
 	virtual void SetUp() {
+		under_test::crt		= &crt;
+		under_test::error	= &error;
+		under_test::md5		= &md5;
+		under_test::messages	= &messages;
 	}
 
 	virtual void TearDown() {
+		under_test::crt		= NULL;
+		under_test::error	= NULL;
+		under_test::md5		= NULL;
+		under_test::messages	= NULL;
 	}
 };
 
