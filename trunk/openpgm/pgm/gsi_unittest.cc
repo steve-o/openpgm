@@ -115,6 +115,7 @@ std::ostream& operator << (std::ostream& os, const pgm_error_t*& err)
 	else
 		os << '"' << err->message << '"';
 	os << " }";
+	return os;
 }
 
 /* Set the hostname returned by mocked gethostname() API.
