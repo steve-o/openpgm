@@ -1,6 +1,6 @@
---- net.c	2011-06-25 22:34:17.000000000 +0800
-+++ net.c89.c	2011-06-26 08:36:56.000000000 +0800
-@@ -65,6 +65,7 @@
+--- net.c	2011-06-27 22:54:07.000000000 +0800
++++ net.c89.c	2011-10-06 01:37:13.000000000 +0800
+@@ -67,6 +67,7 @@
  	pgm_assert( tolen > 0 );
  
  #ifdef NET_DEBUG
@@ -8,7 +8,7 @@
  	char saddr[INET_ADDRSTRLEN];
  	pgm_sockaddr_ntop (to, saddr, sizeof(saddr));
  	pgm_debug ("pgm_sendto (sock:%p use_rate_limit:%s minor_rate_control:%p use_router_alert:%s buf:%p len:%" PRIzu " to:%s [toport:%d] tolen:%d)",
-@@ -73,12 +74,14 @@
+@@ -75,12 +76,14 @@
  		(const void*)minor_rate_control,
  		use_router_alert ? "TRUE" : "FALSE",
  		(const void*)buf,
@@ -24,7 +24,7 @@
  	const SOCKET send_sock = use_router_alert ? sock->send_with_router_alert_sock : sock->send_sock;
  
  	if (use_rate_limit)
-@@ -106,9 +109,11 @@
+@@ -108,9 +111,11 @@
  	if (-1 != hops)
  		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, hops);
  
@@ -39,7 +39,7 @@
  		int save_errno = pgm_get_last_sock_error();
  		if (PGM_UNLIKELY(save_errno != PGM_SOCK_ENETUNREACH &&	/* Network is unreachable */
  		 		 save_errno != PGM_SOCK_EHOSTUNREACH &&	/* No route to host */
-@@ -124,23 +129,24 @@
+@@ -126,23 +131,24 @@
  			const int ready = poll (&p, 1, 500 /* ms */);
  #else
  			fd_set writefds;
@@ -73,7 +73,7 @@
  				{
  					char errbuf[1024];
  					char toaddr[INET6_ADDRSTRLEN];
-@@ -172,7 +178,9 @@
+@@ -174,7 +180,9 @@
  		pgm_sockaddr_multicast_hops (send_sock, sock->send_gsr.gsr_group.ss_family, sock->hops);
  	if (!use_router_alert && sock->can_send_data)
  		pgm_mutex_unlock (&sock->send_mutex);
