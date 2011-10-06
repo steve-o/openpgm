@@ -1,6 +1,7 @@
 ﻿#summary OpenPGM C Reference : Run With These Capabilities
 #labels Phase-Implementation
 
+=== Capabilities ===
 OpenPGM C programs require system capabilities from this list in order to function.
 
 <table border="1" cellpadding="5" cellspacing="0">
@@ -29,7 +30,7 @@ OpenPGM C programs require system capabilities from this list in order to functi
 </tr>
 </table>
 
-*`*` Clock selection* is specified by two system environment variables <tt>PGM_TIMER</tt> governing how to get the current time, and <tt>PGM_SLEEP</tt> governing how to wait for an interval of time.
+*`*` Clock selection* is specified by two system environment variables <tt>PGM_TIMER</tt> governing how to get the current time, and <tt>PGM_SLEEP</tt>^†^ governing how to wait for an interval of time.
 
 
 === Clock Selection ===
@@ -68,7 +69,13 @@ On Linux TSC is calibrated using the details provided by the kernel in <tt>/proc
 <td><tt>GETTIMEOFDAY</tt>`*`</td>
 <td>Use <tt>gettimeofday (tv, NULL)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/gettimeofday.2.html gettimeofday(2)] for further details.</td>
 </tr><tr>
-<td colspan="2"><h3>PGM_SLEEP</h3></td>
+<td><tt>MMTIME</tt>`*`</td>
+<td>Use Windows multi-media timers, lower resolution than other timers but offers greater stability and low cost for frequent usage.</td>
+</tr><tr>
+<td><tt>QPC</tt></td>
+<td>Use Windows Performance Counters, dependent upon accurate drivers and suitable "BIOS support" per the word of MSDN.  Windows selects the "best" underlying hardware timing mechanism to use, can be a combination of APIC, HPET and TSC for interpolation.</td>
+</tr><tr>
+<td colspan="2"><h3>PGM_SLEEP^†^</h3></td>
 </tr><tr>
 <td><tt>CLOCK_NANOSLEEP</tt></td>
 <td>Use <tt>clock_nanosleep (clk_id, TIMER_ABSTIME, tp, NULL)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/clock_nanosleep.2.html clock_nanoslepe(2)] for further details.</td>
@@ -100,7 +107,7 @@ On Linux TSC is calibrated using the details provided by the kernel in <tt>/proc
 </table>
 
 `*` Default settings.
-
+`†` Removed in OpenPGM version 3.0.
 
 === Examples ===
 Use the PGM protocol via raw sockets using the <tt>CAP_NET_RAW</tt> capability,
