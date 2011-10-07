@@ -52,6 +52,49 @@ The returned <tt>[OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]</tt> must be fr
 === Return Value ===
 On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned and if <tt>error</tt> is set it may be populated with details of the exception.
 
+
+=== Errors ===
+
+*PGM_ERROR_DOMAIN_IF, PGM_ERROR_INVAL,*
+  * _"'%c' is not a valid character."_
+    * Valid hostnames must conform to RFC 952, i.e. contain '`a`'-'`z`', `0`-`9`, a hyphen '`-`' or period '`.`'.  Valid IPv4 addresses can contain `0`-`9`, a period '`.`' and a forward slash '`/`' for CIDR blocks.  Valid IPv6 addresses can in addition contain a colon '`:`' and square brackets '`[`', '`]`'.  IPv6 addressing with zones may in addition contain percent mark '`%`' and underscore '`_`'.
+  * _"Send group list contains more than one entity."_
+    * PGM cannot simultaneously send to more than one group.
+  * _"Unresolvable receive group %s%s%s"_
+
+*PGM_ERROR_DOMAIN_IF, PGM_ERROR_XDEV,*
+  * _"Expecting network interface address, found IPv4 multicast network %s%s%s"_
+  * _"Expecting network interface address, found IPv6 multicast network %s%s%s"_
+  * _"Expecting interface address, found IPv4 multicast address %s%s%s"_
+  * _"Expecting interface address, found IPv6 multicast address %s%s%s"_
+  * _"Expecting interface address, found IPv4 multicast name %s%s%s"_
+  * _"Expecting interface address, found IPv6 multicast name %s%s%s"_
+  * _"Network name %s%s%s resolves to IPv4 mulicast address."_
+  * _"Network name %s%s%s resolves to IPv6 mulicast address."_
+
+*PGM_ERROR_DOMAIN_IF, PGM_ERROR_NODEV,*
+  * _"IP address family conflict when resolving network name %s%s%s, found AF_INET when AF_INET6 expected."_
+  * _"IP address family conflict when resolving network name %s%s%s, found AF_INET6 when AF_INET expected."_
+  * _"IP address family conflict when resolving network name %s%s%s, found IPv4 when IPv6 expected."_
+  * _"IP address family conflict when resolving network name %s%s%s, found IPv6 when IPv4 expected."_
+  * _"Not configured for IPv6 network name support, %s%s%s is an IPv6 network name."_
+  * _"IP address class conflict when resolving network name %s%s%s, expected IPv4 multicast."_
+  * _"IP address class conflict when resolving network name %s%s%s, expected IPv6 multicast."_
+  * _"Network name resolves to non-internet protocol address family %s%s%s"_
+  * _"No matching non-loopback and multicast capable network interface %s%s%s"_
+
+*PGM_ERROR_DOMAIN_IF, PGM_ERROR_NOTUNIQ,*
+  * _"Multiple interfaces found with network address %s."_
+  * _"Network interface name not unique %s%s%s"_
+    * PGM cannot simultaneously send to more than one group.
+
+*PGM_ERROR_DOMAIN_IF,*
+  * _"Numeric host resolution: %s(%d)"_
+  * _"Internet host resolution: %s(%d)"_
+  * _"Resolving receive group: %s(%d)"_
+    * Platform specific error.
+
+
 === Example ===
 Basic example using default hints.
 {{{
@@ -73,4 +116,3 @@ Basic example using default hints.
   * [OpenPgm5CReferenceInterface Interface] in OpenPGM C Reference.<br>
   * [OpenPgm5CReferenceErrorHandling Error Handling] in OpenPGM C Reference.<br>
   * [OpenPgmConceptsTransport#Network_Parameters Network Parameters] in the article Transport in OpenPGM Concepts.
-
