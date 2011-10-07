@@ -39,6 +39,14 @@ The GSI is specified when binding a new PGM transport with <tt>[OpenPgm5CReferen
 === Return Value ===
 On success, <tt>true</tt> is returned.  On error, <tt>false</tt> is returned.  If <tt>error</tt> is provided it may be set detailing the fault.
 
+
+=== Errors ===
+
+*PGM_ERROR_DOMAIN_IF,*
+  * _"Resolving hostname: %s"_
+    * Platform specific error.
+
+
 === Example ===
 Basic usage without error handling.
 
@@ -53,7 +61,8 @@ Display an error message detailing failure.
  pgm_gsi_t gsi;
  pgm_error_t *err = NULL;
  if (!pgm_gsi_create_from_hostname (&gsi, &err)) {
-   fprintf (stderr, "GSI failed: %s\n", (err && err->message) ? err->message : "(null)");
+   fprintf (stderr, "GSI failed: %s\n",
+            (err && err->message) ? err->message : "(null)");
    pgm_error_free (err);
    return EXIT_FAILURE;
  }
