@@ -34,6 +34,28 @@ Initiate a PGM socket connection.
 === Return Value ===
 On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned and if <tt>error</tt> is set it may be populated with details of the exception.
 
+
+=== Errors ===
+The following are general socket errors only. There may be other platform-specific error codes.
+
+*PGM_ERROR_DOMAIN_SOCKET,*
+  * _"Sending SPM broadcast: %s"_
+    * Platform specific error during socket send call.
+
+
+=== Example ===
+{{{
+pgm_sock_t *sock = NULL;
+pgm_error_t *err = NULL;
+if (!pgm_connect (sock, &err)) {
+  fprintf (stderr, "Connecting PGM socket: %s\n",
+           (err && err->message) ? err->message : "(null)");
+  pgm_error_free (err);
+  return EXIT_FAILURE;
+}
+}}}
+
+
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
