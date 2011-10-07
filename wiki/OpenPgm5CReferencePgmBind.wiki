@@ -70,6 +70,75 @@ Note not all operating systems segregate packets from different multicast group 
 === Return Value ===
 On success, <tt>true</tt> is returned.  On failure, <tt>false</tt> is returned and if <tt>error</tt> is set it may be populated with details of the exception.
 
+
+=== Errors ===
+The following are general socket errors only. There may be other platform-specific error codes.
+
+*PGM_ERROR_DOMAIN_SOCKET, PGM_ERROR_FAILED,*
+  * _"Invalid maximum TPDU size."_
+    * Common to both send and receive side sockets.
+  * _"SPM ambient interval not configured."_
+  * _"SPM heartbeat interval not configured."_
+  * _"TXW_SQNS not configured."_
+  * _"TXW_MAX_RTE not configured."_
+    * Send-side options are incomplete or invalid.
+  * _"RXW_SQNS not configured."_
+  * _"RXW_MAX_RTE not configured."_
+  * _"Peer timeout not configured."_
+  * _"SPM-Request timeout not configured."_
+  * _"NAK_BO_IVL not configured."_
+  * _"NAK_RPT_IVL not configured."_
+  * _"NAK_RDATA_IVL not configured."_
+  * _"NAK_DATA_RETRIES not configured."_
+  * _"NAK_NCF_RETRIES not configured."_
+    * Receive-side options are incomplete or invalid.
+  * _"Creating ACK notification channel: %s"_
+  * _"Creating RDATA notification channel: %s"_
+  * _"Creating waiting peer notification channel: %s"_
+    * Resource shortage such as insufficient socket handles or file descriptors.
+  * _"Binding receive socket to address %s: %s"_
+  * _"Binding send socket to address %s: %s"_
+  * _"Binding IP Router Alert (RFC 2113) send socket to address %s: %s"_
+    * A platform specific error such as address conflict or insufficient privileges.
+
+*PGM_ERROR_DOMAIN_IF,*
+  * _"Enumerating network interfaces: %s"_
+    * An operating system error or resource shortage.  Typically a socket needs to be created to enumerate the systems interfaces and socket handle or file descriptor shortage will cause a failure.
+
+*PGM_ERROR_DOMAIN_IF, PGM_ERROR_NODEV,*
+  * _"No matching network interface index: %i"_
+    * The interface specified for binding no longer exists, such as a user unplugging a USB WiFi adapter.
+
+
+=== Example ===
+Example binding to a fully specified interface set with a PGM/UDP socket and IPv4 addressing.
+{{{
+pgm_sock_t *sock = NULL;
+struct pgm_sockaddr_t addr;
+struct pgm_interface_req_t if_req;
+pgm_error_t *err = NULL;
+if (!pgm_bind3 (sock,
+                &addr, sizeof (addr),
+                &if_req, sizeof (if_req),        /* tx interface */
+                &if_req, sizeof (if_req),        /* rx interface */
+                &err))
+{
+  fprintf (stderr, "Binding PGM socket: %s\n",
+           (err && err->message) ? err->message : "(null)");
+  pgm_error_free (err);
+  return EXIT_FAILURE;
+}
+}}}
+
+Producing the following output:
+{{{
+Trace: Assuming IP header size of 20 bytes
+Trace: Assuming UDP header size of 8 bytes
+Trace: Binding receive socket to INADDR_ANY
+Trace: Binding send socket to interface index 2
+}}}
+
+
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSockAddrT pgm_sockaddr_t]</tt><br>
