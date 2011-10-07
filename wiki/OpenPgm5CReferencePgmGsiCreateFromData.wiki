@@ -37,14 +37,14 @@ Create a GSI based on MD5 of provided data buffer.
 
 
 === Return Value ===
-On success, <tt>true</tt> is returned.  On error, <tt>false</tt> is returned.
+On success, <tt>true</tt> is returned.  On invalid parameters, <tt>false</tt> is returned.
 
 === Example ===
 {{{
  pgm_gsi_t gsi;
  unsigned char buf[] = { 0x1, 0x2, 0x3, 0x4 };
  if (!pgm_create_data_gsi (&gsi, buf, sizeof(buf))) {
-   fprintf (stderr, "GSI failed.\n");
+   fprintf (stderr, "Invalid parameters.\n");
    return EXIT_FAILURE;
  }
 }}}
