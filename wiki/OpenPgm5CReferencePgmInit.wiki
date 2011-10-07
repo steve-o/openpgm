@@ -30,11 +30,13 @@ Until the first call to <tt>pgm_init()</tt>, all events, queues, and transports 
  if (!pgm_supported ()) pgm_init (NULL);
 }}}
 
+The number of CPUs will be enumerated on the system, if it is detected that only one core is available to the process then busy-wait loops will perform a thread yield or equivalent.  The number of cores can be restricted as per the operating systems process affinity settings, but changing the number of bound cores after calling <tt>pgm_init()</tt> will not update the busy-wait handling.
+
+Memory management for running under a profiler such as Valgrind is configurable via <tt>[OpenPgm5CReferenceEnvironment PGM_DEBUG]</tt> environment variable.  Set to <tt>gc-friendly</tt> to ensure all allocated memory that isn't directly initialized will be reset to 0.
+
 On Microsoft Windows platforms <tt>pgm_init()</tt> will request 1ms minimum resolution timers via the <tt>[http://msdn.microsoft.com/en-us/library/dd757624(v=vs.85).aspx timeBeginPeriod()]</tt> function.  The resolution period is relinquished on shutdown of the PGM engine via <tt>[OpenPgm5CReferencePgmShutdown pgm_shutdown()]</tt>.
 
 The timer mechanism is configurable via the <tt>[OpenPgmCReferenceRunWithTheseCapabilities PGM_TIMER]</tt> environment variable.
-
-Memory management for running under a profiler such as Valgrind is configurable via <tt>[OpenPgm5CReferenceEnvironment PGM_DEBUG]</tt> environment variable.  Set to <tt>gc-friendly</tt> to ensure all allocated memory that isn't directly initialized will be reset to 0.
 
 The PGM protocol number will be read from any system supported name services, for example <tt>/etc/protocols</tt>.  If not configured in the system, or the system does not support such a database the protocol number will default to 113.
 
@@ -83,7 +85,8 @@ The following are general initialization errors only.  There may be other platfo
 {{{
  pgm_error_t *err = NULL;
  if (!pgm_init (&err)) {
-   fprintf (stderr, "PGM Engine initialization error %s\n", (err && err->message) ? err->message : "(null)");
+   fprintf (stderr, "PGM Engine initialization error %s\n",
+            (err && err->message) ? err->message : "(null)");
    pgm_error_free (err);
    return EXIT_FAILURE;
  }
