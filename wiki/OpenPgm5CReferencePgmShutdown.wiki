@@ -16,7 +16,7 @@ Shutdown OpenPGM internal machinery.
 On Microsoft Windows platforms <tt>pgm_shutdown()</tt> will relinquish use of 1ms high resolution timers via the <tt>[http://msdn.microsoft.com/en-us/library/dd757626(v=vs.85).aspx timeEndPeriod()]</tt> function.
 
 === Return Value ===
-On success, returns <tt>true</tt>.  On failure, returns <tt>false</tt>.
+On success, returns <tt>true</tt>.  If the library was not initialized with a call to <tt>[OpenPgm5CReferencePgmInit pgm_init()]</tt>, or calls to <tt>pgm_shutdown()</tt> without a matching <tt>pgm_init()</tt> have occurred then the return value will be <tt>false</tt>.
 
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmSupported pgm_supported()]</tt><br>
