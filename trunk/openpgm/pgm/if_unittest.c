@@ -264,7 +264,7 @@ mock_setup_net (void)
 	APPEND_NETWORK(	"loopback",	"127.0.0.0");
 	APPEND_NETWORK(	"private",	"10.6.28.0");
 	APPEND_NETWORK(	"private2",	"172.16.90.0");
-#ifndef CONFIG_HAVE_GETNETENT
+#ifndef HAVE_GETNETENT
 	APPEND_NETWORK( "pgm-private",	"239.192.0.1");
 	APPEND_NETWORK(	"ip6-private",	"2002:dce8:d28e::");
 	APPEND_NETWORK( "ip6-pgm-private","ff08::1");
@@ -833,7 +833,7 @@ static const struct test_case_t cases_001[] = {
 	{ ";239.192.0.1;PGM.MCAST.NET",		";[ff08::1];IP6-PGM.MCAST.NET"		},
 	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;ff08::1"		},
 	{ ";PGM.MCAST.NET;239.192.0.1",		";IP6-PGM.MCAST.NET;[ff08::1]"		},
-#ifndef CONFIG_HAVE_GETNETENT
+#ifndef HAVE_GETNETENT
 	{ "pgm-private",			/* ‡ */ "ip6-pgm-private"			},
 	{ ";pgm-private",			/* ‡ */ ";ip6-pgm-private"			},
 	{ ";pgm-private;pgm-private",		/* ‡ */ ";ip6-pgm-private;ip6-pgm-private" 	},
@@ -864,7 +864,7 @@ START_TEST (test_parse_transport_pass_001)
 /* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
  *   pgm_if_parse_transport will fail.
  */
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef HAVE_GETNETENT
 	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
 	{
 		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
@@ -911,7 +911,7 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_INTERFACE ";239.192.0.1;PGM.MCAST.NET",	/* † */ MOCK_INTERFACE ";[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;ff08::1"	},
 	{ MOCK_INTERFACE ";PGM.MCAST.NET;239.192.0.1",	/* † */	MOCK_INTERFACE ";IP6-PGM.MCAST.NET;[ff08::1]"	},
-#ifndef CONFIG_HAVE_GETNETENT
+#ifndef HAVE_GETNETENT
 	{ MOCK_INTERFACE ";pgm-private",		/* ‡ */ MOCK_INTERFACE ";ip6-pgm-private" },
 	{ MOCK_INTERFACE ";pgm-private;pgm-private",	/* ‡ */ MOCK_INTERFACE ";ip6-pgm-private;ip6-pgm-private" },
 #endif
@@ -933,7 +933,7 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_ADDRESS ";239.192.0.1;PGM.MCAST.NET",	"[" MOCK_ADDRESS6 "];[ff08::1];IP6-PGM.MCAST.NET"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 ";IP6-PGM.MCAST.NET;ff08::1"	},
 	{ MOCK_ADDRESS ";PGM.MCAST.NET;239.192.0.1",	"[" MOCK_ADDRESS6 "];IP6-PGM.MCAST.NET;[ff08::1]"	},
-#ifndef CONFIG_HAVE_GETNETENT
+#ifndef HAVE_GETNETENT
 	{ MOCK_ADDRESS ";pgm-private",			MOCK_ADDRESS6 ";ip6-pgm-private" },
 	{ MOCK_ADDRESS ";pgm-private",			"[" MOCK_ADDRESS6 "];ip6-pgm-private" },
 	{ MOCK_ADDRESS ";pgm-private;pgm-private",	MOCK_ADDRESS6 ";ip6-pgm-private;ip6-pgm-private" },
@@ -967,7 +967,7 @@ static const struct test_case_t cases_002[] = {
 	{ MOCK_HOSTNAME ";239.192.0.1;PGM.MCAST.NET",	MOCK_HOSTNAME6 ";[ff08::1];IP6-PGM.MCAST.NET" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;ff08::1" },
 	{ MOCK_HOSTNAME ";PGM.MCAST.NET;239.192.0.1",	MOCK_HOSTNAME6 ";IP6-PGM.MCAST.NET;[ff08::1]" },
-#ifndef CONFIG_HAVE_GETNETENT
+#ifndef HAVE_GETNETENT
 	{ MOCK_HOSTNAME ";pgm-private",			MOCK_HOSTNAME6 ";ip6-pgm-private" },
 	{ MOCK_HOSTNAME ";pgm-private;pgm-private",	MOCK_HOSTNAME6 ";ip6-pgm-private;ip6-pgm-private" },
 #endif
@@ -991,7 +991,7 @@ START_TEST (test_parse_transport_pass_002)
 /* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
  *   pgm_if_parse_transport will fail.
  */
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef HAVE_GETNETENT
 	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
 	{
 		g_message ("IPv6 exception, /etc/networks not supported on this platform.");
@@ -1044,7 +1044,7 @@ static const struct test_case_t cases_003[] = {
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;239.192.0.1",	MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;[ff08::1]"	},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET",		MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET"		},
 	{ MOCK_ADDRESS "/24;PGM.MCAST.NET;PGM.MCAST.NET",MOCK_ADDRESS6 "/64;IP6-PGM.MCAST.NET;IP6-PGM.MCAST.NET"	},
-#ifndef CONFIG_HAVE_GETNETENT
+#ifndef HAVE_GETNETENT
 	{ MOCK_ADDRESS "/24;pgm-private",		/* ‡ */ MOCK_ADDRESS6 "/64;ip6-pgm-private"			},
 	{ MOCK_ADDRESS "/24;pgm-private;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ip6-pgm-private;ip6-pgm-private"	},
 	{ MOCK_ADDRESS "/24;239.192.0.1;pgm-private",	/* ‡ */ MOCK_ADDRESS6 "/64;ff08::1;ip6-pgm-private"		},
@@ -1074,7 +1074,7 @@ START_TEST (test_parse_transport_pass_003)
 /* ‡ Linux does not support IPv6 /etc/networks so IPv6 entries appear as 255.255.255.255 and
  *   pgm_if_parse_transport will fail.
  */
-#ifdef CONFIG_HAVE_GETNETENT
+#ifdef HAVE_GETNETENT
 	if (NULL != strstr (s, MOCK_NETWORK6) || NULL != strstr (s, MOCK_PGM_NETWORK6))
 	{
 		g_message ("IPv6 exception, /etc/networks not supported on this platform.");

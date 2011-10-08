@@ -202,7 +202,7 @@ mock_sendto (
 	return len;
 }
 
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 int
 mock_poll (
 	struct pollfd*		fds,

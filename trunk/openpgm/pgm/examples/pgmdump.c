@@ -133,17 +133,6 @@ on_startup (
 /* find PGM protocol id */
 // TODO: fix valgrind errors
 	int ipproto_pgm = IPPROTO_PGM;
-#ifdef HAVE_GETPROTOBYNAME_R
-	char b[1024];
-	struct protoent protobuf, *proto;
-	e = getprotobyname_r ("pgm", &protobuf, b, sizeof(b), &proto);
-	if (e != -1 && proto != NULL) {
-		if (proto->p_proto != ipproto_pgm) {
-			g_message ("Setting PGM protocol number to %i from /etc/protocols.\n");
-			ipproto_pgm = proto->p_proto;
-		}
-	}
-#else
 	struct protoent *proto = getprotobyname ("pgm");
 	if (proto != NULL) {
 		if (proto->p_proto != ipproto_pgm) {
@@ -152,7 +141,6 @@ on_startup (
 			ipproto_pgm = proto->p_proto;
 		}
 	}
-#endif
 
 /* open socket for snooping */
 	g_message ("opening raw socket.");
