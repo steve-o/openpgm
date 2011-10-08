@@ -587,6 +587,7 @@ parse_interface (
 						memcpy (&addr[i++], res->ai_addr, pgm_sockaddr_len (res->ai_addr));
 					}
 					freeaddrinfo (result);
+/* address list complete */
 					check_addr = TRUE;
 					break;
 				}
@@ -599,12 +600,20 @@ parse_interface (
 							continue;
 						break;
 					}
+/* verify entry was found */
+					pgm_assert (NULL != res);
 				}
 				else /* addr_cnt == 0 ∴  use last entry */
 				{
 					for (res = result; NULL != res->ai_next; res = res->ai_next);
 					addr_cnt++;
+/* verify entry is valid */
+					pgm_assert (NULL != res);
 				}
+			}
+			else
+			{
+				res = result;	/* only one result */
 			}
 
 			if (AF_INET == res->ai_family &&
