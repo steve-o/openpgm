@@ -80,7 +80,7 @@ PGM Sockets manage network connections and send outbound messages.
 <td>PGM endpoint address.</td>
 </tr><tr>
 <td><tt>[OpenPgm5CReferencePgmRecv pgm_recv()]</tt></td>
-<td>Receive a message from the PGM socket.</td>
+<td>Receive a message from the PGM socket and drive the PGM receive and send state machines.</td>
 </tr><tr>
 <td><tt>[OpenPgm5CReferencePgmRecv pgm_recvfrom()]</tt></td>
 <td>Receive a message from the PGM socket saving source address.</td>
@@ -131,4 +131,3 @@ PGM Sockets manage network connections and send outbound messages.
 <td>Fill <tt>epoll_event</tt> parameters in preparation for <tt>epoll_wait()</tt>.</td>
 </tr>
 </table>
-
