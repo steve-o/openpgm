@@ -8,7 +8,7 @@ Import('env');
 e = env.Clone();
 e.Prepend(LIBS = ['libpgm']);
 p = e.Clone();
-if '-DCONFIG_HAVE_GETOPT' in env['CCFLAGS']:
+if '-DHAVE_GETOPT' in env['CCFLAGS']:
 	getopt = []
 else:
 	getopt = ['getopt.c']
@@ -33,11 +33,11 @@ if e['WITH_GLIB'] == 'true':
 # sync examples
 	e.Program(['blocksyncrecv.c'])
 	e.Program(['snonblocksyncrecv.c'])
-	if '-DCONFIG_HAVE_POLL' in e['CCFLAGS']:
+	if '-DHAVE_POLL' in e['CCFLAGS']:
 		e.Program(['pnonblocksyncrecv.c'])
 
 # epoll based examples
-	if '-DCONFIG_HAVE_EPOLL' in e['CCFLAGS']:
+	if '-DHAVE_EPOLL_CTL' in e['CCFLAGS']:
 		e.Program(['enonblocksyncrecv.c'])
 		e.Program(['enonblocksyncrecvmsg.c'])
 		e.Program(['enonblocksyncrecvmsgv.c'])
