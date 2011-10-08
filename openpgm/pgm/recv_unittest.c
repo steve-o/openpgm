@@ -613,7 +613,7 @@ mock_pgm_verify_ncf (
 }
 
 /** socket module */
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 int
 mock_pgm_poll_info (
 	pgm_sock_t* const	sock,
