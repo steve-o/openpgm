@@ -34,6 +34,21 @@ Destroy a transport.
 === Return Value ===
 On success, returns <tt>true</tt>.  On invalid parameter, returns <tt>false</tt>.
 
+
+=== Example ===
+{{{
+pgm_sock_t *sock;
+pgm_close (sock, FALSE);
+}}}
+Displaying the following output.
+{{{
+Trace: Closing receive socket.
+Trace: Closing send socket.
+Trace: Destroying rate control.
+Trace: Closing send with router alert socket.
+}}}
+
+
 === See Also ===
   * <tt>[OpenPgm5CReferencePgmSockT pgm_sock_t]</tt><br>
   * <tt>[OpenPgm5CReferencePgmSocket pgm_socket()]</tt><br>
