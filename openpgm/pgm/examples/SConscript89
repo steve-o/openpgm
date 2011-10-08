@@ -8,7 +8,7 @@ Import('env');
 e = env.Clone();
 e.Prepend(LIBS = ['libpgm89']);
 p = e.Clone();
-if '-DCONFIG_HAVE_GETOPT' in env['CCFLAGS']:
+if '-DHAVE_GETOPT' in env['CCFLAGS']:
 	getopt = []
 else:
 	getopt = ['getopt.c']
