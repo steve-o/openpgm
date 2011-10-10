@@ -523,10 +523,10 @@ pgm_sockaddr_router_alert (
 #else
 /* manually set the IP option */
 #	ifndef _WIN32
-	const int ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
-	const int router_alert = htonl (ipopt_ra);
+	const uint32_t ipopt_ra = ((uint32_t)PGM_IPOPT_RA << 24) | (0x04 << 16);
+	const uint32_t router_alert = htonl (ipopt_ra);
 #	else
-	const DWORD ipopt_ra = (PGM_IPOPT_RA << 24) | (0x04 << 16);
+	const DWORD ipopt_ra = ((DWORD)PGM_IPOPT_RA << 24) | (0x04 << 16);
 	const DWORD router_alert = htonl (ipopt_ra);
 #	endif
 	const int optlen = v ? sizeof (router_alert) : 0;
