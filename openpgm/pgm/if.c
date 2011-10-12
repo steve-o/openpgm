@@ -171,7 +171,8 @@ pgm_if_print_all (void)
 	pgm_freeifaddrs (ifap);
 
 /* discover default network parameter */
-	if (pgm_getaddrinfo ("", NULL, &res, NULL)) {
+	if (pgm_getaddrinfo ("", NULL, &res, NULL))
+	{
 		char network[INET6_ADDRSTRLEN], group[INET6_ADDRSTRLEN];
 		struct sockaddr_storage ifaddr;
 		struct sockaddr* addr = (struct sockaddr*)&res->ai_recv_addrs[0].gsr_group;
@@ -195,6 +196,8 @@ pgm_if_print_all (void)
 		pgm_info (_("Default network: \"%s;%s\""), network, group);
 		pgm_freeaddrinfo (res);
 	}
+	else
+		pgm_warn (_("Failed to discover default network parameters, verify hostname configuration."));
 }
 
 /* Equivalent to the description of inet_lnaof(), extract the host
@@ -353,7 +356,9 @@ parse_interface (
 		(const void*)ir,
 		(const void*)error);
 
-/* strip any square brackets for IPv6 early evaluation */
+/* Strip any square brackets for IPv6 early evaluation.  RFC 2732 defines the
+ * term "ipv6reference" for a IPv6 literal address enclosed in square brackets.
+ */
 	if (AF_INET != family &&
 	    '[' == ifname[0])
 	{
@@ -367,7 +372,9 @@ parse_interface (
 		}
 	}
 
-/* network address: in_addr in host byte order */
+/* Network address: e.g. 172.16.0.0, fc00::, or even fec0::%qe0 for scope.
+ * For IPv4 use compatibiltiy API with in_addr in host byte order.
+ */
 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
 	{
 #ifdef IF_DEBUG
@@ -382,6 +389,7 @@ parse_interface (
 				     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
 			return FALSE;
 		}
+/* promote to sockaddr and avoid type punning */
 		struct sockaddr_in s4;
 		memset (&s4, 0, sizeof(s4));
 		s4.sin_family = AF_INET;
@@ -391,6 +399,9 @@ parse_interface (
 		check_inet_network = TRUE;
 		check_addr = TRUE;
 	}
+/* For IPv6 use an internal API that mimicks inet_network but works with sockaddr
+ * instead of in6_addr, the promotion is required to save the scope identifier.
+ */
 	if (AF_INET  != family && 0 == pgm_sa6_network (ifname, &sa6_addr))
 	{
 		if (IN6_IS_ADDR_MULTICAST(&sa6_addr.sin6_addr)) {
@@ -407,7 +418,7 @@ parse_interface (
 		check_addr = TRUE;
 	}
 
-/* numeric host with scope id */
+/* numeric host with scope id, e.g. abcd::1%eth0 */
 	if (!check_addr)
 	{
 		char errbuf[1024];
@@ -465,7 +476,8 @@ parse_interface (
 		}
 	}
 
-/* network name into network address, can be expensive with NSS network lookup
+/* Network name into network address, can be expensive with NSS network lookup.
+ * Limitation as per the man page NETWORKS(5):
  *
  * Only Class A, B or C networks are supported, partitioned networks
  * (i.e. network/26 or network/28) are not supported by this facility.
