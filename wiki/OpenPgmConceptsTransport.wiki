@@ -41,47 +41,66 @@ The TIBCO Rendezvous network parameter consists of up to three parts, separated 
 </pre>
 
 ===== Part One—Interface =====
-Part one identifies the network interface, which you can specify a list of interfaces in several ways:
+Part one identifies the network interface, which you can specify a list of interfaces in several ways.  For compatibility with URL addressing square brackets around IPv6 literal addresses will be ignored.  The format of IPv6 scope identifiers depends upon the operating system, typically Windows will use a numeric index, e.g. <tt>fe80::5efe:169.254.203.133%16</tt>, and Unixes will use the adapter name, e.g. <tt>fe80::21e:52ff:fef2:7854%en0</tt>.
 <pre>
- Interface name            When an application specifies an interface name, the transport creation
+ Interface name§           When an application specifies an interface name, the transport creation
                            function searches the interface table for the specified interface name. 
-                           For example, eth0.
+                           For example, eth0, eri0, etc.
  
  Host IP address           A standard IPv4 or IPv6 multi-part address.
-                           For example: "4.2.2.2"
+                           For example: "4.2.2.2", "abcd::1", "`[`b00c::2`]`"
  
- Network IP                An IPv4 or IPv6 multi-part network prefix with optional size.
- number                    For example: "10.4", "127.1/8", "beef::"
+ Network IP                An IPv4 or IPv6 multi-part network prefix with optional CIDR block size
+ number                    and scope identifier.
+                           For example: "10.4", "127.1/8", "beef::", "fe80::/64%eth0"
  
- Host name                 A NSS resolvable hosts name.
+ Host name⁂                A NSS resolvable hosts name.
                            For example: "localhost"
  
- Network name              A NSS resolvable networks name.
+ Network name†‡¶           A NSS resolvable networks name.
                            For example: "link-local"
  
  Default                   The default interface as per multicast routing tables.
-</pre>
 
 Notes:
-  * When using Source-Specific Multicast (SSM) through a router IPv4 addresses must be in the range 232/8, IPv6 must be FF3 _x_::/96.  On a simple switched environment any multicast address *may* work.
-  * Linux does not support IPv6 NSS network names and any query will return <tt>INADDR_BROADCAST</tt>.
-  * Specifying an interface name in a multi-scoped IPv6 environment will return an error, the IP or network address should be specified instead.
-  * A default Linux DHCP install will have the hostname resolving to 127.0.1.1 and will broadcast this address for repairs in effect disabling PGM reliability.  Ensure that the hostname resolves to an Ethernet link or specify the Ethernet network as the first entity.
-  * On Linux incoming multicast packets are multiplexed to all listeners regardless of the group joined on the socket.  For example when _application A_ joins groups 239.192.0.1 and 239.192.0.2, whilst _application B_ joins only 239.192.0.1, both will receive packets sent to 239.192.0.2.
-  * On POSIX platforms network names are resolved through the [http://en.wikipedia.org/wiki/Name_Service_Switch Name Service Switch] function which allows administrators to deploy configuration through files, LDAP, NIS, and other services.  The networks name service does not support IPv6.  An alternative system is provided to read the files databases directly and as such extends compatibility to Microsoft Windows patforms that do not export an API for reading <tt>%SystemRoot%\system32\drivers\etc\networks</tt>.  Define the environment variable <tt>PGM_NETDB</tt> to override default function usage.
-  * IPv6 zone identifiers may be used to simplify link-local usage, e.g. <tt>[fe80::%19/64]</tt> to use adapter #19.
+  § Specifying an interface name in a multi-scoped IPv6 environment will return an error, the IP
+    or network address should be specified instead.
+
+  ⁂ A default Linux DHCP install will have the hostname resolving to 127.0.1.1 and will broadcast
+    this address for repairs in effect disabling PGM reliability.  Ensure that the hostname
+    resolves to an Ethernet link or specify the Ethernet network as the first entity.
+
+  † Linux does not support IPv6 NSS network names and any query will return INADDR_BROADCAST.
+
+  ‡ Linux NSS networks only supports class A, B, C networking.
+
+  ¶ A compatibility implementation is provided for platforms without full support, see the
+    section "_NSS Networks Compatibility_".
+</pre>
 
 
 ===== Part Two—Receive Groups =====
-a list of one or more multicast groups to join, specified as IP addresses or DNS resolvable names, separated by commas. Each address in part two must denote a valid multicast address. Joining a multicast group enables listeners on the resulting transport to receive data sent to that multicast group.
+A list of one or more multicast groups to join, specified as IP addresses or DNS resolvable names, separated by commas. Each address in part two must denote a valid multicast address. Joining a multicast group enables listeners on the resulting transport to receive data sent to that multicast group.
 
-DNS can be used to specify multicast addresses, some pre-defined by IANA such as ALL-SYSTEMS.MCAST.NET resolves to 224.0.0.1.
+DNS or NSS can be used to specify multicast addresses, some names are pre-defined by IANA such as <tt>ALL-SYSTEMS.MCAST.NET</tt> resolving to 224.0.0.1.
+
+When using Source-Specific Multicast (SSM) through a router IPv4 addresses must be in the range 232/8, IPv6 must be FF3 _x_::/96.  On a simple switched environment any multicast address *may* work but is not guaranteed.
+
+On Linux incoming multicast packets are multiplexed to all listeners regardless of the group joined on the socket.  For example when _application A_ joins groups 239.192.0.1 and 239.192.0.2, whilst _application B_ joins only 239.192.0.1, both will receive packets sent to 239.192.0.2.  This is different behaviour to WinSock on Windows.
 
 
 ===== Part Three-Send Group =====
 Part three is a single send address. When a program sends multicast data on the resulting transport, it is sent to this address. The send address need not be among the list of multicast groups joined in part two.
 
 If you join one or more multicast groups in part two, but do not specify a send address in part three, the send address defaults to the first multicast group listed in part two.
+
+
+==== NSS Networks Compatibility ====
+On POSIX platforms network names are resolved through the [http://en.wikipedia.org/wiki/Name_Service_Switch Name Service Switch] function which allows administrators to deploy configuration through files, LDAP, NIS, and other services.
+
+Unfortunately the Linux networks name service does not support IPv6, an alternative system is provided to read the <tt>/etc/networks</tt> file database directly and extends compatibility to Microsoft Windows patforms that do not export an API at all.
+
+Define the environment variable <tt>PGM_NETDB</tt> with the file database location to override the default system implementation.  On Windows platforms the default configuration file can be found at <tt>%SystemRoot%\system32\drivers\etc\networks</tt>, environmental variables will be expanded as required.
 
 
 === PGM Sessions ===
