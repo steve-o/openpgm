@@ -1,6 +1,10 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * ショートケーキ PGM receiver
+ * ショートケーキ PGM receiver.  An asynchronous receive-
+ * only socket example.  Many middleware libraries implement a queue between
+ * the raw socket and the application.  The separation can be used to present
+ * reconstructed fragmented packets, filtering, and more fundamentally event
+ * notification that is a 1:1 correlation with available data.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *

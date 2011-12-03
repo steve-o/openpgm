@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * プリン PGM receiver
+ * プリン C++ PGM receiver.  A port of purinrecv.c to the overly
+ * cumbersome Boost ASIO styled C++ wrapper.  Used to test C++ builds
+ * don't break.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *

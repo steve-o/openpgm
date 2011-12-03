@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple receiver using the PGM transport, based on enonblocksyncrecvmsgv :/
+ * Simple receiver using the PGM socket and the GLib framework.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *

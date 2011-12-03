@@ -1,6 +1,7 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * プリン PGM sender
+ * プリン C++ PGM sender.  A port of purinsend.c to the overly
+ * cumbersome Boost Asio styled C++ wrapper.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *

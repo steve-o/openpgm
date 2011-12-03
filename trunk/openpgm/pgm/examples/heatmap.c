@@ -1,3 +1,7 @@
+/* Utility tool to convert pgmping recorded latency files into gnuplot
+ * source files for drawing a heatmap.
+ */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
