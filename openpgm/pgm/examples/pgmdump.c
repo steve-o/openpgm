@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Dump PGM packets to the console.
+ * Dump PGM packets to the console similar to tcpdump, but not as good.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *

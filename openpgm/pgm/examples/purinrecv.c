@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * プリン PGM receiver
+ * プリン PGM receiver.  A simple demonstration of synchronous
+ * receive-only PGM sockets.  No additional dependencies for maximum
+ * portability.  Pairs up with purinsend.c or daytime.c as the send-side.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *

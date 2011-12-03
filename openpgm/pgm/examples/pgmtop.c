@@ -1,6 +1,6 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * PGM packet monitor.
+ * NCurses based PGM packet monitor: use Wireshark instead.
  *
  * Copyright (c) 2006-2007 Miru Limited.
  *
