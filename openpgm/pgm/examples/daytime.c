@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Daytime broadcast service.
+ * Daytime broadcast service.  A long running PGM send-only socket with
+ * reliability.  Periodically broadcasts a timestamp.  No additional
+ * dependencies aside of pthread outside of Windows.
  *
  * Copyright (c) 2010 Miru Limited.
  *

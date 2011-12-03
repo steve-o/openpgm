@@ -1,6 +1,8 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * プリン PGM sender
+ * プリン PGM sender.  A simple one-shot unreliable send.  Compare a
+ * reliable implementation would wait TXW_SECS + max(IHB_IVL) duration
+ * before terminating, which could easily be ~30-60 seconds.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *

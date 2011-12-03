@@ -1,6 +1,12 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple send/reply ping tool using the PGM transport.
+ * Complex send/reply ping tool for performance testing.  Performs
+ * coarse grain rate limiting outside of the PGM transport in order to
+ * leave network capacity for recovery traffic.
+ *
+ * Depends upon GLib framework for accelerated development, depends
+ * upon Google Protocol Bufers for the messaging layer.  The build
+ * scripts are hardcoded with paths and need to be manually updated.
  *
  * With no arguments, one message is sent per second.
  *

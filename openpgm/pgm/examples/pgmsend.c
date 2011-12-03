@@ -1,6 +1,7 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * Simple sender using the PGM transport.
+ * Simple one-sot unreliable sender using the PGM transport.  Depends
+ * upon the GLib framework for portability and rapid development.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *
