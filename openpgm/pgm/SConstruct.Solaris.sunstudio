@@ -161,9 +161,9 @@ env = Environment(
 #			'-DHAVE_HOST_ORDER_IP_LEN',
 #			'-DHAVE_HOST_ORDER_IP_OFF',
 # ticket based spinlocks
-			'-DUSE_TICKET_SPINLOCK',
+#			'-DUSE_TICKET_SPINLOCK',
 # dumb read-write spinlock
-			'-DUSE_DUMB_RWSPINLOCK',
+#			'-DUSE_DUMB_RWSPINLOCK',
 # GNU getopt
 			'-DHAVE_GETOPT'
 		 ],

@@ -214,20 +214,13 @@ struct pgm_opt_fragment {
 
 /* 9.3.5.  Option NAK List - OPT_NAK_LIST
  *
- * GNU C allows opt_sqn[0], ISO C89 requireqs opt_sqn[1], ISO C99 permits opt_sqn[]
+ * GNU C allows opt_sqn[0], ISO C89 requireqs opt_sqn[1], ISO C99 permits
+ * opt_sqn[], but C++11 joins the party with only partial C99 support.
  */
 struct pgm_opt_nak_list {
 	uint8_t		opt_reserved;		/* reserved */
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-/* C99 flexible array, sizeof() invalid */
-	uint32_t	opt_sqn[];		/* requested sequence number [62] */
-#elif !defined(__STDC_VERSION__) || defined(__cplusplus)
 /* C90 and older */
-	uint32_t	opt_sqn[1];
-#else
-/* GNU C variable-length object */
-	uint32_t	opt_sqn[0];
-#endif
+	uint32_t	opt_sqn[1];		/* requested sequence number [62] */
 };
 
 /* 9.4.2.  Option Join - OPT_JOIN */
