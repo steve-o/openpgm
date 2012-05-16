@@ -236,16 +236,6 @@ pgm_skb_zero_pad (
 	const uint16_t			len
 	)
 {
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-/* C99 version */
-	if (skb->zero_padded)
-		return;
-
-	const uint16_t tailroom = MIN(pgm_skb_tailroom (skb), len);
-	if (tailroom > 0)
-		memset (skb->tail, 0, tailroom);
-	skb->zero_padded = 1;
-#else
 /* C89 version */
 	const uint16_t tailroom = MIN(pgm_skb_tailroom (skb), len);
 	if (skb->zero_padded)
@@ -254,7 +244,6 @@ pgm_skb_zero_pad (
 	if (tailroom > 0)
 		memset (skb->tail, 0, tailroom);
 	skb->zero_padded = 1;
-#endif
 }
 
 PGM_END_DECLS
