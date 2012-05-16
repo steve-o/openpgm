@@ -132,15 +132,6 @@ pgm_gfdiv (
 	pgm_gf8_t	b
         )
 {
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
-/* C99 version */
-	if (PGM_UNLIKELY( !a )) {
-		return 0;
-	}
-
-	const int sum = pgm_gflog[ a ] - pgm_gflog[ b ];
-	return sum < 0 ? pgm_gfantilog[ sum + PGM_GF_MAX ] : pgm_gfantilog[ sum ];
-#else
 /* C89 version */
 	const int sum = pgm_gflog[ a ] - pgm_gflog[ b ];
 	if (PGM_UNLIKELY( !a )) {
@@ -148,7 +139,6 @@ pgm_gfdiv (
 	}
 
 	return sum < 0 ? pgm_gfantilog[ sum + PGM_GF_MAX ] : pgm_gfantilog[ sum ];
-#endif
 }
 
 PGM_END_DECLS
