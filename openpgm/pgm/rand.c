@@ -76,7 +76,7 @@ pgm_rand_create (
 	FILE* fp;
 	do {
 		fp = fopen ("/dev/urandom", "rb");
-	} while (PGM_UNLIKELY(EINTR == errno));
+	} while (PGM_UNLIKELY(NULL == fp && EINTR == errno));
 	if (fp) {
 		size_t items_read;
 		do {
