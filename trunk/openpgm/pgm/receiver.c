@@ -2169,7 +2169,7 @@ pgm_on_data (
 		0;
 
 /* advance data pointer to payload */
-	pgm_skb_pull (skb, sizeof(struct pgm_data) + opt_total_length);
+	pgm_skb_pull (skb, (uint16_t)(sizeof(struct pgm_data) + opt_total_length));
 
 	if (opt_total_length > 0 &&			/* there are options */
 	    get_pgm_options (skb) &&			/* valid options */
