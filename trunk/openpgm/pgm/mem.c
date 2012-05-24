@@ -98,7 +98,7 @@ pgm_parse_debug_string (
 	}
 	else
 	{
-		while (string) {
+		while (*string) {
 			const char* q = strpbrk (string, ":;, \t");
 			if (!q)
 				q = string + strlen (string);
