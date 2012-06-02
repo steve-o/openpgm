@@ -2,7 +2,7 @@
  *
  * network interface handling.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2012 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,6 +37,7 @@
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
+#include <impl/inet_lnaof.h>
 #include <pgm/if.h>
 
 
@@ -198,56 +199,6 @@ pgm_if_print_all (void)
 	}
 	else
 		pgm_warn (_("Failed to discover default network parameters, verify hostname configuration."));
-}
-
-/* Equivalent to the description of inet_lnaof(), extract the host
- * address out of an IP address.
- * 	hostaddr = inet_lnaof(addr)
- *
- * nb: lnaof = local network address of
- *
- * returns TRUE if host address is defined, FALSE if only network address.
- */
-static inline
-bool
-pgm_inet_lnaof (
-	struct in_addr* restrict	dst,	/* host byte order */
-	const struct in_addr* restrict	src,
-	const struct in_addr* restrict	netmask
-	)
-{
-	bool has_lna = FALSE;
-
-	pgm_assert (NULL != dst);
-	pgm_assert (NULL != src);
-	pgm_assert (NULL != netmask);
-
-	dst->s_addr = src->s_addr & netmask->s_addr;
-	has_lna = (0 != (src->s_addr & ~netmask->s_addr));
-
-	return has_lna;
-}
-
-static inline
-bool
-pgm_inet6_lnaof (
-	struct in6_addr* restrict	dst,
-	const struct in6_addr* restrict	src,
-	const struct in6_addr* restrict	netmask
-	)
-{
-	bool has_lna = FALSE;
-
-	pgm_assert (NULL != dst);
-	pgm_assert (NULL != src);
-	pgm_assert (NULL != netmask);
-
-	for (unsigned i = 0; i < 16; i++) {
-		dst->s6_addr[i] = src->s6_addr[i] & netmask->s6_addr[i];
-		has_lna |= (0 != (src->s6_addr[i] & !netmask->s6_addr[i]));
-	}
-
-	return has_lna;
 }
 
 static inline
