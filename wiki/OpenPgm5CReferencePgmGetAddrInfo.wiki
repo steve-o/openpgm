@@ -26,6 +26,8 @@ The TIBCO Rendezvous network parameter provides a convenient compact representat
 
 The returned <tt>[OpenPgm5CReferencePgmAddrInfoT pgm_addrinfo_t]</tt> must be freed with <tt>pgm_freeaddrinfo()</tt>.
 
+<tt>pgm_getaddrinfo</tt> is analogous to <tt>getaddrinfo</tt> with <tt>AI_PASSIVE</tt> set, it will only return resolved interfaces for the host that it is executed upon.  Consider that network specifications are common to include network or interface names that are not globally well defined.
+
 === Parameters ===
 
 <table border="1" cellpadding="5" cellspacing="0">
