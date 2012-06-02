@@ -22,6 +22,7 @@ libpgm_noinst_la_SOURCES = \
 	sockaddr.c \
 	time.c \
 	if.c \
+	inet_lnaof.c \
 	getifaddrs.c \
 	get_nprocs.c \
 	getnetbyname.c \

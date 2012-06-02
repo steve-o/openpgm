@@ -70,6 +70,7 @@ set(c99-sources
         sockaddr.c
         time.c
         if.c
+	inet_lnaof.c
         getifaddrs.c
 	get_nprocs.c
         getnetbyname.c
