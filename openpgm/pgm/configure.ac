@@ -171,8 +171,8 @@ AC_MSG_CHECKING([for struct ifreq.ifr_netmask])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([[#include <sys/types.h>
 #include <ifaddrs.h>]],
-		[[struct ifaddrs ifa;
-ifa.ifa_netmask = (struct sockaddr*)0;]])],
+		[[struct ifreq ifr;
+ifr.ifr_netmask = (struct sockaddr*)0;]])],
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DHAVE_STRUCT_IFREQ_IFR_NETMASK"],
 	[AC_MSG_RESULT([no])])
