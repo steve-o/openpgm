@@ -247,6 +247,17 @@ case "$host_os" in
 	AC_MSG_RESULT([no])
 	;;
 esac
+# RFC 3542 based IPv6 socket options which are incompatible with RFC 2292
+case "$host_os" in
+*darwin*)
+	AC_MSG_CHECKING([for IPV6_PKTINFO])
+	CFLAGS="-D__APPLE_USE_RFC_3542"
+	AC_COMPILE_IFELSE(
+		[AC_LANG_PROGRAM([[#include <netinet/in.h>]],[[int ipopt = IPV6_PKTINFO;]])],
+		[AC_MSG_RESULT([yes])],
+		[AC_MSG_RESULT([no])])
+	;;
+esac
 # extended assembler on SPARC
 case "$host" in
 sparc-sun-solaris*)
