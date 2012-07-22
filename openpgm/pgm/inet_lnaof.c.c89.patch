@@ -1,0 +1,17 @@
+--- inet_lnaof.c	2012-06-03 03:23:01.000000000 +0800
++++ inet_lnaof.c89.c	2012-06-03 03:25:02.000000000 +0800
+@@ -73,10 +73,13 @@
+ 	pgm_assert (NULL != src);
+ 	pgm_assert (NULL != netmask);
+ 
+-	for (unsigned i = 0; i < 16; i++) {
++	{
++	unsigned i;
++	for (i = 0; i < 16; i++) {
+ 		dst->s6_addr[i] = src->s6_addr[i] & netmask->s6_addr[i];
+ 		has_lna |= (0 != (src->s6_addr[i] & !netmask->s6_addr[i]));
+ 	}
++	}
+ 
+ 	return has_lna;
+ }
