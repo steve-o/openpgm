@@ -655,7 +655,8 @@ parse_interface (
 		}
 
 		const unsigned ifindex = pgm_if_nametoindex (ifa->ifa_addr->sa_family, ifa->ifa_name);
-		pgm_assert (0 != ifindex);
+/* Some faulty systems may fail, handle this situation without raising an assertion. */
+		const bool has_valid_if_name = (ifindex > 0);
 
 /* check numeric host */
 		if (check_addr)
@@ -664,6 +665,8 @@ parse_interface (
 			{
 				if (0 == pgm_sockaddr_cmp (ifa->ifa_addr, (const struct sockaddr*)&addr[i]))
 				{
+					if (!has_valid_if_name)
+						pgm_warn (_("Interface %s does not resolve to an interface index, multicast traffic will follow the systems routing table and may appear on a different network than specified."), ir->ir_name);
 					pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 					ir->ir_flags = ifa->ifa_flags;
 					if (ir->ir_flags & IFF_LOOPBACK)
@@ -690,6 +693,10 @@ parse_interface (
 			if (!pgm_inet_lnaof (&lna, &in_addr, &netmask) &&
 				is_in_net (&ifaddr, &in_addr, &netmask))
 			{
+				if (!has_valid_if_name) {
+					pgm_warn (_("Skipping matching network device %s that fails reverse interface name lookup."), ir->ir_name);
+					goto skip_inet_network;
+				}
 				pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 				ir->ir_flags = ifa->ifa_flags;
 				if (ir->ir_flags & IFF_LOOPBACK) {
@@ -731,6 +738,10 @@ parse_interface (
 			if (!pgm_inet6_lnaof (&lna, &sa6_addr.sin6_addr, &netmask) &&
 				is_in_net6 (&ifaddr, &sa6_addr.sin6_addr, &netmask))
 			{
+				if (!has_valid_if_name) {
+					pgm_warn (_("Skipping matching network device %s that fails reverse interface name lookup."), ir->ir_name);
+					goto skip_inet_network;
+				}
 				pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
 				ir->ir_flags = ifa->ifa_flags;
 				if (ir->ir_flags & IFF_LOOPBACK) {
@@ -768,6 +779,9 @@ skip_inet_network:
 			if (0 != strcmp (ifname, ifa->ifa_name))
 				continue;
 
+/* skip devices that fail reverse name lookup */
+			if (!has_valid_if_name)
+				continue;
 			ir->ir_flags = ifa->ifa_flags;
 /* skip loopback and non-multicast capable devices */
 			if ((ir->ir_flags & IFF_LOOPBACK) || !(ir->ir_flags & IFF_MULTICAST))
