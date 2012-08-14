@@ -1,4 +1,4 @@
---- socket.c	2011-06-30 01:56:13.000000000 +0800
+--- socket.c	2012-08-14 07:59:08.000000000 +0800
 +++ socket.c89.c	2011-07-03 02:34:28.000000000 +0800
 @@ -380,7 +380,9 @@
  	new_sock->adv_mode	= 0;	/* advance with time */
@@ -232,11 +232,10 @@
  }
  
  bool
-@@ -2358,12 +2390,14 @@
+@@ -2358,11 +2390,14 @@
  {
  	pgm_return_val_if_fail (sock != NULL, FALSE);
  	pgm_return_val_if_fail (sock->recv_gsr_len > 0, FALSE);
--	pgm_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
 -	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
 +	{
 +	unsigned i;
@@ -249,7 +248,7 @@
  	pgm_return_val_if_fail (sock->send_gsr.gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
  /* shutdown */
  	if (PGM_UNLIKELY(!pgm_rwlock_writer_trylock (&sock->lock)))
-@@ -2472,6 +2506,7 @@
+@@ -2471,6 +2506,7 @@
  		return SOCKET_ERROR;
  	}
  
@@ -257,7 +256,7 @@
  	const bool is_congested = (sock->use_pgmcc && sock->tokens < pgm_fp8 (1)) ? TRUE : FALSE;
  
  	if (readfds)
-@@ -2500,6 +2535,7 @@
+@@ -2499,6 +2535,7 @@
  #endif
  			}
  		}
@@ -265,7 +264,7 @@
  		const SOCKET pending_fd = pgm_notify_get_socket (&sock->pending_notify);
  		FD_SET(pending_fd, readfds);
  #ifndef _WIN32
-@@ -2507,6 +2543,7 @@
+@@ -2506,6 +2543,7 @@
  #else
  		fds++;
  #endif
@@ -273,7 +272,7 @@
  	}
  
  	if (sock->can_send_data && writefds && !is_congested)
-@@ -2524,6 +2561,7 @@
+@@ -2523,6 +2561,7 @@
  #else
  	return *n_fds + fds;
  #endif
