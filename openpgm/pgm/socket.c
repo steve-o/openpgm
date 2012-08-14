@@ -2358,7 +2358,6 @@ pgm_connect (
 {
 	pgm_return_val_if_fail (sock != NULL, FALSE);
 	pgm_return_val_if_fail (sock->recv_gsr_len > 0, FALSE);
-	pgm_return_val_if_fail (sock->recv_gsr_len == 1, FALSE);
 	for (unsigned i = 0; i < sock->recv_gsr_len; i++)
 	{
 		pgm_return_val_if_fail (sock->recv_gsr[i].gsr_group.ss_family == sock->recv_gsr[0].gsr_group.ss_family, FALSE);
