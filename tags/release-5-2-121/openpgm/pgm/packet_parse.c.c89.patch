@@ -1,0 +1,153 @@
+--- packet_parse.c	2011-06-27 22:54:25.000000000 +0800
++++ packet_parse.c89.c	2011-10-06 01:37:50.000000000 +0800
+@@ -120,6 +120,7 @@
+  */
+ 
+ /* decode IP header */
++	{
+ 	const struct pgm_ip* ip = (struct pgm_ip*)skb->data;
+ 	switch (ip->ip_v) {
+ 	case 4: {
+@@ -145,16 +146,18 @@
+ 		return FALSE;
+ 	}
+ 
++	{
+ 	const size_t ip_header_length = ip->ip_hl * 4;		/* IP header length in 32bit octets */
+ 	if (PGM_UNLIKELY(ip_header_length < sizeof(struct pgm_ip))) {
+ 		pgm_set_error (error,
+ 			     PGM_ERROR_DOMAIN_PACKET,
+ 			     PGM_ERROR_BOUNDS,
+ 			     _("IP header reports an invalid header length %" PRIzu " bytes."),
+-			     ip_header_length);
++			     (unsigned long)ip_header_length);
+ 		return FALSE;
+ 	}
+ 
++	{
+ #ifndef HAVE_HOST_ORDER_IP_LEN
+ 	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
+ #else
+@@ -176,13 +179,14 @@
+ 			     PGM_ERROR_DOMAIN_PACKET,
+ 			     PGM_ERROR_BOUNDS,
+ 			     _("IP packet received at %" PRIu16 " bytes whilst IP header reports %" PRIzu " bytes."),
+-			     skb->len, packet_length);
++			     skb->len, (unsigned long)packet_length);
+ 		return FALSE;
+ 	}
+ 
+ /* packets that fail checksum will generally not be passed upstream except with rfc3828
+  */
+ #ifdef PGM_CHECK_IN_CKSUM
++	{
+ 	const uint16_t sum = in_cksum (data, packet_length, 0);
+ 	if (PGM_UNLIKELY(0 != sum)) {
+ 		const uint16_t ip_sum = ntohs (ip->ip_sum);
+@@ -193,9 +197,11 @@
+ 			     ip_sum, sum);
+ 		return FALSE;
+ 	}
++	}
+ #endif
+ 
+ /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
++	{
+ #ifndef HAVE_HOST_ORDER_IP_OFF
+ 	const uint16_t offset = ntohs (ip->ip_off);
+ #else
+@@ -231,8 +237,12 @@
+ 
+ /* advance DATA pointer to PGM packet */
+ 	skb->data	= skb->pgm_header;
+-	skb->len       -= ip_header_length;
++	skb->len	= (uint16_t)(skb->len - ip_header_length);
+ 	return pgm_parse (skb, error);
++	}
++	}
++	}
++	}
+ }
+ 
+ PGM_GNUC_INTERNAL
+@@ -249,7 +259,7 @@
+ 			     PGM_ERROR_DOMAIN_PACKET,
+ 			     PGM_ERROR_BOUNDS,
+ 			     _("UDP payload too small for PGM packet at %" PRIu16 " bytes, expecting at least %" PRIzu " bytes."),
+-			     skb->len, sizeof(struct pgm_header));
++			     skb->len, (unsigned long)sizeof(struct pgm_header));
+ 		return FALSE;
+ 	}
+ 
+@@ -260,6 +270,7 @@
+ 
+ /* will modify packet contents to calculate and check PGM checksum
+  */
++
+ static
+ bool
+ pgm_parse (
+@@ -275,6 +286,7 @@
+ 	{
+ 		const uint16_t sum = skb->pgm_header->pgm_checksum;
+ 		skb->pgm_header->pgm_checksum = 0;
++		{
+ 		const uint16_t pgm_sum = pgm_csum_fold (pgm_csum_partial ((const char*)skb->pgm_header, skb->len, 0));
+ 		skb->pgm_header->pgm_checksum = sum;
+ 		if (PGM_UNLIKELY(pgm_sum != sum)) {
+@@ -285,6 +297,7 @@
+ 			     	     pgm_sum, sum);
+ 			return FALSE;
+ 		}
++		}
+ 	} else {
+ 		if (PGM_ODATA == skb->pgm_header->pgm_type ||
+ 		    PGM_RDATA == skb->pgm_header->pgm_type)
+@@ -339,6 +352,7 @@
+ /* pre-conditions */
+ 	pgm_assert (NULL != skb);
+ 
++	{
+ 	const struct pgm_spm* spm = (const struct pgm_spm*)skb->data;
+ 	switch (ntohs (spm->spm_nla_afi)) {
+ /* truncated packet */
+@@ -356,6 +370,7 @@
+ 	}
+ 
+ 	return TRUE;
++	}
+ }
+ 
+ /* 14.7.1.  Poll Request
+@@ -394,6 +409,7 @@
+ /* pre-conditions */
+ 	pgm_assert (NULL != skb);
+ 
++	{
+ 	const struct pgm_poll* poll4 = (const struct pgm_poll*)skb->data;
+ 	switch (ntohs (poll4->poll_nla_afi)) {
+ /* truncated packet */
+@@ -411,6 +427,7 @@
+ 	}
+ 
+ 	return TRUE;
++	}
+ }
+ 
+ /* 14.7.2.  Poll Response
+@@ -499,6 +516,7 @@
+ 	if (PGM_UNLIKELY(skb->len < PGM_MIN_NAK_SIZE))
+ 		return FALSE;
+ 
++	{
+ 	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
+ 	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
+ 	uint16_t nak_grp_nla_afi = 0;
+@@ -542,6 +560,7 @@
+ 	}
+ 
+ 	return TRUE;
++	}
+ }
+ 
+ /* 8.3.  N-NAK

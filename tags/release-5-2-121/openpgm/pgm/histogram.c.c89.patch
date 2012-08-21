@@ -1,0 +1,201 @@
+--- histogram.c	2011-06-27 22:49:03.000000000 +0800
++++ histogram.c89.c	2011-10-06 01:32:29.000000000 +0800
+@@ -64,10 +64,12 @@
+ 		value = INT_MAX - 1;
+ 	if (value < 0)
+ 		value = 0;
++	{
+ 	const unsigned i = bucket_index (histogram, value);
+ 	pgm_assert_cmpint (value, >=, histogram->ranges[ i ]);
+ 	pgm_assert_cmpint (value,  <, histogram->ranges[ i + 1 ]);
+ 	accumulate (histogram, value, 1, i);
++	}
+ }
+ 
+ void
+@@ -77,19 +79,21 @@
+ {
+ 	if (!pgm_histograms)
+ 		return;
++	{
+ 	pgm_slist_t* snapshot = pgm_histograms;
+ 	while (snapshot) {
+ 		pgm_histogram_t* histogram = snapshot->data;
+ 		pgm_histogram_write_html_graph (histogram, string);
+ 		snapshot = snapshot->next;
+ 	}
++	}
+ }
+ 
+ static
+ void
+ pgm_histogram_write_html_graph (
+ 	pgm_histogram_t* restrict histogram,
+-	pgm_string_t*	 restrict string
++	pgm_string_t*    restrict string
+ 	)
+ {
+ 	pgm_string_append (string, "<PRE>");
+@@ -122,8 +126,11 @@
+ 	)
+ {
+ 	pgm_count_t total = 0;
+-	for (unsigned i = 0; i < sample_set->counts_len; i++)
++	{
++	unsigned i;
++	for (i = 0; i < sample_set->counts_len; i++)
+ 		total += sample_set->counts[ i ];
++	}
+ 	return total;
+ }
+ 
+@@ -176,7 +183,8 @@
+ 		const double log_current = log ((double)current);
+ 		log_ratio = (log_max - log_current) / (histogram->bucket_count - i);
+ 		log_next = log_current + log_ratio;
+-#ifdef __GNUC__	
++		{
++#ifdef __GNUC__ 
+ 		const int next = floor (exp (log_next) + 0.5);
+ #else
+ /* bad-function-cast warning in GCC */
+@@ -187,6 +195,7 @@
+ 		else
+ 			current++;
+ 		set_bucket_range (histogram, i, current);
++		}
+ 	}
+ 	pgm_assert_cmpuint (histogram->bucket_count, ==, i);
+ }
+@@ -200,6 +209,7 @@
+ {
+ 	pgm_assert_cmpint (histogram->ranges[0], <=, value);
+ 	pgm_assert_cmpint (histogram->ranges[ histogram->bucket_count ], >, value);
++	{
+ 	unsigned under = 0;
+ 	unsigned over = histogram->bucket_count;
+ 	unsigned mid;
+@@ -216,6 +226,7 @@
+ 	} while (TRUE);
+ 	pgm_assert (histogram->ranges[ mid ] <= value && histogram->ranges[ mid + 1] > value);
+ 	return mid;
++	}
+ }
+ 
+ static
+@@ -238,19 +249,21 @@
+ 	pgm_string_t*	 restrict output
+ 	)
+ {
+-	pgm_count_t snapshot_counts[ histogram->sample.counts_len ];
+-	pgm_sample_set_t snapshot = {
+-		.counts		= snapshot_counts,
+-		.counts_len	= histogram->sample.counts_len,
+-		.sum		= histogram->sample.sum,
+-		.square_sum	= histogram->sample.square_sum
+-	};
++	pgm_count_t* snapshot_counts = pgm_newa (pgm_count_t, histogram->sample.counts_len);
++	pgm_sample_set_t snapshot;
++	snapshot.counts		= snapshot_counts;
++	snapshot.counts_len	= histogram->sample.counts_len;
++	snapshot.sum		= histogram->sample.sum;
++	snapshot.square_sum	= histogram->sample.square_sum;
++
+ 	memcpy (snapshot_counts, histogram->sample.counts, sizeof(pgm_count_t) * histogram->sample.counts_len);
+ 
++	{
+ 	pgm_count_t sample_count = sample_set_total_count (&snapshot);
+ 	write_ascii_header (histogram, &snapshot, sample_count, output);
+ 	pgm_string_append (output, newline);
+ 
++	{
+ 	double max_size = get_peak_bucket_size (histogram, &snapshot);
+ 	unsigned largest_non_empty_bucket = histogram->bucket_count - 1;
+ 	while (0 == snapshot.counts[ largest_non_empty_bucket ])
+@@ -260,8 +273,11 @@
+ 		largest_non_empty_bucket--;
+ 	}
+ 
++	{
+ 	int print_width = 1;
+-	for (unsigned i = 0; i < histogram->bucket_count; ++i)
++	{
++	unsigned i;
++	for (i = 0; i < histogram->bucket_count; ++i)
+ 	{
+ 		if (snapshot.counts[ i ]) {
+ 			pgm_string_t* bucket_range = get_ascii_bucket_range (histogram, i);
+@@ -271,16 +287,22 @@
+ 				print_width = width;
+ 		}
+ 	}
++	}
+ 
++	{
+ 	int64_t remaining = sample_count;
+ 	int64_t past = 0;
+-	for (unsigned i = 0; i < histogram->bucket_count; ++i)
++	{
++	unsigned i;
++	for (i = 0; i < histogram->bucket_count; ++i)
+ 	{
+ 		pgm_count_t current = snapshot.counts[ i ];
+ 		remaining -= current;
++		{
+ 		pgm_string_t* bucket_range = get_ascii_bucket_range (histogram, i);
+ 		pgm_string_append_printf (output, "%*s ", print_width, bucket_range->str);
+ 		pgm_string_free (bucket_range, TRUE);
++		}
+ 		if (0 == current &&
+ 		    i < histogram->bucket_count - 1 &&
+ 		    0 == snapshot.counts[ i + 1 ])
+@@ -295,12 +317,19 @@
+ 			continue;
+ 		}
+ 
++		{
+ 		const double current_size = get_bucket_size (histogram, current, i);
+ 		write_ascii_bucket_graph (current_size, max_size, output);
++		}
+ 		write_ascii_bucket_context (past, current, remaining, i, output);
+ 		pgm_string_append (output, newline);
+ 		past += current;
+ 	}
++	}
++	}
++	}
++	}
++	}
+ }
+ 
+ static
+@@ -382,11 +411,14 @@
+ 	)
+ {
+ 	double max_size = 0;
+-	for (unsigned i = 0; i < histogram->bucket_count; i++) {
++	{
++	unsigned i;
++	for (i = 0; i < histogram->bucket_count; i++) {
+ 		const double current_size = get_bucket_size (histogram, sample_set->counts[ i ], i);
+ 		if (current_size > max_size)
+ 			max_size = current_size;
+ 	}
++	}
+ 	return max_size;
+ }
+ 
+@@ -399,11 +431,13 @@
+ 	)
+ {
+ 	pgm_assert_cmpint (histogram->ranges[ i + 1 ], >, histogram->ranges[ i ]);
++	{
+ 	static const double kTransitionWidth = 5;
+ 	double denominator = histogram->ranges[ i + 1 ] - histogram->ranges[ i ];
+ 	if (denominator > kTransitionWidth)
+ 		denominator = kTransitionWidth;
+ 	return current / denominator;
++	}
+ }
+ 
+ static

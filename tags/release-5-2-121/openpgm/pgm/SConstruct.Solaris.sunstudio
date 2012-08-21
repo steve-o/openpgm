@@ -1,0 +1,340 @@
+# -*- mode: python -*-
+# OpenPGM build script
+
+import platform
+import os
+import time
+import sys
+
+EnsureSConsVersion( 1, 0 )
+SConsignFile('scons.signatures' + '-' + platform.system() + '-' + platform.machine() + '-sunstudio');
+
+vars = Variables()
+vars.AddVariables (
+	EnumVariable ('BUILD', 'build environment', 'debug',
+			allowed_values=('release', 'debug', 'profile')),
+	EnumVariable ('BRANCH', 'branch prediction', 'none',
+			allowed_values=('none', 'profile', 'seed')),
+	EnumVariable ('WITH_GETTEXT', 'l10n support via libintl', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_GLIB', 'Build GLib dependent modules', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_SNMP', 'SNMP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_TEST', 'Network test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_CC', 'C++ examples', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PLUS', 'libpgmplus GPL library', 'false',
+			allowed_values=('true', 'false')),
+)
+
+#-----------------------------------------------------------------------------
+# Dependencies
+
+def force_sunstudio(env):
+	env.PrependENVPath('PATH', '/usr/ccs/bin');
+	env.PrependENVPath('PATH', '/opt/glib-sunstudio/bin');
+	env.PrependENVPath('PATH', '/opt/sunstudio12.1/bin');
+	env.Tool('sunc++');
+	env.Tool('suncc');
+	env.Tool('sunlink');
+	env.Tool('sunar');
+
+env = Environment();
+force_sunstudio(env);
+
+def CheckPKGConfig(context, version):
+	context.Message( 'Checking for pkg-config... ' )
+	ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+	context.Result( ret )
+	return ret
+
+def CheckPKG(context, name):
+	context.Message( 'Checking for %s... ' % name )
+	ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
+	context.Result( ret )
+	return ret
+
+conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
+				       'CheckPKG' : CheckPKG })
+
+if not conf.CheckPKGConfig('0.15.0'):
+	print 'pkg-config >= 0.15.0 not found.'
+	Exit(1)
+
+if not conf.CheckPKG('glib-2.0 >= 2.10'):
+	print 'glib-2.0 >= 2.10 not found.'
+	Exit(1)
+
+if not conf.CheckPKG('gthread-2.0'):
+	print 'gthread-2.0 not found.'
+	Exit(1)
+
+env = conf.Finish();
+
+#-----------------------------------------------------------------------------
+# Platform specifics
+
+env = Environment(
+	variables = vars,
+	ENV = os.environ,
+	CCFLAGS = [
+# strict C
+			'-v',
+# enable warnings
+			'+w',
+# strict ISO C
+			'-Xc',
+# C99
+			'-xc99=all',
+			'-D_XOPEN_SOURCE=600',
+			'-D__EXTENSIONS__',
+# re-entrant libc
+			'-D_REENTRANT',
+# optimium checksum implementation
+#			'-DUSE_8BIT_CHECKSUM',
+			'-DUSE_16BIT_CHECKSUM',
+#			'-DUSE_32BIT_CHECKSUM',
+#			'-DUSE_64BIT_CHECKSUM',
+#			'-DUSE_VECTOR_CHECKSUM',
+# optimum galois field multiplication
+			'-DUSE_GALOIS_MUL_LUT',
+# POSIX spinlocks
+			'-DHAVE_PTHREAD_SPINLOCK',
+# NSS protocol lookup
+			'-DHAVE_GETPROTOBYNAME_R',
+			'-DGETPROTOBYNAME_R_STRUCT_PROTOENT_P',
+# NSS networks lookup, IPv4 only
+ 			'-DHAVE_GETNETENT',
+# variadic macros
+			'-DHAVE_ISO_VARARGS',
+#			'-DHAVE_GNUC_VARARGS',
+# stack memory api header
+			'-DHAVE_ALLOCA_H',
+# Linux eventfd api
+#			'-DHAVE_EVENTFD',
+# useful /proc system
+#			'-DHAVE_PROC_CPUINFO',
+# example: crash handling
+#			'-DHAVE_BACKTRACE',
+# timing
+			'-DHAVE_CLOCK_GETTIME',
+			'-DHAVE_FTIME',
+			'-DHAVE_GETTIMEOFDAY',
+#			'-DHAVE_PSELECT',
+#			'-DHAVE_DEV_RTC',
+#			'-DHAVE_TSC',
+#			'-DHAVE_DEV_HPET',
+# event handling
+			'-DHAVE_POLL',
+#			'-DHAVE_EPOLL_CTL',
+# interface enumeration
+#			'-DHAVE_GETIFADDRS',
+#			'-DHAVE_STRUCT_IFADDRS_IFR_NETMASK',
+# win32 cmsg
+#			'-DHAVE_WSACMSGHDR',
+# multicast
+			'-DHAVE_STRUCT_GROUP_REQ',
+#			'-DHAVE_STRUCT_IP_MREQN',
+			'-DHAVE_STRUCT_IP_MSFILTER',
+# sprintf
+#			'-DHAVE_SPRINTF_GROUPING',
+#			'-DHAVE_VASPRINTF',
+# symbol linking scope
+			'-DHAVE_DSO_VISIBILITY',
+# socket binding
+			'-DUSE_BIND_INADDR_ANY',
+# IP header order as per IP(4) on FreeBSD
+#			'-DHAVE_HOST_ORDER_IP_LEN',
+#			'-DHAVE_HOST_ORDER_IP_OFF',
+# ticket based spinlocks
+#			'-DUSE_TICKET_SPINLOCK',
+# dumb read-write spinlock
+#			'-DUSE_DUMB_RWSPINLOCK',
+# GNU getopt
+			'-DHAVE_GETOPT'
+		 ],
+	LINKFLAGS = [],
+	LIBS = [
+# histogram math
+			'm',
+# clock_gettime()
+			'rt',
+# Solaris sockets
+			'resolv',
+			'socket',
+			'nsl'
+		    ],
+	PROTOBUF_CCFLAGS = '-I/opt/glib-sunstudio/include',
+	PROTOBUF_LIBS    = '/opt/glib-sunstudio/lib/sparcv9/libprotobuf.a',
+	PROTOBUF_PROTOC  = '/opt/glib-sunstudio/bin/protoc'
+)
+force_sunstudio(env);
+
+# Branch prediction
+if env['BRANCH'] == 'profile':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+elif env['BRANCH'] == 'seed':
+	env.Append(CCFLAGS = '-fbranch-probabilities')
+
+# Define separate build environments
+release = env.Clone(BUILD = 'release')
+release.Append(CCFLAGS = ['-xO2','-m64'], LINKFLAGS = '-m64')
+
+# outstanding defect with 12u1 cannot compile extended asm without optimization.:w
+#
+debug = env.Clone(BUILD = 'debug')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG','-xO1', '-g','-m64'], LINKFLAGS = ['-g','-m64'])
+
+profile = env.Clone(BUILD = 'profile')
+profile.Append(CCFLAGS = ['-xO2','-pg','-m64'], LINKFLAGS = ['-pg','-m64'])
+
+thirtytwo = release.Clone(BUILD = 'thirtytwo')
+thirtytwo.Append(CCFLAGS = ['-xO2','-m32'], LINKFLAGS = '-m32');
+
+# choose and environment to build
+if env['BUILD'] == 'release':
+	Export({'env':release})
+elif env['BUILD'] == 'profile':
+	Export({'env':profile})
+elif env['BUILD'] == 'thirtytwo':
+	Export({'env':thirtytwo})
+else:
+	Export({'env':debug})
+
+#-----------------------------------------------------------------------------
+# Re-analyse dependencies
+
+Import('env')
+
+# vanilla environment
+if env['WITH_GLIB'] == 'true':
+	env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
+else:
+	env['GLIB_FLAGS'] = '';
+
+# l10n
+if env['WITH_GETTEXT'] == 'true':
+	env.Append(CCFLAGS = '-DCONFIG_HAVE_GETTEXT');
+
+# instrumentation
+if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
+	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
+
+# managed environment for libpgmsnmp, libpgmhttp
+if env['WITH_SNMP'] == 'true':
+# net-snmp-config is broken in Solaris 10 and requires two separate calls
+	env['SNMP_FLAGS'] = env.ParseFlags(['!/usr/sfw/bin/net-snmp-config-64 --cflags',
+					    '!/usr/sfw/bin/net-snmp-config-64 --agent-libs']);
+
+def CheckSNMP(context):
+	context.Message('Checking Net-SNMP...');
+#       backup = context.env.Clone().Dictionary();
+        lastASFLAGS     = context.env.get('ASFLAGS', '');
+        lastCCFLAGS     = context.env.get('CCFLAGS', '');
+        lastCFLAGS      = context.env.get('CFLAGS', '');
+        lastCPPDEFINES  = context.env.get('CPPDEFINES', '');
+        lastCPPFLAGS    = context.env.get('CPPFLAGS', '');
+        lastCPPPATH     = context.env.get('CPPPATH', '');
+        lastLIBPATH     = context.env.get('LIBPATH', '');
+        lastLIBS        = context.env.get('LIBS', '');
+        lastLINKFLAGS   = context.env.get('LINKFLAGS', '');
+        lastRPATH       = context.env.get('RPATH', '');
+	context.env.MergeFlags(env['SNMP_FLAGS']);
+	result = context.TryLink("""
+int main(int argc, char**argv)
+{
+	init_agent("PGM");
+	return 0;
+}
+""", '.c');
+#       context.env.Replace(**backup);
+        context.env.Replace(ASFLAGS     = lastASFLAGS,
+                            CCFLAGS     = lastCCFLAGS,
+                            CFLAGS      = lastCFLAGS,
+                            CPPDEFINES  = lastCPPDEFINES,
+                            CPPFLAGS    = lastCPPFLAGS,
+                            CPPPATH     = lastCPPPATH,
+                            LIBPATH     = lastLIBPATH,
+                            LIBS        = lastLIBS,
+                            LINKFLAGS   = lastLINKFLAGS,
+                            RPATH       = lastRPATH);
+	context.Result(not result);
+	return result;
+
+def CheckCheck(context):
+	context.Message('Checking Check unit test framework...');
+	result = context.TryAction('pkg-config --cflags --libs check')[0];
+	context.Result(result);
+	return result;
+
+tests = {
+	'CheckCheck':	CheckCheck
+}
+if env['WITH_SNMP'] == 'true':
+	tests['CheckSNMP'] = CheckSNMP;
+conf = Configure(env, custom_tests = tests);
+
+if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
+
+if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
+	print 'Enabling Check unit tests.';
+	conf.env['CHECK'] = 'true';
+	env['CHECK_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs check');
+else:
+	print 'Disabling Check unit tests.';
+	conf.env['CHECK'] = 'false';
+
+env = conf.Finish();
+
+# add builder to create PIC static libraries for including in shared libraries
+action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
+if env.Detect('ranlib'):
+	ranlib_action = Action("$RANLIBCOM", "$RANLIBCOMSTR");
+	action_list.append(ranlib_action);
+pic_lib = Builder(	action = action_list,
+			emitter = '$LIBEMITTER',
+			prefix = '$LIBPREFIX',
+			suffix = '$LIBSUFFIX',
+			src_suffix = '$OBJSUFFIX',
+			src_builder = 'SharedObject')
+env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
+
+
+#-----------------------------------------------------------------------------
+
+ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '-sunstudio/';
+BuildDir(ref_node, '.', duplicate=0)
+
+env.Append(CPPPATH = os.getcwd() + '/include');
+env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
+
+if env['WITH_GLIB'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmex');
+SConscript(ref_node + 'SConscript.libpgm');
+if env['WITH_HTTP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmhttp');
+if env['WITH_SNMP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmsnmp');
+if env['WITH_TEST'] == 'true':
+	SConscript(ref_node + 'test/SConscript');
+if env['WITH_EXAMPLES'] == 'true':
+	SConscript(ref_node + 'examples/SConscript');
+
+# end of file

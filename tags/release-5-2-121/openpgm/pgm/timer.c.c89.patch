@@ -1,0 +1,39 @@
+--- timer.c	2011-06-19 07:56:24.000000000 +0800
++++ timer.c89.c	2011-06-19 07:56:38.000000000 +0800
+@@ -147,11 +147,13 @@
+ 			if (pgm_time_after_eq (now, sock->ack_expiry))
+ 			{
+ #ifdef DEBUG_PGMCC
++{
+ char nows[1024];
+ time_t t = time (NULL);
+ struct tm* tmp = localtime (&t);
+ strftime (nows, sizeof(nows), "%Y-%m-%d %H:%M:%S", tmp);
+ printf ("ACK timeout, T:%u W:%u\n", pgm_fp8tou(sock->tokens), pgm_fp8tou(sock->cwnd_size));
++}
+ #endif
+ 				sock->tokens = sock->cwnd_size = pgm_fp8 (1);
+ 				sock->ack_bitmap = 0xffffffff;
+@@ -165,11 +167,13 @@
+ 
+ /* SPM broadcast */
+ 		pgm_mutex_lock (&sock->timer_mutex);
++		{
+ 		const unsigned spm_heartbeat_state = sock->spm_heartbeat_state;
+ 		const pgm_time_t next_heartbeat_spm = sock->next_heartbeat_spm;
+ 		pgm_mutex_unlock (&sock->timer_mutex);
+ 
+ /* no lock needed on ambient */
++		{
+ 		const pgm_time_t next_ambient_spm = sock->next_ambient_spm;
+ 		pgm_time_t next_spm = spm_heartbeat_state ? MIN(next_heartbeat_spm, next_ambient_spm) : next_ambient_spm;
+ 
+@@ -211,6 +215,8 @@
+ 		}
+ 
+ 		next_expiration = next_expiration > 0 ? MIN(next_expiration, next_spm) : next_spm;
++		}
++		}
+ 
+ /* check for reset */
+ 		pgm_mutex_lock (&sock->timer_mutex);

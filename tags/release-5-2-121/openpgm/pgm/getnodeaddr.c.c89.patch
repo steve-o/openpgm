@@ -1,0 +1,79 @@
+--- getnodeaddr.c	2011-08-02 13:24:08.000000000 +0800
++++ getnodeaddr.c89.c	2011-10-02 08:04:00.000000000 +0800
+@@ -63,6 +63,7 @@
+ 	pgm_debug ("pgm_getnodeaddr (family:%s res:%p error:%p)",
+ 		pgm_family_string (family), (const void*)res, (const void*)error);
+ 
++	{
+ 	char hostname[NI_MAXHOST];
+ 	struct hostent* he;
+ 
+@@ -79,14 +80,16 @@
+ 	}
+ 	hostname[NI_MAXHOST - 1] = '\0';
+ 
+-	struct addrinfo hints = {
+-		.ai_family	= family,
+-		.ai_socktype	= SOCK_STREAM,		/* not really */
+-		.ai_protocol	= IPPROTO_TCP,		/* not really */
+-		.ai_flags	= AI_ADDRCONFIG,
+-	}, *result, *ai;
++	{
++	int e;
++	struct addrinfo hints, *result, *ai;
++	memset (&hints, 0, sizeof(hints));
++	hints.ai_family		= family,
++	hints.ai_socktype	= SOCK_STREAM,		/* not really */
++	hints.ai_protocol	= IPPROTO_TCP,		/* not really */
++	hints.ai_flags		= AI_ADDRCONFIG;
+ 
+-	int e = getaddrinfo (hostname, NULL, &hints, &result);
++	e = getaddrinfo (hostname, NULL, &hints, &result);
+ 	if (0 == e) {
+ /* NB: getaddrinfo may return multiple addresses, the sorting order of the
+  * list defined by RFC 3484 and /etc/gai.conf
+@@ -101,6 +104,7 @@
+ 		}
+ 
+ 		na = pgm_malloc0 (na_len);
++		{
+ 		char* p = (char*)na + na_len;	/* point to end of block */
+ 		struct addrinfo* prev = NULL;
+ 
+@@ -112,14 +116,17 @@
+ 				continue;
+ 			p -= ai->ai_addrlen;
+ 			memcpy (p, ai->ai_addr, ai->ai_addrlen);
++			{
+ 			struct addrinfo* t = (struct addrinfo*)(p - sizeof (struct addrinfo));
+ 			t->ai_family	= ai->ai_family;
+ 			t->ai_addrlen	= ai->ai_addrlen;
+ 			t->ai_addr	= (struct sockaddr*)p;
+ 			t->ai_next	= prev;
+ 			prev = t;
++			}
+ 			p   -= sizeof (struct addrinfo);
+ 		}
++		}
+ 		freeaddrinfo (result);
+ 		*res = na;
+ 		return TRUE;
+@@ -160,7 +167,9 @@
+ 				);
+ 		return FALSE;
+ 	}
++	}
+ 
++	{
+ 	struct pgm_ifaddrs_t *ifap, *ifa, *ifa6;
+ 	if (!pgm_getifaddrs (&ifap, error)) {
+ 		pgm_prefix_error (error,
+@@ -213,6 +222,8 @@
+ 	memcpy (na->ai_addr, ifa6->ifa_addr, na->ai_addrlen);
+ 	pgm_freeifaddrs (ifap);
+ 	*res = na;
++	}
++	}
+ 	return TRUE;
+ }
+ 

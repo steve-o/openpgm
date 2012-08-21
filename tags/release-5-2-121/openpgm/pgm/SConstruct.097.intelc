@@ -1,0 +1,404 @@
+# -*- mode: python -*-
+# OpenPGM build script
+
+import platform
+import os
+import time
+import sys
+
+EnsureSConsVersion( 0, 97 )
+SConsignFile('scons.signatures'+ '-' + platform.system() + '-' + platform.machine() + '-intelc');
+
+opt = Options(None, ARGUMENTS)
+opt.AddOptions (
+	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
+	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
+	(EnumOption ('WITH_GETTEXT', 'l10n support via libintl', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_GLIB', 'Build GLib dependent modules', 'false', ('true', 'false'))),
+	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
+	(EnumOption ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_HTTP', 'HTTP administration', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_SNMP', 'SNMP administration', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_CC', 'C++ Examples', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
+	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
+)
+
+#-----------------------------------------------------------------------------
+# Dependencies
+
+def force_intelc(env):
+#	env.Tool('intelc', version='11.1', topdir='/opt/intel/Compiler/11.1/064/bin/intel64');
+	env.Tool('intelc', topdir='/opt/intel/composerxe');
+
+env = Environment();
+force_intelc(env);
+
+def CheckPKGConfig(context, version):
+	context.Message( 'Checking for pkg-config... ' )
+	ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+	context.Result( ret )
+	return ret
+
+def CheckPKG(context, name):
+	context.Message( 'Checking for %s... ' % name )
+	ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
+	context.Result( ret )
+	return ret
+
+conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
+				       'CheckPKG' : CheckPKG })
+
+if not conf.CheckPKGConfig('0.15.0'):
+	print 'pkg-config >= 0.15.0 not found.'
+#	Exit(1)
+
+if not conf.CheckPKG('glib-2.0 >= 2.10'):
+	print 'glib-2.0 >= 2.10 not found.'
+#	Exit(1)
+
+if not conf.CheckPKG('gthread-2.0'):
+	print 'gthread-2.0 not found.'
+#	Exit(1)
+
+env = conf.Finish();
+
+#-----------------------------------------------------------------------------
+# Platform specifics
+
+env = Environment(ENV = os.environ,
+	CCFLAGS = [	'-pipe',
+			'-Wall',
+#				'-Wextra',
+#				'-Wfloat-equal',
+				'-Wshadow',
+#				'-Wunsafe-loop-optimizations',
+				'-Wpointer-arith',
+#				'-Wbad-function-cast',
+#				'-Wcast-qual',
+#				'-Wcast-align',
+				'-Wwrite-strings',
+#				'-Waggregate-return',
+				'-Wstrict-prototypes',
+#				'-Wold-style-definition',
+				'-Wmissing-prototypes',
+				'-Wmissing-declarations',
+#				'-Wmissing-noreturn',
+#				'-Wmissing-format-attribute',
+#				'-Wredundant-decls',
+#				'-Wnested-externs',
+# Verbose inlining reports
+#				'-Winline',
+
+#  175: subscript out of range
+#  - Ignored for broken compiler C99 support
+#    e.g. tbuf[ sizeof(tbuf) ] = '\0';
+				'-wd175',
+
+#  177: function was declared but never referenced
+#  - Ignored as side effect of portability pre-processor blocks.
+				'-wd177',
+
+#  181: argument is incompatible with corresponding format string conversion
+#  - Ignored as pre-processor fails to parse variadic printf style macros.
+				'-wd181',
+
+#  191: type qualifier is meaningless on cast type
+#  - Ignored as cast required for portability
+#    e.g. pgm_txw_state_t*const state = (pgm_txw_state_t*const)&skb->cb;
+				'-wd191',
+
+#  269: invalid format string conversion
+#  - Ignored with failure to display PRIu32 with (volatile uint32_t)
+				'-wd269',
+
+#  556: cannot assign to an entity of type "void *"
+#  - Ignored, it's a C++2003 error, valid in C99 aside of const down-converting.
+#    e.g. const char *s = ""; void *p = s;
+				'-wd556',
+
+#  589: transfer of control bypasses initialization
+#  - Ignored, it's a C++2003 error, perfectly valid in C99.
+				'-wd589',
+
+#  593: variable was set but never used
+#				'-wd593',
+
+#  981: operands are evaluated in unspecified order
+#  - Ignored as pedantic warning against possible side effects.
+#    e.g. printf ("%s.%s > ",
+#                 pgm_gethostbyaddr((const struct in_addr*)&ip->ip_src),
+#                 pgm_udpport_string(pgm_header->pgm_sport));
+				'-wd981',
+
+# 1292: attribute ignored
+# - Ignored for GCC and other compiler targetted attributes
+				'-wd1292',
+
+# 2259: non-pointer conversion from "/type a/" to "/type b/" may lose significant bits
+# - Ignored for really pedantic compiler temporary value conversions,
+#   e.g. uint16_t j = 1, i = ~j;
+				'-wd2259',
+
+			'-strict-ansi',
+#			'-pedantic',
+# C99
+			'-std=c99',
+			'-D_XOPEN_SOURCE=600',
+			'-D_BSD_SOURCE',
+# re-entrant libc
+			'-D_REENTRANT',
+# POSIX spinlocks
+			'-DHAVE_PTHREAD_SPINLOCK',
+# NSS protocol lookup
+			'-DHAVE_GETPROTOBYNAME_R',
+#			'-DGETPROTOBYNAME_R_STRUCT_PROTOENT_P',
+# NSS networks lookup, IPv4 only
+ 			'-DHAVE_GETNETENT',
+# variadic macros
+ 			'-DHAVE_ISO_VARARGS',
+#			'-DHAVE_GNUC_VARARGS',
+# stack memory api header
+			'-DHAVE_ALLOCA_H',
+# optimium checksum implementation
+#			'-DUSE_8BIT_CHECKSUM',
+			'-DUSE_16BIT_CHECKSUM',
+#			'-DUSE_32BIT_CHECKSUM',
+#			'-DUSE_64BIT_CHECKSUM',
+#			'-DUSE_VECTOR_CHECKSUM',
+# useful /proc system
+			'-DHAVE_PROC_CPUINFO',
+# example: crash handling
+			'-DHAVE_BACKTRACE',
+# timing
+			'-DHAVE_FTIME',
+			'-DHAVE_GETTIMEOFDAY',
+			'-DHAVE_CLOCK_GETTIME',
+			'-DHAVE_PSELECT',
+# ioctl RTC_IRQP_SET: undefined reference to `__invalid_size_argument_for_IOC'
+#			'-DHAVE_DEV_RTC',
+			'-DHAVE_RDTSC',
+# event handling
+			'-DHAVE_POLL',
+			'-DHAVE_EPOLL_CTL',
+# interface enumeration
+			'-DHAVE_GETIFADDRS',
+			'-DHAVE_STRUCT_IFADDRS_IFR_NETMASK',
+# win32 cmsg
+#			'-DHAVE_WSACMSGHDR',
+# multicast
+			'-DHAVE_STRUCT_GROUP_REQ',
+			'-DHAVE_STRUCT_IP_MREQN',
+			'-DHAVE_STRUCT_IP_MSFILTER',
+# sprintf
+			'-DHAVE_SPRINTF_GROUPING',
+			'-DHAVE_VASPRINTF',
+# symbol linking scope
+			'-DHAVE_DSO_VISIBILITY',
+# socket binding
+			'-DUSE_BIND_INADDR_ANY',
+# IP header order as per IP(4) on FreeBSD
+#			'-DHAVE_HOST_ORDER_IP_LEN',
+#			'-DHAVE_HOST_ORDER_IP_OFF',
+# ticket based spinlocks
+			'-DUSE_TICKET_SPINLOCK',
+# dumb read-write spinlock
+			'-DUSE_DUMB_RWSPINLOCK',
+# optimum galois field multiplication
+			'-DUSE_GALOIS_MUL_LUT',
+# GNU getopt
+			'-DHAVE_GETOPT'
+		 ],
+	LINKFLAGS = [	'-pipe'
+		    ],
+	LIBS = [
+# histogram math
+			'm',
+# clock_gettime()
+			'rt'
+		],
+	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.1.0/src',
+	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.1.0/src/.libs/libprotobuf.a',
+	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.1.0/src/protoc'
+)
+opt.Update (env)
+force_intelc(env);
+
+# Branch prediction
+if env['BRANCH'] == 'profile':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+elif env['BRANCH'] == 'seed':
+	env.Append(CCFLAGS = '-fbranch-probabilities')
+
+# Coverage analysis
+if env['COVERAGE'] == 'full':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(CCFLAGS = '-ftest-coverage')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-lgcov')
+
+# Define separate build environments
+release = env.Clone(BUILD = 'release')
+release.Append(CCFLAGS = '-O2')
+
+debug = env.Clone(BUILD = 'debug')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-ggdb')
+
+profile = env.Clone(BUILD = 'profile')
+profile.Append(CCFLAGS = ['-O0','-pg'], LINKFLAGS = '-pg')
+
+thirtytwo = release.Clone(BUILD = 'thirtytwo')
+thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
+
+# choose and environment to build
+if env['BUILD'] == 'release':
+	Export({'env':release})
+elif env['BUILD'] == 'profile':
+	Export({'env':profile})
+elif env['BUILD'] == 'thirtytwo':
+	Export({'env':thirtytwo})
+else:
+	Export({'env':debug})
+
+#-----------------------------------------------------------------------------
+# Re-analyse dependencies
+
+Import('env')
+
+# vanilla environment
+if env['WITH_GLIB'] == 'true':
+	env['GLIB_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs glib-2.0 gthread-2.0');
+else:
+	env['GLIB_FLAGS'] = '';
+
+# l10n
+if env['WITH_GETTEXT'] == 'true':
+	env.Append(CCFLAGS = '-DHAVE_GETTEXT');
+
+# instrumentation
+if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
+	env.Append(CCFLAGS = '-DUSE_HISTOGRAMS');
+
+# managed environment for libpgmsnmp, libpgmhttp
+if env['WITH_SNMP'] == 'true':
+	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --cflags --agent-libs');
+
+def CheckSNMP(context):
+	context.Message('Checking Net-SNMP...');
+#	backup = context.env.Clone().Dictionary();
+	lastASFLAGS	= context.env.get('ASFLAGS', '');
+	lastCCFLAGS	= context.env.get('CCFLAGS', '');
+	lastCFLAGS	= context.env.get('CFLAGS', '');
+	lastCPPDEFINES	= context.env.get('CPPDEFINES', '');
+	lastCPPFLAGS	= context.env.get('CPPFLAGS', '');
+	lastCPPPATH	= context.env.get('CPPPATH', '');
+	lastLIBPATH	= context.env.get('LIBPATH', '');
+	lastLIBS	= context.env.get('LIBS', '');
+	lastLINKFLAGS	= context.env.get('LINKFLAGS', '');
+	lastRPATH	= context.env.get('RPATH', '');
+	context.env.MergeFlags(env['SNMP_FLAGS']);
+	result = context.TryLink("""
+int main(int argc, char**argv)
+{
+	init_agent("PGM");
+	return 0;
+}
+""", '.c');
+#	context.env.Replace(**backup);
+	context.env.Replace(ASFLAGS	= lastASFLAGS,
+			    CCFLAGS	= lastCCFLAGS,
+			    CFLAGS	= lastCFLAGS,
+			    CPPDEFINES	= lastCPPDEFINES,
+			    CPPFLAGS	= lastCPPFLAGS,
+			    CPPPATH	= lastCPPPATH,
+			    LIBPATH	= lastLIBPATH,
+			    LIBS	= lastLIBS,
+			    LINKFLAGS	= lastLINKFLAGS,
+			    RPATH	= lastRPATH);
+	context.Result(not result);
+	return result;
+
+def CheckCheck(context):
+	context.Message('Checking Check unit test framework...');
+	result = context.TryAction('pkg-config --cflags --libs check')[0];
+	context.Result(result);
+	return result;
+
+def CheckEventFD(context):
+	context.Message('Checking eventfd...');
+	result = context.TryLink("""
+#include <sys/eventfd.h>
+int main(int argc, char**argv)
+{
+	eventfd(0,0);
+	return 0;
+}
+""", '.c')
+	context.Result(result);
+	return result;
+
+tests = {
+	'CheckCheck':	CheckCheck,
+	'CheckEventFD':	CheckEventFD
+}
+if env['WITH_SNMP'] == 'true':
+	tests['CheckSNMP'] = CheckSNMP;
+conf = Configure(env, custom_tests = tests);
+
+if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
+
+if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
+	print 'Enabling Check unit tests.';
+	conf.env['CHECK'] = 'true';
+	env['CHECK_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs check');
+else:
+	print 'Disabling Check unit tests.';
+	conf.env['CHECK'] = 'false';
+
+if conf.CheckEventFD():
+	print 'Enabling kernel eventfd notification mechanism.';
+	conf.env.Append(CCFLAGS = '-DHAVE_EVENTFD');
+
+env = conf.Finish();
+
+# add builder to create PIC static libraries for including in shared libraries
+action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
+if env.Detect('ranlib'):
+	ranlib_action = Action("$RANLIBCOM", "$RANLIBCOMSTR");
+	action_list.append(ranlib_action);
+pic_lib = Builder(	action = action_list,
+			emitter = '$LIBEMITTER',
+			prefix = '$LIBPREFIX',
+			suffix = '$LIBSUFFIX',
+			src_suffix = '$OBJSUFFIX',
+			src_builder = 'SharedObject')
+env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
+
+
+#-----------------------------------------------------------------------------
+
+ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '-intelc/';
+BuildDir(ref_node, '.', duplicate=0)
+
+env.Append(CPPPATH = os.getcwd() + '/include');
+env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
+
+if env['WITH_GLIB'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmex');
+SConscript(ref_node + 'SConscript.libpgm');
+if env['WITH_HTTP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmhttp');
+if env['WITH_SNMP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmsnmp');
+if env['WITH_TEST'] == 'true':
+	SConscript(ref_node + 'test/SConscript');
+if env['WITH_EXAMPLES'] == 'true':
+	SConscript(ref_node + 'examples/SConscript');
+
+# end of file
