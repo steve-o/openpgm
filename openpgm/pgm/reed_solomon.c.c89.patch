@@ -1,5 +1,5 @@
 --- reed_solomon.c	2011-06-27 22:56:30.000000000 +0800
-+++ reed_solomon.c89.c	2011-10-06 01:41:21.000000000 +0800
++++ reed_solomon.c89.c	2012-09-06 03:14:06.000000000 +0800
 @@ -51,6 +51,7 @@
  		return;
  
@@ -202,9 +202,10 @@
 +	}
  
 -	pgm_gf8_t alpha[ n ];
+-	memset (alpha, 0, sizeof(alpha));
 +	{
 +	pgm_gf8_t* alpha = pgm_newa (pgm_gf8_t, n);
- 	memset (alpha, 0, sizeof(alpha));
++	memset (alpha, 0, sizeof(pgm_gf8_t) * n);
  
  	alpha[ n - 1 ] = P[ 0 ];
 -	for (uint_fast8_t i = 1; i < n; i++)
