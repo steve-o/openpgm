@@ -1,5 +1,5 @@
---- getifaddrs.c	2011-09-07 11:24:43.000000000 +0800
-+++ getifaddrs.c89.c	2011-10-02 08:08:48.000000000 +0800
+--- getifaddrs.c	2012-09-22 21:48:41.000000000 +0800
++++ getifaddrs.c89.c	2012-09-22 21:51:10.000000000 +0800
 @@ -584,7 +584,9 @@
  /* loop to handle interfaces coming online causing a buffer overflow
   * between first call to list buffer length and second call to enumerate.

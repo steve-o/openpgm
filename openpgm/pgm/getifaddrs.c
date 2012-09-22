@@ -1011,6 +1011,68 @@ _pgm_getadaptersaddresses (
 	return TRUE;
 }
 #endif /* _WIN32 */
+#if defined( HAVE_GETIFADDRS )
+static
+bool
+_pgm_getifaddrs (
+	struct pgm_ifaddrs_t** restrict	ifap,
+	pgm_error_t**	       restrict	error
+	)
+{
+	struct ifaddrs *_ifap, *_ifa;
+	const int e = getifaddrs (&_ifap);
+	if (-1 == e) {
+		char errbuf[1024];
+		pgm_set_error (error,
+				PGM_ERROR_DOMAIN_IF,
+				pgm_error_from_errno (errno),
+				_("getifaddrs failed: %s"),
+				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
+		return FALSE;
+	}
+
+	int n = 0, k = 0;
+	for (_ifa = _ifap; _ifa; _ifa = _ifa->ifa_next)
+		++n;
+
+	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
+	struct _pgm_ifaddrs_t* ift = ifa;
+	for (_ifa = _ifap; _ifa; _ifa = _ifa->ifa_next)
+	{
+/* ensure IP adapter */
+		if (NULL == _ifa->ifa_addr ||
+		      (_ifa->ifa_addr->sa_family != AF_INET &&
+		       _ifa->ifa_addr->sa_family != AF_INET6) )
+		{
+			continue;
+		}
+
+/* address */
+		ift->_ifa.ifa_addr = (void*)&ift->_addr;
+		memcpy (ift->_ifa.ifa_addr, _ifa->ifa_addr, pgm_sockaddr_len (_ifa->ifa_addr));
+
+/* name */
+		ift->_ifa.ifa_name = ift->_name;
+		pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, _ifa->ifa_name, _TRUNCATE);
+
+/* flags */
+		ift->_ifa.ifa_flags = _ifa->ifa_flags;
+
+/* netmask */
+		ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
+		memcpy (ift->_ifa.ifa_netmask, _ifa->ifa_netmask, pgm_sockaddr_len (_ifa->ifa_netmask));
+
+/* next */
+		if (k++ < (n - 1)) {
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
+			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+		}
+	}
+	freeifaddrs (_ifap);
+	*ifap = (struct pgm_ifaddrs_t*)ifa;
+	return TRUE;
+}
+#endif /* HAVE_GETIFADDRS */
 
 /* returns TRUE on success setting ifap to a linked list of system interfaces,
  * returns FALSE on failure and sets error appropriately.
@@ -1028,17 +1090,7 @@ pgm_getifaddrs (
 		(void*)ifap, (void*)error);
 
 #if defined( HAVE_GETIFADDRS )
-	const int e = getifaddrs ((struct ifaddrs**)ifap);
-	if (-1 == e) {
-		char errbuf[1024];
-		pgm_set_error (error,
-				PGM_ERROR_DOMAIN_IF,
-				pgm_error_from_errno (errno),
-				_("getifaddrs failed: %s"),
-				pgm_strerror_s (errbuf, sizeof (errbuf), errno));
-		return FALSE;
-	}
-	return TRUE;
+	return _pgm_getifaddrs (ifap, error);
 #elif defined( _WIN32 )
 	return _pgm_getadaptersaddresses (ifap, error);
 #elif defined( SIOCGLIFCONF )
@@ -1057,11 +1109,7 @@ pgm_freeifaddrs (
 {
 	pgm_return_if_fail (NULL != ifa);
 
-#ifdef HAVE_GETIFADDRS
-	freeifaddrs ((struct ifaddrs*)ifa);
-#else
 	pgm_free (ifa);
-#endif
 }
 
 /* eof */
