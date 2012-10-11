@@ -1447,7 +1447,7 @@ g_message ("reflector congestion");
 			if (recv_time > now)
 				g_warning ("recv time %" PGM_TIME_FORMAT " newer than now %" PGM_TIME_FORMAT,
 					   recv_time, now);
-			if (send_time >= recv_time){
+			if (send_time > recv_time){
 				g_message ("timer mismatch, send time = recv time + %.3f ms (last time + %.3f ms)",
 					   pgm_to_msecsf(send_time - recv_time),
 					   pgm_to_msecsf(last_time - send_time));
