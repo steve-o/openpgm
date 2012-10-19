@@ -257,16 +257,25 @@ install (FILES ${docs} DESTINATION doc)
 install (FILES ${mibs} DESTINATION mibs)
 install (FILES ${examples} DESTINATION examples)
 
-include (InstallRequiredSystemLibraries)
+# Only need to ship CRT if distributing executable binaries.
+# include (InstallRequiredSystemLibraries)
 if (CMAKE_SIZEOF_VOID_P EQUAL 8)
 	set (CPACK_INSTALL_CMAKE_PROJECTS
-		"${CMAKE_SOURCE_DIR}/build64;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug64;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/build/x64/v110;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug/x64/v110;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/build/x64/v100;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug/x64/v100;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/build/x64/v90;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug/x64/v90;OpenPGM;ALL;/"
 	)
 else (CMAKE_SIZEOF_VOID_P EQUAL 8)
 	set (CPACK_INSTALL_CMAKE_PROJECTS
-		"${CMAKE_SOURCE_DIR}/build;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/build/x86/v110;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug/x86/v110;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/build/x86/v100;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug/x86/v100;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/build/x86/v90;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug/x86/v90;OpenPGM;ALL;/"
 	)
 endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
 set (CPACK_PACKAGE_VENDOR "Miru Limited")
