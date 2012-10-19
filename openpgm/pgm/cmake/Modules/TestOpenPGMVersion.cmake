@@ -1,0 +1,21 @@
+message(STATUS "Detecting OpenPGM")
+execute_process (COMMAND ${PERL_EXECUTABLE} version.pl "%major"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE OPENPGM_VERSION_MAJOR)
+execute_process (COMMAND ${PERL_EXECUTABLE} version.pl "%minor"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE OPENPGM_VERSION_MINOR)
+execute_process (COMMAND ${PERL_EXECUTABLE} version.pl "%micro"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE OPENPGM_VERSION_MICRO)
+message(STATUS "Detecting OpenPGM - ${OPENPGM_VERSION_MAJOR}.${OPENPGM_VERSION_MINOR}.${OPENPGM_VERSION_MICRO}")
+
+if(MSVC_VERSION MATCHES "1700")
+	set(_pgm_COMPILER "-v110")
+elseif(MSVC10)
+	set(_pgm_COMPILER "-v100")
+elseif(MSVC90)
+	set(_pgm_COMPILER "-v90")
+else()
+	set(_pgm_COMPILER "")
+endif()
