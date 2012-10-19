@@ -1,7 +1,6 @@
 # CMake build script for OpenPGM on Windows
 
 cmake_minimum_required (VERSION 2.8)
-
 project (OpenPGM)
 
 #-----------------------------------------------------------------------------
@@ -24,6 +23,8 @@ endif(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 find_package(PythonInterp REQUIRED)
 find_package(Perl REQUIRED)
 find_program(PATCH_EXECUTABLE patch)
+
+include (${CMAKE_SOURCE_DIR}/cmake/Modules/TestOpenPGMVersion.cmake)
 
 #-----------------------------------------------------------------------------
 # default to Release build
@@ -50,6 +51,16 @@ add_definitions(
 	-DHAVE_DSO_VISIBILITY
 	-DUSE_BIND_INADDR_ANY
 )
+
+# Parallel make.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+
+# Optimization flags.
+# http://msdn.microsoft.com/en-us/magazine/cc301698.aspx
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
+set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS_RELEASE} /LTCG")
 
 #-----------------------------------------------------------------------------
 # source files
@@ -196,7 +207,13 @@ set(sources
 #-----------------------------------------------------------------------------
 # output
 
-add_library(libpgm STATIC ${sources})
+add_library(libpgm STATIC ${sources} ${CMAKE_BINARY_DIR}/NSIS.template.in)
+set_target_properties(libpgm PROPERTIES
+	RELEASE_POSTFIX "${_pgm_COMPILER}-mt-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}"
+	DEBUG_POSTFIX "${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}")
+
+#-----------------------------------------------------------------------------
+# installer
 
 set(docs
 	COPYING
@@ -215,24 +232,49 @@ set(examples
 	examples/shortcakerecv.c
 )
 
+if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+	set (nsis-template ${CMAKE_SOURCE_DIR}/cmake/NSIS.template64.in)
+else (CMAKE_SIZEOF_VOID_P EQUAL 8)
+	set (nsis-template ${CMAKE_SOURCE_DIR}/cmake/NSIS.template32.in)
+endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
+add_custom_command(
+	OUTPUT ${CMAKE_BINARY_DIR}/NSIS.template.in
+	COMMAND ${CMAKE_COMMAND}
+	ARGS    -E
+		copy
+		${nsis-template}
+		${CMAKE_BINARY_DIR}/NSIS.template.in
+	DEPENDS ${nsis-template}
+)
+set (CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
+
 install (TARGETS libpgm DESTINATION lib)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+	install (FILES ${CMAKE_BINARY_DIR}/lib/libpgm${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}.pdb DESTINATION lib)
+endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 install (FILES ${headers} DESTINATION include/pgm)
 install (FILES ${docs} DESTINATION doc)
 install (FILES ${mibs} DESTINATION mibs)
 install (FILES ${examples} DESTINATION examples)
 
 include (InstallRequiredSystemLibraries)
+if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+	set (CPACK_INSTALL_CMAKE_PROJECTS
+		"${CMAKE_SOURCE_DIR}/build64;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug64;OpenPGM;ALL;/"
+	)
+else (CMAKE_SIZEOF_VOID_P EQUAL 8)
+	set (CPACK_INSTALL_CMAKE_PROJECTS
+		"${CMAKE_SOURCE_DIR}/build;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/debug;OpenPGM;ALL;/"
+	)
+endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
 set (CPACK_PACKAGE_VENDOR "Miru Limited")
 set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-execute_process (COMMAND perl version.pl "%major"
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	OUTPUT_VARIABLE CPACK_PACKAGE_VERSION_MAJOR)
-execute_process (COMMAND perl version.pl "%minor"
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	OUTPUT_VARIABLE CPACK_PACKAGE_VERSION_MINOR)
-execute_process (COMMAND perl version.pl "%micro"
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	OUTPUT_VARIABLE CPACK_PACKAGE_VERSION_PATCH)
+set (CPACK_NSIS_COMPRESSOR "/SOLID lzma")
+set (CPACK_PACKAGE_VERSION_MAJOR ${OPENPGM_VERSION_MAJOR})
+set (CPACK_PACKAGE_VERSION_MINOR ${OPENPGM_VERSION_MINOR})
+set (CPACK_PACKAGE_VERSION_PATCH ${OPENPGM_VERSION_MICRO})
 include (CPack)
 
 # end of file
