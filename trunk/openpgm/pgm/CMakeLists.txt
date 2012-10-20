@@ -209,8 +209,8 @@ set(sources
 
 add_library(libpgm STATIC ${sources} ${CMAKE_BINARY_DIR}/NSIS.template.in)
 set_target_properties(libpgm PROPERTIES
-	RELEASE_POSTFIX "${_pgm_COMPILER}-mt-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}"
-	DEBUG_POSTFIX "${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}")
+	RELEASE_POSTFIX "${_pgm_COMPILER}-mt-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}"
+	DEBUG_POSTFIX "${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}")
 
 #-----------------------------------------------------------------------------
 # installer
@@ -250,7 +250,7 @@ set (CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
 
 install (TARGETS libpgm DESTINATION lib)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-	install (FILES ${CMAKE_BINARY_DIR}/lib/libpgm${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}.pdb DESTINATION lib)
+	install (FILES ${CMAKE_BINARY_DIR}/lib/libpgm${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}.pdb DESTINATION lib)
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 install (FILES ${headers} DESTINATION include/pgm)
 install (FILES ${docs} DESTINATION doc)
