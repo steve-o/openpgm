@@ -19,6 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
+#       include <config.h>
+#endif
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -197,7 +201,7 @@ verify_ip_header (
  * 
  * RFC3828 allows partial packets such that len < packet_length with UDP lite
  */
-#ifndef CONFIG_HOST_ORDER_IP_LEN
+#ifndef HAVE_HOST_ORDER_IP_LEN
 	guint packet_length = g_ntohs(ip->ip_len);	/* total packet length */
 #else
 	guint packet_length = ip->ip_len;
@@ -234,7 +238,7 @@ verify_ip_header (
 	}
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
-#ifndef CONFIG_HOST_ORDER_IP_OFF
+#ifndef HAVE_HOST_ORDER_IP_OFF
 	int offset = g_ntohs(ip->ip_off);
 #else
 	int offset = ip->ip_off;
@@ -263,7 +267,7 @@ print_ip_header (
 		ip->ip_tos & 0x3
 		);
 	printf ("\t\t\"length\": %i,\n",
-#ifndef CONFIG_HOST_ORDER_IP_LEN
+#ifndef HAVE_HOST_ORDER_IP_LEN
 		g_ntohs(ip->ip_len)
 #else
 		ip->ip_len

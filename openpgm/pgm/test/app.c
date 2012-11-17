@@ -19,6 +19,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
+#       include <config.h>
+#endif
+
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -704,7 +708,7 @@ session_send (
 	int status;
 	gsize stringlen = strlen(string) + 1;
 	struct timeval tv;
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 	int n_fds = 1;
 	struct pollfd fds[ n_fds ];
 	int timeout;
@@ -740,7 +744,7 @@ printf ("pgm_send (sock:%p string:\"%s\" stringlen:%" G_GSIZE_FORMAT " NULL)\n",
 /* fall through */
 	case PGM_IO_STATUS_WOULD_BLOCK:
 block:
-#ifdef CONFIG_HAVE_POLL
+#ifdef HAVE_POLL
 		timeout = PGM_IO_STATUS_WOULD_BLOCK == status ? -1 : ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 		memset (fds, 0, sizeof(fds));
 		pgm_poll_info (sess->sock, fds, &n_fds, POLLOUT);
@@ -759,7 +763,7 @@ block:
 		break;
 	}
 
-#ifndef CONFIG_HAVE_POLL
+#ifndef HAVE_POLL
 	WSACloseEvent (waitEvents[0]);
 #endif
 }

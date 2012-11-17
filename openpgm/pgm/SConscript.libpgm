@@ -199,6 +199,7 @@ if env['WITH_CHECK'] == 'true':
 			te.Object('histogram.c'),
 			te.Object('indextoaddr.c'),
 			te.Object('indextoname.c'),
+			te.Object('inet_lnaof.c'),
 			te.Object('inet_network.c'),
 			te.Object('list.c'),
 			te.Object('math.c'),
