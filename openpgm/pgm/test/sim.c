@@ -19,6 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
+#       include <config.h>
+#endif
 
 #include <errno.h>
 #include <getopt.h>
@@ -600,7 +603,7 @@ fake_pgm_bind3 (
                 struct sockaddr_storage ss;
         } recv_addr, recv_addr2, send_addr, send_with_router_alert_addr;
 
-#ifdef CONFIG_BIND_INADDR_ANY
+#ifdef USE_BIND_INADDR_ANY
 /* force default interface for bind-only, source address is still valid for multicast membership.
  * effectively same as running getaddrinfo(hints = {ai_flags = AI_PASSIVE})
  */
@@ -693,16 +696,22 @@ fake_pgm_bind3 (
 /* resolve bound address if 0.0.0.0 */
         if (AF_INET == send_addr.ss.ss_family)
         {
-                if ((INADDR_ANY == ((struct sockaddr_in*)&send_addr)->sin_addr.s_addr) &&
-                    !pgm_if_getnodeaddr (AF_INET, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
-                {
-                        return FALSE;
-                }
+                if (INADDR_ANY == ((struct sockaddr_in*)&send_addr)->sin_addr.s_addr)
+		{
+			struct addrinfo *result;
+			if (!pgm_getnodeaddr (AF_INET, &result, error))
+				return FALSE;
+			memcpy (&send_addr, result->ai_addr, result->ai_addrlen);
+	                pgm_freenodeaddr (result);
+		}
         }
-        else if ((memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0) &&
-                 !pgm_if_getnodeaddr (AF_INET6, (struct sockaddr*)&send_addr, sizeof(send_addr), error))
-        {
-                return FALSE;
+        else if (memcmp (&in6addr_any, &((struct sockaddr_in6*)&send_addr)->sin6_addr, sizeof(in6addr_any)) == 0)
+	{
+		struct addrinfo *result;
+		if (!pgm_getnodeaddr (AF_INET6, &result, error))
+                	return FALSE;
+		memcpy (&send_addr, result->ai_addr, result->ai_addrlen);
+                pgm_freenodeaddr (result);
         }
 
         {
