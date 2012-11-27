@@ -621,6 +621,9 @@ pgm_clock_update (void)
 #endif /* HAVE_CLOCK_GETTIME */
 
 #ifdef HAVE_FTIME
+/* Note that _ftime32_s is implemented using GetSystemTimeAsFileTime().
+ * ref: CRT source code as shipped with Microsoft Visual Studio: crt/src/ftime.c
+ */
 static
 pgm_time_t
 pgm_ftime_update (void)
