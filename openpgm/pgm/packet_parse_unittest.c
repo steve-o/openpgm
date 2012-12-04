@@ -67,7 +67,11 @@ generate_raw_pgm (void)
 	iphdr->ip_hl		= sizeof(struct pgm_ip) / 4;
 	iphdr->ip_v		= 4;
 	iphdr->ip_tos		= 0;
+#ifndef HAVE_HOST_ORDER_IP_LEN
 	iphdr->ip_len		= g_htons (skb->len);
+#else
+	iphdr->ip_len		= skb->len;
+#endif
 	iphdr->ip_id		= 0;
 	iphdr->ip_off		= 0;
 	iphdr->ip_ttl		= 16;
