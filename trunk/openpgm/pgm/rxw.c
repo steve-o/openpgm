@@ -329,7 +329,7 @@ pgm_rxw_add (
 
 /* protocol sanity check: valid trail pointer wrt. sequence */
 	if (PGM_UNLIKELY(skb->sequence - ntohl (skb->pgm_data->data_trail) >= ((UINT32_MAX/2)-1)))
-		return PGM_RXW_MALFORMED;
+		return PGM_RXW_BOUNDS;
 
 /* verify fragment header for original data, parity packets include a
  * parity fragment header
