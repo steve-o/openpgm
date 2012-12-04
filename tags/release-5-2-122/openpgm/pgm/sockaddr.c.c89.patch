@@ -1,0 +1,70 @@
+--- sockaddr.c	2011-10-11 04:55:37.000000000 +0800
++++ sockaddr.c89.c	2011-10-11 04:58:25.000000000 +0800
+@@ -236,7 +236,7 @@
+ 	)
+ {
+ 	return getnameinfo (sa, pgm_sockaddr_len (sa),
+-			    host, hostlen,
++			    host, (DWORD)hostlen,
+ 			    NULL, 0,
+ 			    NI_NUMERICHOST);
+ }
+@@ -248,12 +248,13 @@
+ 	struct sockaddr* restrict dst		/* will error on wrong size */
+ 	)
+ {
+-	struct addrinfo hints = {
+-		.ai_family	= AF_UNSPEC,
+-		.ai_socktype	= SOCK_STREAM,		/* not really */
+-		.ai_protocol	= IPPROTO_TCP,		/* not really */
+-		.ai_flags	= AI_NUMERICHOST
+-	}, *result = NULL;
++	struct addrinfo hints, *result;
++	memset (&hints, 0, sizeof(hints));
++	hints.ai_family		= AF_UNSPEC;
++	hints.ai_socktype	= SOCK_STREAM;		/* not really */
++	hints.ai_protocol	= IPPROTO_TCP;		/* not really */
++	hints.ai_flags		= AI_NUMERICHOST;
++	{
+ 	const int status = getaddrinfo (src, NULL, &hints, &result);
+ 	if (PGM_LIKELY(0 == status)) {
+ 		memcpy (dst, result->ai_addr, result->ai_addrlen);
+@@ -261,6 +262,7 @@
+ 		return 1;
+ 	}
+ 	return 0;
++	}
+ }
+ 
+ /* returns tri-state value: 1 if sa is multicast, 0 if sa is not multicast, -1 on error
+@@ -1311,13 +1313,14 @@
+ 	pgm_assert (NULL != src);
+ 	pgm_assert (NULL != dst);
+ 
+-	struct addrinfo hints = {
+-		.ai_family	= af,
+-		.ai_socktype	= SOCK_STREAM,		/* not really */
+-		.ai_protocol	= IPPROTO_TCP,		/* not really */
+-		.ai_flags	= AI_NUMERICHOST
+-	}, *result = NULL;
+-
++	{
++	struct addrinfo hints, *result;
++	memset (&hints, 0, sizeof(hints));
++	hints.ai_family		= af;
++	hints.ai_socktype	= SOCK_STREAM;		/* not really */
++	hints.ai_protocol	= IPPROTO_TCP;		/* not really */
++	hints.ai_flags		= AI_NUMERICHOST;
++	{
+ 	const int e = getaddrinfo (src, NULL, &hints, &result);
+ 	if (0 != e) {
+ 		return 0;	/* error */
+@@ -1348,6 +1351,8 @@
+ 
+ 	freeaddrinfo (result);
+ 	return 1;	/* success */
++	}
++	}
+ }
+ 
+ PGM_GNUC_INTERNAL

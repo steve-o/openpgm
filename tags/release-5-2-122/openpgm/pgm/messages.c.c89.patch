@@ -1,0 +1,27 @@
+--- messages.c	2011-06-27 22:53:36.000000000 +0800
++++ messages.c89.c	2011-10-06 01:36:37.000000000 +0800
+@@ -179,14 +179,22 @@
+ 	char tbuf[1024];
+ 
+ 	pgm_mutex_lock (&messages_mutex);
++	{
+ 	const int offset = pgm_snprintf_s (tbuf, sizeof (tbuf), _TRUNCATE, "%s: ", log_level_text (log_level));
+ 	pgm_vsnprintf_s (tbuf + offset, sizeof(tbuf) - offset, _TRUNCATE, format, args);
++	}
+ 	if (log_handler)
+ 		log_handler (log_level, tbuf, log_handler_closure);
+ 	else {
+ /* ignore return value */
+-		(void) write (STDOUT_FILENO, tbuf, strlen (tbuf));
+-		(void) write (STDOUT_FILENO, "\n", 1);
++#ifdef _MSC_VER
++		const int stdoutfd = _fileno (stdout);
++		_write (stdoutfd, tbuf, (unsigned)strlen (tbuf));
++		_write (stdoutfd, "\n", 1);
++#else
++		write (STDOUT_FILENO, tbuf, strlen (tbuf));
++		write (STDOUT_FILENO, "\n", 1);
++#endif
+ 	}
+ 		
+ 	pgm_mutex_unlock (&messages_mutex);

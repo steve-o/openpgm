@@ -1,0 +1,134 @@
+--- rate_control.c	2011-06-27 22:55:37.000000000 +0800
++++ rate_control.c89.c	2011-10-06 01:39:44.000000000 +0800
+@@ -84,7 +84,7 @@
+ 	const bool		is_nonblocking
+ 	)
+ {
+-	int64_t new_major_limit, new_minor_limit;
++	ssize_t new_major_limit, new_minor_limit;
+ 	pgm_time_t now;
+ 
+ /* pre-conditions */
+@@ -106,7 +106,9 @@
+ 			if (time_since_last_rate_check > pgm_msecs(1)) 
+ 				new_major_limit = major_bucket->rate_per_msec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_major_limit = major_bucket->rate_limit + ((major_bucket->rate_per_msec * time_since_last_rate_check) / 1000UL);
++#pragma warning( default : 4244 )
+ 				if (new_major_limit > major_bucket->rate_per_msec)
+ 					new_major_limit = major_bucket->rate_per_msec;
+ 			}
+@@ -117,7 +119,9 @@
+ 			if (time_since_last_rate_check > pgm_secs(1)) 
+ 				new_major_limit = major_bucket->rate_per_sec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_major_limit = major_bucket->rate_limit + ((major_bucket->rate_per_sec * time_since_last_rate_check) / 1000000UL);
++#pragma warning( default : 4244 )
+ 				if (new_major_limit > major_bucket->rate_per_sec)
+ 					new_major_limit = major_bucket->rate_per_sec;
+ 			}
+@@ -154,7 +158,9 @@
+ 			if (time_since_last_rate_check > pgm_msecs(1)) 
+ 				new_minor_limit = minor_bucket->rate_per_msec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_minor_limit = minor_bucket->rate_limit + ((minor_bucket->rate_per_msec * time_since_last_rate_check) / 1000UL);
++#pragma warning( default : 4244 )
+ 				if (new_minor_limit > minor_bucket->rate_per_msec)
+ 					new_minor_limit = minor_bucket->rate_per_msec;
+ 			}
+@@ -165,7 +171,9 @@
+ 			if (time_since_last_rate_check > pgm_secs(1)) 
+ 				new_minor_limit = minor_bucket->rate_per_sec;
+ 			else {
++#pragma warning( disable : 4244 )
+ 				new_minor_limit = minor_bucket->rate_limit + ((minor_bucket->rate_per_sec * time_since_last_rate_check) / 1000000UL);
++#pragma warning( default : 4244 )
+ 				if (new_minor_limit > minor_bucket->rate_per_sec)
+ 					new_minor_limit = minor_bucket->rate_per_sec;
+ 			}
+@@ -212,7 +220,7 @@
+ 	const bool		is_nonblocking
+ 	)
+ {
+-	int64_t new_rate_limit;
++	ssize_t new_rate_limit;
+ 
+ /* pre-conditions */
+ 	pgm_assert (NULL != bucket);
+@@ -222,6 +230,7 @@
+ 		return TRUE;
+ 
+ 	pgm_spinlock_lock (&bucket->spinlock);
++	{
+ 	pgm_time_t now = pgm_time_update_now();
+ 
+ 	if (bucket->rate_per_msec)
+@@ -230,7 +239,9 @@
+ 		if (time_since_last_rate_check > pgm_msecs(1)) 
+ 			new_rate_limit = bucket->rate_per_msec;
+ 		else {
++#pragma warning( disable : 4244 )
+ 			new_rate_limit = bucket->rate_limit + ((bucket->rate_per_msec * time_since_last_rate_check) / 1000UL);
++#pragma warning( default : 4244 )
+ 			if (new_rate_limit > bucket->rate_per_msec)
+ 				new_rate_limit = bucket->rate_per_msec;
+ 		}
+@@ -241,7 +252,9 @@
+ 		if (time_since_last_rate_check > pgm_secs(1)) 
+ 			new_rate_limit = bucket->rate_per_sec;
+ 		else {
++#pragma warning( disable : 4244 )
+ 			new_rate_limit = bucket->rate_limit + ((bucket->rate_per_sec * time_since_last_rate_check) / 1000000UL);
++#pragma warning( default : 4244 )
+ 			if (new_rate_limit > bucket->rate_per_sec)
+ 				new_rate_limit = bucket->rate_per_sec;
+ 		}
+@@ -267,6 +280,7 @@
+ 	} 
+ 	pgm_spinlock_unlock (&bucket->spinlock);
+ 	return TRUE;
++	}
+ }
+ 
+ PGM_GNUC_INTERNAL
+@@ -291,12 +305,14 @@
+ 	{
+ 		pgm_spinlock_lock (&major_bucket->spinlock);
+ 		now = pgm_time_update_now();
++		{
+ 		const int64_t bucket_bytes = major_bucket->rate_limit + pgm_to_secs (major_bucket->rate_per_sec * (now - major_bucket->last_rate_check)) - n;
+ 
+ 		if (bucket_bytes < 0) {
+ 			const int64_t outstanding_bytes = -bucket_bytes;
+ 			const pgm_time_t major_remaining = (1000000UL * outstanding_bytes) / major_bucket->rate_per_sec;
+-			remaining = major_remaining;
++			 remaining = major_remaining;
++		}
+ 		}
+ 	}
+ 	else
+@@ -338,6 +354,7 @@
+ 		return 0;
+ 
+ 	pgm_spinlock_lock (&bucket->spinlock);
++	{
+ 	const pgm_time_t now = pgm_time_update_now();
+ 	const pgm_time_t time_since_last_rate_check = now - bucket->last_rate_check;
+ 	const int64_t bucket_bytes = bucket->rate_limit + pgm_to_secs (bucket->rate_per_sec * time_since_last_rate_check) - n;
+@@ -346,10 +363,13 @@
+ 	if (bucket_bytes >= 0)
+ 		return 0;
+ 
++	{
+ 	const int64_t outstanding_bytes = -bucket_bytes;
+ 	const pgm_time_t remaining = (1000000UL * outstanding_bytes) / bucket->rate_per_sec;
+ 
+ 	return remaining;
++	}
++	}
+ }
+ 
+ /* eof */

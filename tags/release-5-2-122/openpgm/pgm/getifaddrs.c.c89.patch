@@ -1,0 +1,208 @@
+--- getifaddrs.c	2012-09-22 21:48:41.000000000 +0800
++++ getifaddrs.c89.c	2012-09-22 21:51:10.000000000 +0800
+@@ -584,7 +584,9 @@
+ /* loop to handle interfaces coming online causing a buffer overflow
+  * between first call to list buffer length and second call to enumerate.
+  */
+-	for (unsigned i = MAX_TRIES; i; i--)
++	{
++	unsigned i;
++	for (i = MAX_TRIES; i; i--)
+ 	{
+ 		pgm_debug ("IP_ADAPTER_INFO buffer length %lu bytes.", ulOutBufLen);
+ 		pAdapterInfo = (IP_ADAPTER_INFO*)_pgm_heap_alloc (ulOutBufLen);
+@@ -596,6 +598,7 @@
+ 			break;
+ 		}
+ 	}
++	}
+ 
+ 	switch (dwRet) {
+ 	case ERROR_SUCCESS:	/* NO_ERROR */
+@@ -620,12 +623,15 @@
+ 	}
+ 
+ /* count valid adapters */
++	{
+ 	int n = 0, k = 0;
+ 	for (pAdapter = pAdapterInfo;
+ 		 pAdapter;
+ 		 pAdapter = pAdapter->Next)
+ 	{
+-		for (IP_ADDR_STRING *pIPAddr = &pAdapter->IpAddressList;
++	{
++	IP_ADDR_STRING *pIPAddr;
++	for (pIPAddr = &pAdapter->IpAddressList;
+ 			 pIPAddr;
+ 			 pIPAddr = pIPAddr->Next)
+ 		{
+@@ -635,10 +641,12 @@
+ 			++n;
+ 		}
+ 	}
++	}
+ 
+ 	pgm_debug ("GetAdaptersInfo() discovered %d interfaces.", n);
+ 
+ /* contiguous block for adapter list */
++	{
+ 	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
+ 	struct _pgm_ifaddrs_t* ift = ifa;
+ 
+@@ -647,7 +655,9 @@
+ 		 pAdapter;
+ 		 pAdapter = pAdapter->Next)
+ 	{
+-		for (IP_ADDR_STRING *pIPAddr = &pAdapter->IpAddressList;
++		{
++		IP_ADDR_STRING *pIPAddr;
++		for (pIPAddr = &pAdapter->IpAddressList;
+ 			 pIPAddr;
+ 			 pIPAddr = pIPAddr->Next)
+ 		{
+@@ -680,11 +690,14 @@
+ 				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+ 			}
+ 		}
++		}
+ 	}
+ 
+ 	if (pAdapterInfo)
+ 		_pgm_heap_free (pAdapterInfo);
+ 	*ifap = (struct pgm_ifaddrs_t*)ifa;
++	}
++	}
+ 	return TRUE;
+ }
+ 
+@@ -716,12 +729,13 @@
+ /* loop to handle interfaces coming online causing a buffer overflow
+  * between first call to list buffer length and second call to enumerate.
+  */
+-	for (unsigned i = MAX_TRIES; i; i--)
++	{
++	unsigned i;
++	for (i = MAX_TRIES; i; i--)
+ 	{
+ 		pgm_debug ("IP_ADAPTER_ADDRESSES buffer length %lu bytes.", dwSize);
+ 		pAdapterAddresses = (IP_ADAPTER_ADDRESSES*)_pgm_heap_alloc (dwSize);
+ 		dwRet = GetAdaptersAddresses (AF_UNSPEC,
+-/* requires Windows XP SP1 */
+ 						GAA_FLAG_INCLUDE_PREFIX |
+ 						GAA_FLAG_SKIP_ANYCAST |
+ 						GAA_FLAG_SKIP_DNS_SERVER |
+@@ -737,6 +751,7 @@
+ 			break;
+ 		}
+ 	}
++	}
+ 
+ 	switch (dwRet) {
+ 	case ERROR_SUCCESS:
+@@ -761,12 +776,15 @@
+ 	}
+ 
+ /* count valid adapters */
++	{
+ 	int n = 0, k = 0;
+ 	for (adapter = pAdapterAddresses;
+ 		 adapter;
+ 		 adapter = adapter->Next)
+ 	{
+-		for (IP_ADAPTER_UNICAST_ADDRESS *unicast = adapter->FirstUnicastAddress;
++		{
++		IP_ADAPTER_UNICAST_ADDRESS *unicast;
++		for (unicast = adapter->FirstUnicastAddress;
+ 			 unicast;
+ 			 unicast = unicast->Next)
+ 		{
+@@ -779,9 +797,11 @@
+ 
+ 			++n;
+ 		}
++		}
+ 	}
+ 
+ /* contiguous block for adapter list */
++	{
+ 	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, n);
+ 	struct _pgm_ifaddrs_t* ift = ifa;
+ 
+@@ -791,7 +811,9 @@
+ 		 adapter = adapter->Next)
+ 	{
+ 		int unicastIndex = 0;
+-		for (IP_ADAPTER_UNICAST_ADDRESS *unicast = adapter->FirstUnicastAddress;
++		{
++		IP_ADAPTER_UNICAST_ADDRESS *unicast;
++		for (unicast = adapter->FirstUnicastAddress;
+ 			 unicast;
+ 			 unicast = unicast->Next, ++unicastIndex)
+ 		{
+@@ -831,6 +853,7 @@
+  * host IP address prefix, subnet IP address, and subnet broadcast IP
+  * address.  In addition there is a multicast and broadcast address prefix.
+  */
++			{
+ 			ULONG prefixLength = 0;
+ 
+ #if defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 )
+@@ -866,6 +889,8 @@
+ 			else
+ 				prefixLength = unicast->OnLinkPrefixLength;
+ #else
++			{
++			IP_ADAPTER_PREFIX *prefix;
+ /* The order of linked IP_ADAPTER_UNICAST_ADDRESS structures pointed to by
+  * the FirstUnicastAddress member does not have any relationship with the
+  * order of linked IP_ADAPTER_PREFIX structures pointed to by the FirstPrefix
+@@ -913,7 +938,7 @@
+ 
+ #define IN_LINKLOCAL(a)	((((uint32_t) (a)) & 0xaffff0000) == 0xa9fe0000)
+ 
+-			for (IP_ADAPTER_PREFIX *prefix = adapter->FirstPrefix;
++			for (prefix = adapter->FirstPrefix;
+ 				prefix;
+ 				prefix = prefix->Next)
+ 			{
+@@ -958,6 +983,7 @@
+ 				prefixLength = prefix->PrefixLength;
+ 				break;
+ 			}
++			}
+ #endif /* defined( _WIN32 ) && ( _WIN32_WINNT >= 0x0600 ) */
+ 
+ /* map prefix to netmask */
+@@ -990,12 +1016,16 @@
+ 						prefixLength);
+ 					prefixLength = 128;
+ 				}
+-				for (ULONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
++				{
++				ULONG i, j;
++				for (i = prefixLength, j = 0; i > 0; i -= 8, ++j)
+ 				{
+ 					((struct sockaddr_in6*)ift->_ifa.ifa_netmask)->sin6_addr.s6_addr[ j ] = i >= 8 ? 0xff : (ULONG)(( 0xffU << ( 8 - i ) ) & 0xffU );
+ 				}
++				}
+ 				break;
+ 			}
++			}
+ 
+ /* next */
+ 			if (k++ < (n - 1)) {
+@@ -1003,11 +1033,14 @@
+ 				ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
+ 			}
+ 		}
++		}
+ 	}
+ 
+ 	if (pAdapterAddresses)
+ 		_pgm_heap_free (pAdapterAddresses);
+ 	*ifap = (struct pgm_ifaddrs_t*)ifa;
++	}
++	}
+ 	return TRUE;
+ }
+ #endif /* _WIN32 */

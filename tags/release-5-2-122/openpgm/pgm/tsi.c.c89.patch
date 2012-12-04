@@ -1,0 +1,16 @@
+--- tsi.c	2011-06-19 06:55:34.000000000 +0800
++++ tsi.c89.c	2011-06-19 06:55:50.000000000 +0800
+@@ -47,11 +47,13 @@
+ 	pgm_return_val_if_fail (NULL != buf, -1);
+ 	pgm_return_val_if_fail (bufsize > 0, -1);
+ 
++	{
+ 	const uint8_t* gsi = (const uint8_t*)tsi;
+ 	const uint16_t source_port = tsi->sport;
+ 
+ 	return pgm_snprintf_s (buf, bufsize, _TRUNCATE, "%u.%u.%u.%u.%u.%u.%u",
+ 				 gsi[0], gsi[1], gsi[2], gsi[3], gsi[4], gsi[5], ntohs (source_port));
++	}
+ }
+ 
+ /* transform TSI to ASCII string form.

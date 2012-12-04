@@ -1,0 +1,88 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+import os;
+
+Import('env');
+e = env.Clone();
+e.Prepend(LIBS = ['libpgm']);
+p = e.Clone();
+if '-DHAVE_GETOPT' in env['CCFLAGS']:
+	getopt = []
+else:
+	getopt = ['getopt.c']
+
+if e['WITH_GLIB'] == 'true':
+	e.Prepend(LIBS = ['libpgmex']);
+	e.MergeFlags(env['GLIB_FLAGS']);
+	e2 = e.Clone();
+	if e2['WITH_SNMP'] == 'true':
+		e2.Append(CCFLAGS = ['-DCONFIG_WITH_SNMP']);
+		e2.Prepend(LIBS = ['libpgmsnmp']);
+		e2.MergeFlags(e['SNMP_FLAGS']);
+	if e2['WITH_HTTP'] == 'true':
+		e2.Append(CCFLAGS = ['-DCONFIG_WITH_HTTP']);
+		e2.Prepend(LIBS = ['libpgmhttp']);
+
+# core preferred examples
+	e.Program(['pgmdump.c'])
+	e2.Program(['pgmsend.c'])
+	e2.Program(['pgmrecv.c'])
+
+# sync examples
+	e.Program(['blocksyncrecv.c'])
+	e.Program(['snonblocksyncrecv.c'])
+	if '-DHAVE_POLL' in e['CCFLAGS']:
+		e.Program(['pnonblocksyncrecv.c'])
+
+# epoll based examples
+	if '-DHAVE_EPOLL_CTL' in e['CCFLAGS']:
+		e.Program(['enonblocksyncrecv.c'])
+		e.Program(['enonblocksyncrecvmsg.c'])
+		e.Program(['enonblocksyncrecvmsgv.c'])
+
+# ncurses examples
+	if e['WITH_NCURSES'] == 'true':
+		en = e.Clone()
+		en.Append(LIBS = ['panel', 'ncurses']);
+		en.Program(['pgmtop.c'])
+
+# Google Protocol Buffer example
+	if e['WITH_PROTOBUF'] == 'true':
+		ep = e2.Clone();
+		newCCFLAGS = [];
+		for flag in ep['CCFLAGS']:
+			if ("-W" != flag[:2]) and ("-std=gnu99" != flag[:10]) and ("-pedantic" != flag[:9]) and ("-D_XOPEN_SOURCE=600" != flag[:19]) and ("-xc99=all" != flag[:9]):
+				newCCFLAGS.append(flag);
+			if ("-D_XOPEN_SOURCE=600" == flag[:19]):
+				newCCFLAGS.append("-D_XOPEN_SOURCE=500");
+		ep['CCFLAGS'] = newCCFLAGS;
+		ep.Append(CPPPATH = '.');
+		ep.Append(CCFLAGS = ep['PROTOBUF_CCFLAGS']);
+		protobuf = Builder(action = 'cd ${SOURCE.dir} && %s ${SOURCE.file} --cpp_out=../${TARGET.dir}' % ep['PROTOBUF_PROTOC'])
+		ep.Append(BUILDERS = {'Protobuf' : protobuf})
+		ep.Program(['pgmping.cc', 'ping.pb.cc', ep['PROTOBUF_LIBS']])
+		protobuf = ep.Protobuf('ping.pb.cc', 'ping.proto')
+		ep.Requires(ep.Object('pgmping.cc'), protobuf);
+
+# Vanilla example
+p.Program(['purinsend.c'] + getopt)
+p.Program(['purinrecv.c'] + getopt)
+p.Program(['daytime.c'] + getopt)
+p.Program(['shortcakerecv.c', 'async.c'] + getopt)
+
+# Vanilla C++ example
+if e['WITH_CC'] == 'true':
+	pcc = p.Clone();
+	newCCFLAGS = [];
+	for flag in pcc['CCFLAGS']:
+		if ("-W" != flag[:2]) and ("-std=gnu99" != flag[:10]) and ("-pedantic" != flag[:9]) and ("-D_XOPEN_SOURCE=600" != flag[:19]) and ("-xc99=all" != flag[:9]) and ("-std=c99" != flag[:8]):
+			newCCFLAGS.append(flag);
+		if ("-D_XOPEN_SOURCE=600" == flag[:19]):
+			newCCFLAGS.append("-D_XOPEN_SOURCE=500");
+	pcc['CCFLAGS'] = newCCFLAGS;
+	pcc.Program('purinsendcc', ['purinsendcc.cc'] + p.Object(getopt))
+	pcc.Program('purinrecvcc', ['purinrecvcc.cc'] + p.Object(getopt))
+
+# end of file

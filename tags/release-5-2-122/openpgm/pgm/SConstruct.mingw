@@ -1,0 +1,319 @@
+# -*- mode: python -*-
+# OpenPGM build script
+
+import platform
+import os
+import time
+import sys
+
+EnsureSConsVersion( 1, 0 )
+SConsignFile('scons.signatures' + '-Win32-' + platform.machine());
+
+vars = Variables()
+vars.AddVariables (
+	EnumVariable ('BUILD', 'build environment', 'debug',
+			allowed_values=('release', 'debug', 'profile')),
+	EnumVariable ('BRANCH', 'branch prediction', 'none',
+			allowed_values=('none', 'profile', 'seed')),
+	EnumVariable ('WITH_GETTEXT', 'l10n support via libintl', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_GLIB', 'Build GLib dependent modules', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('COVERAGE', 'test coverage', 'none',
+			allowed_values=('none', 'full')),
+	EnumVariable ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_HTTP', 'HTTP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_SNMP', 'SNMP administration', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_CHECK', 'Check test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_TEST', 'Network test system', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_CC', 'C++ examples', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_EXAMPLES', 'Examples', 'true',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_NCURSES', 'NCURSES examples', 'false',
+			allowed_values=('true', 'false')),
+	EnumVariable ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false',
+			allowed_values=('true', 'false')),
+)
+
+#-----------------------------------------------------------------------------
+# Platform specifics
+
+def force_mingw(env):
+	env.Tool('crossmingw', toolpath=['.']);
+
+env = Environment(
+	variables = vars,
+	ENV = os.environ,
+	CCFLAGS = [	'-pipe',
+			'-Wall',
+				'-Wextra',
+				'-Wfloat-equal',
+				'-Wshadow',
+				'-Wunsafe-loop-optimizations',
+				'-Wpointer-arith',
+				'-Wbad-function-cast',
+				'-Wcast-qual',
+				'-Wcast-align',
+				'-Wwrite-strings',
+				'-Waggregate-return',
+				'-Wstrict-prototypes',
+				'-Wold-style-definition',
+				'-Wmissing-prototypes',
+				'-Wmissing-declarations',
+				'-Wmissing-noreturn',
+				'-Wmissing-format-attribute',
+				'-Wredundant-decls',
+				'-Wnested-externs',
+#				'-Winline',
+				'-Wno-inline',
+				'-Wno-unused-function',
+			'-pedantic',
+# C99
+			'-std=gnu99',
+			'-D_BSD_SOURCE',
+# 0x0403 required for SetCriticalSectionSpinCount()
+# 0x0501 required for getaddrinfo() on MinGW and IPv6 enabled getaddrinfo() on XP
+# /Windows 2000/ required for InterlockedExchangeAdd()
+# /Windows XP/ required for CreateWellKnownSid(), WSARecvMsg()
+# NB: MinGW32 defaults to 0x0400, i.e. NT 4.0
+#     MinGW-w64 defaults to 0x502, i.e. Windows XP SP2
+			'-D_WIN32_WINNT=0x0501',
+# re-entrant libc
+			'-D_REENTRANT',
+# POSIX spinlocks
+#			'-DHAVE_PTHREAD_SPINLOCK',
+# NSS protocol lookup
+#			'-DHAVE_GETPROTOBYNAME_R',
+#			'-DGETPROTOBYNAME_R_STRUCT_PROTOENT_P',
+# NSS networks lookup, IPv4 only
+# 			'-DHAVE_GETNETENT',
+# variadic macros
+			'-DHAVE_ISO_VARARGS',
+#			'-DHAVE_GNUC_VARARGS',
+# stack memory api header
+#			'-DHAVE_ALLOCA_H',
+# optimium checksum implementation
+#			'-DUSE_8BIT_CHECKSUM',
+			'-DUSE_16BIT_CHECKSUM',
+#			'-DUSE_32BIT_CHECKSUM',
+#			'-DUSE_64BIT_CHECKSUM',
+#			'-DUSE_VECTOR_CHECKSUM',
+# useful /proc system
+#			'-DHAVE_PROC_CPUINFO',
+# example: crash handling
+#			'-DHAVE_BACKTRACE',
+# timing
+			'-DHAVE_FTIME',
+#			'-DHAVE_GETTIMEOFDAY',
+#			'-DHAVE_CLOCK_GETTIME',
+#			'-DHAVE_PSELECT',
+#			'-DHAVE_DEV_RTC',
+			'-DHAVE_RDTSC',
+#			'-DHAVE_DEV_HPET',
+# event handling
+#			'-DHAVE_POLL',
+#			'-DHAVE_EPOLL_CTL',
+# interface enumeration
+#			'-DHAVE_GETIFADDRS',
+#			'-DHAVE_STRUCT_IFADDRS_IFR_NETMASK',
+# win32 cmsg
+			'-DHAVE_WSACMSGHDR',
+# multicast
+#			'-DHAVE_STRUCT_GROUP_REQ',
+#			'-DHAVE_STRUCT_IP_MREQN',
+			'-DHAVE_STRUCT_IP_MSFILTER',
+# sprintf
+#			'-DHAVE_SPRINTF_GROUPING',
+#			'-DHAVE_VASPRINTF',
+# symbol linking scope
+			'-DHAVE_DSO_VISIBILITY',
+# socket binding
+			'-DUSE_BIND_INADDR_ANY',
+# IP header order as per IP(4) on FreeBSD
+#			'-DHAVE_HOST_ORDER_IP_LEN',
+#			'-DHAVE_HOST_ORDER_IP_OFF',
+# ticket based spinlocks
+			'-DUSE_TICKET_SPINLOCK',
+# dumb read-write spinlock
+			'-DUSE_DUMB_RWSPINLOCK',
+# optimum galois field multiplication
+			'-DUSE_GALOIS_MUL_LUT',
+# GNU getopt
+#			'-DHAVE_GETOPT'
+		 ],
+	LINKFLAGS = [	'-pipe'
+		    ],
+	LIBS = [	'iphlpapi.lib',
+			'ws2_32.lib',
+			'winmm.lib'
+		]
+)
+force_mingw(env);
+
+# Win32 regex
+env['REGEX_FLAGS'] = env.ParseFlags('-I/miru/projects/regex/include -L/miru/projects/regex/lib -lregex');
+
+# Branch prediction
+if env['BRANCH'] == 'profile':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+elif env['BRANCH'] == 'seed':
+	env.Append(CCFLAGS = '-fbranch-probabilities')
+
+# Coverage analysis
+if env['COVERAGE'] == 'full':
+	env.Append(CCFLAGS = '-fprofile-arcs')
+	env.Append(CCFLAGS = '-ftest-coverage')
+	env.Append(LINKFLAGS = '-fprofile-arcs')
+	env.Append(LINKFLAGS = '-lgcov')
+
+# Define separate build environments
+release = env.Clone(BUILD = 'release')
+release.Append(CCFLAGS = '-O2')
+
+debug = env.Clone(BUILD = 'debug')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = ['-gdb'])
+
+profile = env.Clone(BUILD = 'profile')
+profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
+
+thirtytwo = release.Clone(BUILD = 'thirtytwo')
+thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
+
+# choose and environment to build
+if env['BUILD'] == 'release':
+	Export({'env':release})
+elif env['BUILD'] == 'profile':
+	Export({'env':profile})
+elif env['BUILD'] == 'thirtytwo':
+	Export({'env':thirtytwo})
+else:
+	Export({'env':debug})
+
+#-----------------------------------------------------------------------------
+# Re-analyse dependencies
+
+Import('env')
+
+# vanilla environment
+if env['WITH_GLIB'] == 'true':
+	env['GLIB_FLAGS'] = env.ParseFlags('!PKG_CONFIG_PATH=win/lib/pkgconfig pkg-config --cflags --libs glib-2.0 gthread-2.0');
+	env.MergeFlags('-Iwin/include -Lwin/lib');
+else:
+	env['GLIB_FLAGS'] = '';
+
+# l10n
+if env['WITH_GETTEXT'] == 'true':
+	env.Append(CCFLAGS = '-DHAVE_GETTEXT');
+
+# instrumentation
+if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
+	env.Append(CCFLAGS = '-DUSE_HISTOGRAMS');
+
+# managed environment for libpgmsnmp, libpgmhttp
+if env['WITH_SNMP'] == 'true':
+# no command line helper, so hard code
+	env['SNMP_FLAGS'] = env.ParseFlags('-Iwin/include -Lwin/lib -lnetsnmpagent -lnetsnmphelpers -lnetsnmpmibs -lnetsnmp');
+
+def CheckSNMP(context):
+	context.Message('Checking Net-SNMP...');
+	lastLIBS = context.env['LIBS'];
+	lastCCFLAGS= context.env['CCFLAGS'];
+	context.env.MergeFlags(env['SNMP_FLAGS']);
+	result = context.TryLink("""
+int main(int argc, char**argv)
+{
+	init_agent("PGM");
+	return 0;
+}
+""", '.c');
+	context.env.Replace(LIBS = lastLIBS, CCFLAGS=lastCCFLAGS);
+	context.Result(not result);
+	return result;
+
+def CheckCheck(context):
+	context.Message('Checking Check unit test framework...');
+	result = context.TryAction('PKG_CONFIG_PATH=win/lib/pkgconfig pkg-config --cflags --libs check')[0];
+	context.Result(result);
+	return result;
+
+def CheckEventFD(context):
+	context.Message('Checking eventfd...');
+	result = context.TryLink("""
+#include <sys/eventfd.h>
+int main(int argc, char**argv)
+{
+	eventfd(0,0);
+	return 0;
+}
+""", '.c')
+	context.Result(result);
+	return result;
+
+tests = {
+	'CheckCheck':	CheckCheck,
+	'CheckEventFD':	CheckEventFD
+}
+if env['WITH_SNMP'] == 'true':
+	tests['CheckSNMP'] = CheckSNMP;
+conf = Configure(env, custom_tests = tests);
+
+if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
+	print 'Net-SNMP libraries not compatible.';
+	Exit(1);
+
+if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
+	print 'Enabling Check unit tests.';
+	conf.env['CHECK'] = 'true';
+	env['CHECK_FLAGS'] = env.ParseFlags('!PKG_CONFIG_PATH=win/lib/pkgconfig pkg-config --cflags --libs check');
+else:
+	print 'Disabling Check unit tests.';
+	conf.env['CHECK'] = 'false';
+
+if conf.CheckEventFD():
+	print 'Enabling kernel eventfd notification mechanism.';
+	conf.env.Append(CCFLAGS = '-DHAVE_EVENTFD');
+
+env = conf.Finish();
+
+# add builder to create PIC static libraries for including in shared libraries
+action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
+if env.Detect('ranlib'):
+	ranlib_action = Action("$RANLIBCOM", "$RANLIBCOMSTR");
+	action_list.append(ranlib_action);
+pic_lib = Builder(	action = action_list,
+			emitter = '$LIBEMITTER',
+			prefix = '$LIBPREFIX',
+			suffix = '$LIBSUFFIX',
+			src_suffix = '$OBJSUFFIX',
+			src_builder = 'SharedObject')
+env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
+
+
+#-----------------------------------------------------------------------------
+
+ref_node = 'ref/' + env['BUILD'] + '-Win32-' + platform.machine() + '/';
+BuildDir(ref_node, '.', duplicate=0)
+
+env.Append(CPPPATH = os.getcwd() + '/include');
+env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
+
+if env['WITH_GLIB'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmex');
+SConscript(ref_node + 'SConscript.libpgm');
+if env['WITH_HTTP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmhttp');
+if env['WITH_SNMP'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmsnmp');
+if env['WITH_TEST'] == 'true':
+	SConscript(ref_node + 'test/SConscript');
+if env['WITH_EXAMPLES'] == 'true':
+	SConscript(ref_node + 'examples/SConscript');
+
+# end of file

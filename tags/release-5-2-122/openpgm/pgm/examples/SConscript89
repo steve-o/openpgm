@@ -1,0 +1,41 @@
+# -*- mode: python -*-
+# OpenPGM build script
+# $Id$
+
+import os;
+
+Import('env');
+e = env.Clone();
+e.Prepend(LIBS = ['libpgm89']);
+p = e.Clone();
+if '-DHAVE_GETOPT' in env['CCFLAGS']:
+	getopt = []
+else:
+	getopt = ['getopt.c']
+
+c89source = Builder(action = 'perl -p -e "s/%z(u|d)/%l\\1/g" $SOURCE > $TARGET',
+		    suffix = '.c89.c',
+		    src_suffix = '.c',
+		    single_source = 1);
+p.Append(BUILDERS = {'C89Source' : c89source})
+
+for c99file in ['purinsend.c', 'purinrecv.c']:
+	p.C89Source(c99file);
+
+p.Program('purinsend', ['purinsend.c89.c'] + getopt)
+p.Program('purinrecv', ['purinrecv.c89.c'] + getopt)
+
+# Vanilla C++ example
+if e['WITH_CC'] == 'true':
+	pcc = p.Clone();
+	newCCFLAGS = [];
+	for flag in pcc['CCFLAGS']:
+		if ("-W" != flag[:2]) and ("-std=gnu99" != flag[:10]) and ("-pedantic" != flag[:9]) and ("-D_XOPEN_SOURCE=600" != flag[:19]) and ("-xc99=all" != flag[:9]):
+			newCCFLAGS.append(flag);
+		if ("-D_XOPEN_SOURCE=600" == flag[:19]):
+			newCCFLAGS.append("-D_XOPEN_SOURCE=500");
+	pcc['CCFLAGS'] = newCCFLAGS;
+	pcc.Program('purinsendcc', ['purinsendcc.cc'] + p.Object(getopt))
+	pcc.Program('purinrecvcc', ['purinrecvcc.cc'] + p.Object(getopt))
+
+# end of file

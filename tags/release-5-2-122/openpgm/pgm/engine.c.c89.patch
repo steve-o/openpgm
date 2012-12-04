@@ -1,0 +1,53 @@
+--- engine.c	2011-07-27 11:58:16.000000000 +0800
++++ engine.c89.c	2011-07-27 11:58:28.000000000 +0800
+@@ -101,6 +101,7 @@
+ 	pgm_rand_init();
+ 
+ #ifdef _WIN32
++	{
+ 	WORD wVersionRequested = MAKEWORD (2, 2);
+ 	WSADATA wsaData;
+ 	if (WSAStartup (wVersionRequested, &wsaData) != 0)
+@@ -157,9 +158,11 @@
+ 		pgm_debug ("Retrieved address of WSARecvMsg.");
+ 		closesocket (sock);
+ 	}
++	}
+ #endif /* _WIN32 */
+ 
+ /* find PGM protocol id overriding default value, use first value from NIS */
++	{
+ 	const struct pgm_protoent_t *proto = pgm_getprotobyname ("pgm");
+ 	if (proto != NULL) {
+ 		if (proto->p_proto != pgm_ipproto_pgm) {
+@@ -168,8 +171,10 @@
+ 			pgm_ipproto_pgm = proto->p_proto;
+ 		}
+ 	}
++	}
+ 
+ /* ensure timing enabled */
++	{
+ 	pgm_error_t* sub_error = NULL;
+ 	if (!pgm_time_init (&sub_error)) {
+ 		if (sub_error)
+@@ -179,9 +184,11 @@
+ #endif
+ 		goto err_shutdown;
+ 	}
++	}
+ 
+ /* receiver simulated loss rate */
+ #ifdef PGM_DEBUG
++	{
+ 	char* env;
+ 	size_t envlen;
+ 
+@@ -194,6 +201,7 @@
+ 		}
+ 		pgm_free (env);
+ 	}
++	}
+ #endif
+ 
+ /* create global sock list lock */

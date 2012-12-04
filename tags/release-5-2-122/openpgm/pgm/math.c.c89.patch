@@ -1,0 +1,16 @@
+--- math.c	2011-06-27 22:51:05.000000000 +0800
++++ math.c89.c	2011-10-06 01:34:51.000000000 +0800
+@@ -69,9 +69,12 @@
+ unsigned
+ pgm_spaced_primes_closest (unsigned num)
+ {
+-	for (unsigned i = 0; i < PGM_N_ELEMENTS(primes); i++)
++	{
++	unsigned i;
++	for (i = 0; i < PGM_N_ELEMENTS(primes); i++)
+ 		if (primes[i] > num)
+ 			return primes[i];
++	}
+ 	return primes[PGM_N_ELEMENTS(primes) - 1];
+ }
+ 

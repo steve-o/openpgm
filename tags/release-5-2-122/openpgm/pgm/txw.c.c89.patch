@@ -1,0 +1,153 @@
+--- txw.c	2011-06-19 07:30:21.000000000 +0800
++++ txw.c89.c	2011-06-19 07:30:33.000000000 +0800
+@@ -194,12 +194,13 @@
+ 
+ 	pgm_debug ("create (tsi:%s max-tpdu:%" PRIu16 " sqns:%" PRIu32  " secs %u max-rte %" PRIzd " use-fec:%s rs(n):%u rs(k):%u)",
+ 		pgm_tsi_print (tsi),
+-		tpdu_size, sqns, secs, max_rte,
++		tpdu_size, sqns, secs, (long)max_rte,
+ 		use_fec ? "YES" : "NO",
+ 		rs_n, rs_k);
+ 
+ /* calculate transmit window parameters */
+ 	pgm_assert (sqns || (tpdu_size && secs && max_rte));
++	{
+ 	const unsigned alloc_sqns = sqns ? sqns : (unsigned)( (secs * max_rte) / tpdu_size );
+ 	window = pgm_malloc0 (sizeof(pgm_txw_t) + ( alloc_sqns * sizeof(struct pgm_sk_buff_t*) ));
+ 	window->tsi = tsi;
+@@ -231,6 +232,7 @@
+ 	pgm_assert (!pgm_txw_retransmit_can_peek (window));
+ 
+ 	return window;
++	}
+ }
+ 
+ /* destructor for transmit window.  must not be called more than once for same window.
+@@ -318,8 +320,10 @@
+ 	skb->sequence = window->lead;
+ 
+ /* add skb to window */
++	{
+ 	const uint_fast32_t index_ = skb->sequence % pgm_txw_max_length (window);
+ 	window->pdata[index_] = skb;
++	}
+ 
+ /* statistics */
+ 	window->size += skb->len;
+@@ -456,6 +460,7 @@
+ 	pgm_assert (NULL != window);
+ 	pgm_assert_cmpuint (tg_sqn_shift, <, 8 * sizeof(uint32_t));
+ 
++	{
+ 	const uint32_t tg_sqn_mask = 0xffffffff << tg_sqn_shift;
+ 	const uint32_t nak_tg_sqn  = sequence &  tg_sqn_mask;	/* left unshifted */
+ 	const uint32_t nak_pkt_cnt = sequence & ~tg_sqn_mask;
+@@ -494,6 +499,7 @@
+ 	pgm_assert (!pgm_queue_is_empty (&window->retransmit_queue));
+ 	state->waiting_retransmit = 1;
+ 	return TRUE;
++	}
+ }
+ 
+ static
+@@ -586,10 +592,13 @@
+ 	}
+ 
+ /* generate parity packet to satisify request */	
++	{
+ 	const uint8_t rs_h = state->pkt_cnt_sent % (window->rs.n - window->rs.k);
+ 	const uint32_t tg_sqn_mask = 0xffffffff << window->tg_sqn_shift;
+ 	const uint32_t tg_sqn = skb->sequence & tg_sqn_mask;
+-	for (uint_fast8_t i = 0; i < window->rs.k; i++)
++	{
++	uint_fast8_t i;
++	for (i = 0; i < window->rs.k; i++)
+ 	{
+ 		const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
+ 		const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
+@@ -609,6 +618,7 @@
+ 			is_op_encoded = TRUE;
+ 		}
+ 	}
++	}
+ 
+ /* construct basic PGM header to be completed by send_rdata() */
+ 	skb = window->parity_buffer;
+@@ -628,7 +638,9 @@
+ 	{
+ 		skb->pgm_header->pgm_options |= PGM_OPT_VAR_PKTLEN;
+ 
+-		for (uint_fast8_t i = 0; i < window->rs.k; i++)
++		{
++		uint_fast8_t i;
++		for (i = 0; i < window->rs.k; i++)
+ 		{
+ 			struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
+ 			const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
+@@ -642,6 +654,7 @@
+ 				odata_skb->zero_padded = 1;
+ 			}
+ 		}
++		}
+ 		parity_length += 2;
+ 	}
+ 
+@@ -658,17 +671,21 @@
+  */
+ 	if (is_op_encoded)
+ 	{
+-		struct pgm_opt_header	*opt_header;
+-		struct pgm_opt_length	*opt_len;
+-		struct pgm_opt_fragment	*opt_fragment, null_opt_fragment;
+-		const pgm_gf8_t		*opt_src[ window->rs.k ];
++		struct pgm_opt_header	 *opt_header;
++		struct pgm_opt_length	 *opt_len;
++		struct pgm_opt_fragment	 *opt_fragment, null_opt_fragment;
++		const pgm_gf8_t		**opt_src;
+ 
+ 		skb->pgm_header->pgm_options |= PGM_OPT_PRESENT;
+ 
+ 		memset (&null_opt_fragment, 0, sizeof(null_opt_fragment));
+ 		*(uint8_t*)&null_opt_fragment |= PGM_OP_ENCODED_NULL;
+ 
+-		for (uint_fast8_t i = 0; i < window->rs.k; i++)
++		opt_src = pgm_newa (pgm_gf8_t*, window->rs.k);
++
++		{
++		uint_fast8_t i;
++		for (i = 0; i < window->rs.k; i++)
+ 		{
+ 			const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
+ 
+@@ -683,8 +700,10 @@
+ 				opt_src[i] = (pgm_gf8_t*)&null_opt_fragment;
+ 			}
+ 		}
++		}
+ 
+ /* add options to this rdata packet */
++		{
+ 		const uint16_t opt_total_length = sizeof(struct pgm_opt_length) +
+ 						 sizeof(struct pgm_opt_header) +
+ 						 sizeof(struct pgm_opt_fragment);
+@@ -696,6 +715,7 @@
+ 		opt_len->opt_type			= PGM_OPT_LENGTH;
+ 		opt_len->opt_length			= sizeof(struct pgm_opt_length);
+ 		opt_len->opt_total_length		= htons ( opt_total_length );
++		}
+ 		opt_header			 	= (struct pgm_opt_header*)(opt_len + 1);
+ 		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
+ 		opt_header->opt_length			= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
+@@ -724,9 +744,12 @@
+ 			parity_length);
+ 
+ /* calculate partial checksum */
++	{
+ 	const uint16_t tsdu_length = ntohs (skb->pgm_header->pgm_tsdu_length);
+ 	state->unfolded_checksum = pgm_csum_partial ((char*)skb->tail - tsdu_length, tsdu_length, 0);
++	}
+ 	return skb;
++	}
+ }
+ 
+ /* remove head entry from retransmit queue, will fail on assertion if queue is empty.

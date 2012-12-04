@@ -1,0 +1,52 @@
+--- string.c	2011-06-27 22:58:17.000000000 +0800
++++ string.c89.c	2011-06-27 23:08:39.000000000 +0800
+@@ -104,10 +104,12 @@
+ 		free (strp);
+ 	}
+ #else
++	{
+ #	ifdef _MSC_VER
+ /* can only copy on assignment, pointer to stack frame */
+ 	va_list args2 = args;
+ #	else
++/* C99 va_copy macro */
+ 	va_list args2;
+ 	va_copy (args2, args);
+ #	endif
+@@ -115,6 +117,7 @@
+ 	*string = pgm_malloc (len);
+ 	len = pgm_vsnprintf_s (*string, len, _TRUNCATE, format, args2);
+ 	va_end (args2);
++	}
+ #endif
+ 	return len;
+ }
+@@ -145,13 +148,14 @@
+ #ifdef HAVE_STPCPY
+ 	return stpcpy (dest, src);
+ #else
++	{
+ 	char		*d = dest;
+ 	const char	*s = src;
+-
+ 	do {
+ 		*d++ = *s;
+ 	} while (*s++ != '\0');
+ 	return d - 1;
++	}
+ #endif
+ }
+ 
+@@ -260,8 +264,11 @@
+ {
+ 	if (PGM_LIKELY (NULL != str_array))
+ 	{
+-		for (unsigned i = 0; str_array[i] != NULL; i++)
++		{
++		unsigned i;
++		for (i = 0; str_array[i] != NULL; i++)
+ 			pgm_free (str_array[i]);
++		}
+ 
+ 		pgm_free (str_array);
+ 	}

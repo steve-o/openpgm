@@ -1,0 +1,52 @@
+--- md5.c	2011-06-27 22:51:21.000000000 +0800
++++ md5.c89.c	2011-10-06 01:35:24.000000000 +0800
+@@ -96,6 +96,7 @@
+ 	pgm_assert (len > 0);
+ 	pgm_assert (NULL != ctx);
+ 
++	{
+ 	uint32_t correct_words[16];
+ 	const uint32_t *words = buffer;
+ 	const size_t nwords = len / sizeof (uint32_t);
+@@ -108,7 +109,7 @@
+ /* First increment the byte count.  RFC 1321 specifies the possible
+    length of the file up to 2^64 bits.  Here we only compute the
+    number of bytes.  Do a double word increment.  */
+-	ctx->total[0] += len;
++	ctx->total[0] += (uint32_t)len;
+ 	if (ctx->total[0] < len)
+ 		++ctx->total[1];
+ 
+@@ -247,6 +248,7 @@
+ 	ctx->B = B;
+ 	ctx->C = C;
+ 	ctx->D = D;
++	}
+ }
+ 
+ PGM_GNUC_INTERNAL
+@@ -302,7 +304,7 @@
+ 			left_over -= 64;
+ 			memcpy (ctx->buffer, &ctx->buffer[64], left_over);
+ 		}
+-		ctx->buflen = left_over;
++		ctx->buflen = (uint32_t)left_over;
+ 	}
+ }
+ 
+@@ -349,6 +351,7 @@
+ 	pgm_assert (NULL != resbuf);
+ 
+ /* Take yet unprocessed bytes into account.  */
++	{
+ 	const uint32_t bytes = ctx->buflen;
+ 	size_t pad;
+ 
+@@ -369,6 +372,7 @@
+ 	_pgm_md5_process_block (ctx, ctx->buffer, bytes + pad + 8);
+ 
+ 	return _pgm_md5_read_ctx (ctx, resbuf);
++	}
+ }
+ 
+ /* eof */

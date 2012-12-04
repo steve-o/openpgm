@@ -1,0 +1,75 @@
+--- inet_network.c	2011-06-27 22:50:07.000000000 +0800
++++ inet_network.c89.c	2011-10-06 01:34:16.000000000 +0800
+@@ -115,13 +115,16 @@
+ //g_trace ("bit mask %i", val);
+ 
+ /* zero out host bits */
+-			const struct in_addr netaddr = { .s_addr = cidr_to_netmask (val) };
++			{
++			struct in_addr netaddr;
++			netaddr.s_addr = cidr_to_netmask (val);
+ #ifdef INET_NETWORK_DEBUG
+ {
+ g_debug ("netaddr %s", inet_ntoa (netaddr));
+ }
+ #endif
+ 			in->s_addr &= netaddr.s_addr;
++			}
+ 			return 0;
+ 		
+ 		} else if (*p == 'x' || *p == 'X') {	/* skip number, e.g. 1.x.x.x */
+@@ -226,11 +229,16 @@
+ 	pgm_debug ("subnet size %i", val);
+ 
+ /* zero out host bits */
++	{
+ 	const unsigned suffix_length = 128 - val;
+-	for (int i = suffix_length, j = 15; i > 0; i -= 8, --j)
++	{
++	int i, j;
++	for (i = suffix_length, j = 15; i > 0; i -= 8, --j)
+ 	{
+ 		in6->s6_addr[ j ] &= i >= 8 ? 0x00 : (unsigned)(( 0xffU << i ) & 0xffU );
+ 	}
++	}
++	}
+ 
+ 	pgm_debug ("effective IPv6 network address after subnet mask: %s",
+ 		pgm_inet_ntop(AF_INET6, in6, s2, sizeof(s2)));
+@@ -256,12 +264,12 @@
+ 	char		 s2[INET6_ADDRSTRLEN];
+ 	char		*p2 = s2;
+ 	unsigned	 val = 0;
+-	struct addrinfo	 hints = {
+-		.ai_family	= AF_INET6,
+-		.ai_socktype	= SOCK_STREAM,		/* not really */
+-		.ai_protocol	= IPPROTO_TCP,		/* not really */
+-		.ai_flags	= AI_NUMERICHOST
+-	}, *result = NULL;
++	struct addrinfo	 hints, *result = NULL;
++
++	hints.ai_family		= AF_INET6;
++	hints.ai_socktype	= SOCK_STREAM;		/* not really */
++	hints.ai_protocol	= IPPROTO_TCP;		/* not really */
++	hints.ai_flags		= AI_NUMERICHOST;
+ 
+ 	pgm_return_val_if_fail (NULL != s,   -1);
+ 	pgm_return_val_if_fail (NULL != sa6, -1);
+@@ -321,11 +329,16 @@
+ 	pgm_debug ("subnet size %i", val);
+ 
+ /* zero out host bits */
++	{
+ 	const unsigned suffix_length = 128 - val;
+-	for (int i = suffix_length, j = 15; i > 0; i -= 8, --j)
++	{
++	int i, j;
++	for (i = suffix_length, j = 15; i > 0; i -= 8, --j)
+ 	{
+ 		sa6->sin6_addr.s6_addr[ j ] &= i >= 8 ? 0x00 : (unsigned)(( 0xffU << i ) & 0xffU );
+ 	}
++	}
++	}
+ 
+ #ifdef INET_NETWORK_DEBUG
+ 	pgm_sockaddr_ntop ((const struct sockaddr*)sa6, sdebug, sizeof(sdebug));

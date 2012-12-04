@@ -1,0 +1,119 @@
+--- mem.c	2011-06-27 22:51:37.000000000 +0800
++++ mem.c89.c	2011-10-06 01:36:00.000000000 +0800
+@@ -84,16 +84,24 @@
+ 	if (NULL == string)
+ 		return result;
+ 
++/* C++ warning completely irrelevant for C */
++#pragma warning( disable : 4996 )
+ 	if (!strcasecmp (string, "all"))
+ 	{
+-		for (unsigned i = 0; i < nkeys; i++)
++		{
++		unsigned i;
++		for (i = 0; i < nkeys; i++)
+ 			result |= keys[i].value;
++		}
+ 	}
+ 	else if (!strcasecmp (string, "help"))
+ 	{
+ 		fprintf (stderr, "Supported debug values:");
+-		for (unsigned i = 0; i < nkeys; i++)
++		{
++		unsigned i;
++		for (i = 0; i < nkeys; i++)
+ 			fprintf (stderr, " %s", keys[i].key);
++		}
+ 		fprintf (stderr, "\n");
+ 	}
+ 	else
+@@ -102,14 +110,18 @@
+ 			const char* q = strpbrk (string, ":;, \t");
+ 			if (!q)
+ 				q = string + strlen (string);
+-			for (unsigned i = 0; i < nkeys; i++)
++			{
++			unsigned i;
++			for (i = 0; i < nkeys; i++)
+ 				if (debug_key_matches (keys[i].key, string, (unsigned)(q - string)))
+ 					result |= keys[i].value;
++			}
+ 			string = q;
+ 			if (*string)
+ 				string++;
+ 		}
+ 	}
++#pragma warning( default : 4996 )
+ 	return result;
+ }
+ 
+@@ -127,11 +139,13 @@
+ 	if (pgm_atomic_exchange_and_add32 (&mem_ref_count, 1) > 0)
+ 		return;
+ 
++	{
+ 	const errno_t err = pgm_dupenv_s (&env, &envlen, "PGM_DEBUG");
+ 	if (0 == err && envlen > 0) {
+ 		flags = pgm_parse_debug_string (env, keys, PGM_N_ELEMENTS (keys));
+ 		pgm_free (env);
+ 	}
++	}
+ 
+ 	if (flags & 1)
+ 		pgm_mem_gc_friendly = TRUE;
+@@ -164,11 +178,11 @@
+ #ifdef __GNUC__
+ 		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu " bytes",
+ 			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #else
+ 		pgm_fatal ("file %s: line %d: failed to allocate %" PRIzu " bytes",
+ 			__FILE__, __LINE__,
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #endif
+ 		abort ();
+ 	}
+@@ -187,11 +201,11 @@
+ #ifdef __GNUC__
+ 		pgm_fatal ("file %s: line %d (%s): overflow allocating %" PRIzu "*%" PRIzu " bytes",
+ 			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #else
+ 		pgm_fatal ("file %s: line %d: overflow allocating %" PRIzu "*%" PRIzu " bytes",
+ 			__FILE__, __LINE__,
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #endif
+ 	}
+ 	return pgm_malloc (n_blocks * block_bytes);
+@@ -211,11 +225,11 @@
+ #ifdef __GNUC__
+ 		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu " bytes",
+ 			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #else
+ 		pgm_fatal ("file %s: line %d: failed to allocate %" PRIzu " bytes",
+ 			__FILE__, __LINE__,
+-			n_bytes);
++			(unsigned long)n_bytes);
+ #endif
+ 		abort ();
+ 	}
+@@ -237,11 +251,11 @@
+ #ifdef __GNUC__
+ 		pgm_fatal ("file %s: line %d (%s): failed to allocate %" PRIzu "*%" PRIzu " bytes",
+ 			__FILE__, __LINE__, __PRETTY_FUNCTION__,
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #else
+ 		pgm_fatal ("file %s: line %d: failed to allocate %" PRIzu "*%" PRIzu " bytes",
+ 			__FILE__, __LINE__,
+-			n_blocks, block_bytes);
++			(unsigned long)n_blocks, (unsigned long)block_bytes);
+ #endif
+ 		abort ();
+ 	}

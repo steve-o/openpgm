@@ -1,0 +1,337 @@
+# -*- mode: python -*-
+# OpenPGM Autoconf script
+# $Id$
+
+from __future__ import print_function;
+import os;
+import os.path;
+import string;
+
+Import ('env');
+
+# POSIX spinlocks
+def CheckPthreadSpinlock (context):
+	context.Message ('Checking for pthread_spinlock...');
+	source = """
+#include <pthread.h>
+int
+main ()
+{
+	pthread_spinlock_t spinlock; pthread_spin_lock (&spinlock);
+	return 0;
+}
+	""";
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# NSS protocol lookup
+def CheckGetProtoByNameR (context):
+	context.Message ('Checking whether getprotobyname_r returns struct protoent *...');
+	source = """
+#include <netdb.h>
+int
+main ()
+{
+	struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (int)0);
+	return 0;
+}
+	""";
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# Variadic macros
+def CheckIsoVariadicMacros (context):
+	context.Message ('Checking for C99 variadic macros...');
+	source = """
+#include <stdio.h>
+#define error(...) fprintf (stderr, __VA_ARGS__)
+int
+main ()
+{
+	error ("moo");
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+def CheckGnuVariadicMacros (context):
+	context.Message ('Checking for GNU-style variadic macros...');
+	source = """
+#include <stdio.h>
+#define error(x...) fprintf (stderr, x)
+int
+main ()
+{
+	error ("moo");
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# AC_CHECK_FILE
+def CheckFile (context, file):
+	context.Message ('Checking for file %s...' % file);
+	try:
+		fh = open (file);
+		result = 1;
+	except IOError as e:
+		result = 0;
+	context.Result (result);
+	return result;
+
+# Timing
+def CheckRdtsc (context):
+	context.Message ('Checking for RDTSC instruction...');
+	source = """
+unsigned long lo, hi;
+int
+main ()
+{
+#ifdef __APPLE__
+	fail fail fail
+#else
+	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+#endif
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# AC_CHECK_MEMBER
+def CheckMember (context, member, header):
+	context.Message ('Checking for %s...' % member);
+	source = header + """
+#include <stddef.h>
+int
+main ()
+{
+	offsetof (""" + string.replace (member, '.', ', ') + """);
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# sprintf, caveat http://savannah.gnu.org/patch/?6848 (ax_c_printf_thsep)
+def CheckSprintfGrouping (context):
+	context.Message ('Checking for printf thousands\' grouping...');
+	source = """
+int
+main ()
+{
+	printf ("%'d", 1000000);
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# symbol linking scope
+# nb: sun x86 ld doesn't support DSO visibility but the compiler raises
+# warnings and these are easier to detect in autoconf.
+def CheckDsoVisibility (context):
+	context.Message ('Checking for hidden visibility attribute...');
+	source = """
+#ifdef __SUNPRO_C
+__hidden
+#else
+__attribute__((visibility("hidden")))
+#endif
+void moo (void) {};
+int
+main ()
+{
+	moo();
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# Socket passive binding
+def CheckBindInaddrAny (context):
+	context.Message ('Checking for bind on INADDR_ANY...');
+	result = 1;
+	context.Result (result);
+	return result;
+
+# IP header order as per IP(4) on FreeBSD
+def CheckIpLengthHostOrder (context):
+	context.Message ('Checking for raw IP sockets ip_{len,off} host byte ordering...');
+	source = """
+int
+main ()
+{
+#if defined( __APPLE__ ) || defined( __NetBSD__ ) || defined( __FreeBSD__ )
+	fail fail fail
+#endif
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+def CheckIpOffsetHostOrder (context):
+	return CheckIpLengthHostOrder (context);
+
+# Extended assembler on SPARC
+def CheckSparcAssembler (context):
+	context.Message ('Checking for SPARC extended assembler...');
+	source = """
+#include <stdint.h>
+uint32_t add32_with_carry (uint32_t a, uint32_t b) {
+	__asm__ ("addcc %2, %0, %0\n\taddx %0, %%g0, %0" : "=r" (a) : "0" (a), "r" (b) : "cc");
+	return a;
+}
+int
+main ()
+{
+	add32_with_carry (1, 2);
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+# ticket spinlock friendly: unaligned pointers & atomic ops (excl. Sun Pro)
+def CheckTicketSpinlock (context):
+	context.Message ('Checking for unaligned pointers...');
+	source = """
+char* nezumi = "mouse";
+int
+main ()
+{
+	short x = *(short*)(nezumi + 2);
+	return 0;
+}
+	"""
+	result = context.TryRun (source, '.c');
+	context.Result (result[0]);
+	return result[0];
+
+def CheckDumbRwSpinlock (context):
+	context.Message ('Checking for intrinsic atomic ops...');
+	source = """
+#if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+/* GCC assembler */
+#elif defined( __sun )
+/* Solaris intrinsic */
+#elif defined( __APPLE__ )
+/* Darwin intrinsic */
+#elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
+/* GCC 4.0.1 intrinsic */
+#elif defined( _WIN32 )
+/* Windows intrinsic */
+#else
+#	errir "Unsupported atomic ops."
+#endif
+int
+main ()
+{
+	return 0;
+}
+	"""
+	result = context.TryCompile (source, '.c');
+	context.Result (result);
+	return result;
+
+
+def AutoConf (env):
+	settings = {};
+	conf = Configure (env, custom_tests = {	'CheckPthreadSpinlock': CheckPthreadSpinlock,
+						'CheckGetProtoByNameR': CheckGetProtoByNameR,
+						'CheckIsoVariadicMacros': CheckIsoVariadicMacros,
+						'CheckGnuVariadicMacros': CheckGnuVariadicMacros,
+						'CheckFile': CheckFile,
+						'CheckRdtsc': CheckRdtsc,
+						'CheckMember': CheckMember,
+						'CheckSprintfGrouping': CheckSprintfGrouping,
+						'CheckDsoVisibility': CheckDsoVisibility,
+						'CheckBindInaddrAny': CheckBindInaddrAny,
+						'CheckIpLengthHostOrder': CheckIpLengthHostOrder,
+						'CheckIpOffsetHostOrder': CheckIpOffsetHostOrder,
+						'CheckTicketSpinlock': CheckTicketSpinlock,
+						'CheckDumbRwSpinlock': CheckDumbRwSpinlock
+						 });
+	# AC_CHECK_FUNCS
+	settings['HAVE_CLOCK_GETTIME'] = conf.CheckFunc ('clock_gettime');
+	settings['HAVE_FTIME'] = conf.CheckFunc ('ftime');
+	settings['HAVE_GETTIMEOFDAY'] = conf.CheckFunc ('gettimeofday');
+	# Custom checks
+	settings['HAVE_PTHREAD_SPINLOCK'] = conf.CheckPthreadSpinlock();
+	settings['HAVE_GETPROTOBYNAME_R'] = conf.CheckFunc ('getprotobyname_r');
+	settings['GETPROTOBYNAME_R_STRUCT_PROTOENT_P'] = conf.CheckGetProtoByNameR();
+	settings['HAVE_GETNETENT'] = conf.CheckFunc ('getnetent');
+	settings['HAVE_ISO_VARARGS'] = conf.CheckIsoVariadicMacros();
+	settings['HAVE_GNUC_VARARGS'] = conf.CheckGnuVariadicMacros();
+	settings['HAVE_ALLOCA_H'] = conf.CheckCHeader ('alloca.h');
+	settings['HAVE_EVENTFD'] = conf.CheckFunc ('eventfd');
+	settings['HAVE_PROC_CPUINFO'] = conf.CheckFile ('/proc/cpuinfo');
+	settings['HAVE_BACKTRACE'] = conf.CheckFunc ('backtrace');
+	settings['HAVE_PSELECT'] = conf.CheckFunc ('pselect');
+	settings['HAVE_DEV_RTC'] = conf.CheckFile ('/dev/rtc');
+	settings['HAVE_RDTSC'] = conf.CheckRdtsc();
+	settings['HAVE_DEV_HPET'] = conf.CheckFile ('/dev/hpet');
+	settings['HAVE_POLL'] = conf.CheckFunc ('poll');
+	settings['HAVE_EPOLL_CTL'] = conf.CheckFunc ('epoll_ctl');
+	settings['HAVE_GETIFADDRS'] = conf.CheckFunc ('getifaddrs');
+	settings['HAVE_STRUCT_IFADDRS_IFR_NETMASK'] = conf.CheckMember ('struct ifaddrs.ifa_netmask', "#include <sys/types.h>\n#include <ifaddrs.h>\n");
+	settings['HAVE_WSACMSGHDR'] = conf.CheckMember ('struct _WSAMSG.name', "#include <winsock2.h>\n");
+	settings['HAVE_STRUCT_GROUP_REQ'] = conf.CheckMember ('struct group_req.gr_interface', "#include <netinet/in.h>\n");
+	settings['HAVE_STRUCT_IP_MREQN'] = conf.CheckMember ('struct ip_mreqn.imr_ifindex', "#include <netinet/in.h>\n");
+	settings['HAVE_STRUCT_IP_MSFILTER'] = conf.CheckMember ('struct ip_msfilter.imsf_multiaddr', "#include <sys/sockio.h>\n");
+	settings['HAVE_SPRINTF_GROUPING'] = conf.CheckSprintfGrouping();
+	settings['HAVE_VASPRINTF'] = conf.CheckFunc ('vasprintf');
+	settings['HAVE_DSO_VISIBILITY'] = conf.CheckDsoVisibility();
+	settings['USE_BIND_INADDR_ANY'] = conf.CheckBindInaddrAny();
+	settings['HAVE_HOST_ORDER_IP_LEN'] = conf.CheckIpLengthHostOrder();
+	settings['HAVE_HOST_ORDER_IP_OFF'] = conf.CheckIpOffsetHostOrder();
+	settings['USE_TICKET_SPINLOCK'] = conf.CheckTicketSpinlock();
+	settings['USE_DUMB_RWSPINLOCK'] = conf.CheckDumbRwSpinlock();
+	settings['HAVE_GETOPT'] = conf.CheckFunc ('getopt');
+
+	conf.CheckLibWithHeader ('pthread', 'pthread.h', 'c');
+	conf.CheckLib ( library='m', symbol='sqrt' );
+	conf.CheckLib ( library='rt', symbol='clock_gettime' );
+	conf.CheckLib ( library='socket', symbol='socket' );
+	conf.CheckLib ( library='nsl', symbol='gethostname' );
+	conf.CheckLib ( library='resolv', symbol='inet_aton' );
+	conf.CheckLib ( library='kstat', symbol='kstat_open' );
+
+	env = conf.Finish();
+	env['settings'] = settings;
+	return env;
+
+def GenerateConfig (target, source, env):
+	settings = env['settings'];
+	for t in target:
+		print (t);
+		with open (str (t), 'wt') as f:
+			for key in settings.keys():
+				if isinstance (settings[key], str):
+					print ('#define %s %s' % (key, settings[key]), file = f);
+				else:
+					if settings[key]:
+						print ('#define %s 1' % (key,), file = f);
+					else:
+						print ('/* #undef %s */' % (key,), file = f);
+	return None;
+
+env = AutoConf (env);
+Execute (Mkdir ('include'));
+GenerateConfig (['include/config.h'], [], env);
+
+# end of file
