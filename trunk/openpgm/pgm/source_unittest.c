@@ -269,12 +269,10 @@ generate_nak_list (void)
 	opt_len->opt_length = sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = g_htons (   sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
-						sizeof(struct pgm_opt_nak_list) +
 						( 62 * sizeof(guint32) ) );
 	struct pgm_opt_header* opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type = PGM_OPT_NAK_LIST | PGM_OPT_END;
-	opt_header->opt_length = sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_nak_list) +
-				 ( 62 * sizeof(guint32) );
+	opt_header->opt_length = sizeof(struct pgm_opt_header) + ( 62 * sizeof(guint32) );
 	struct pgm_opt_nak_list* opt_nak_list = (struct pgm_opt_nak_list*)(opt_header + 1);
 	for (unsigned i = 1; i < 63; i++) {
 		opt_nak_list->opt_sqn[i-1] = g_htonl (i);
