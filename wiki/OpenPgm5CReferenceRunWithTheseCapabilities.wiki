@@ -42,6 +42,32 @@ The RTC device <tt>/dev/rtc</tt> cannot be shared between multiple applications 
 
 The TSC will be calibrated with a per-platform specific configuration, on Linux this will be from <tt>/proc/cpuinfo</tt> on Windows this will be the registry key <tt>HKLM/HARDWARE/DESCRIPTION/System/!CentralProcessor/0/~MHz</tt>, on OS X through the system control <tt>hw.cpufrequency</tt>, on FreeBSD using <tt>hw.clockrate</tt>, and on Solaris using <i>kstat</i> and the <tt>clock_MHz</tt> key.  If calibration is unavailable or disabled then a runtime calibration will run using <tt>nanosleep()</tt> as a timing source.  The frequency can be overriden with the environment variable <tt>RDTSC_FREQUENCY</tt> set in kilohertz.  It is recommended to set this frequency or use an alternative timing mechanism on Solaris or Intel platforms with [http://en.wikipedia.org/wiki/SpeedStep SpeedStep] or [http://en.wikipedia.org/wiki/Intel_Turbo_Boost Turbo Boost] technology enabled.  A dynamic clock frequency may be discovered by comparing the system reported clock frequency with the hardware capability.
 
+Example, an [http://ark.intel.com/products/27217/Intel-Xeon-Processor-5140-4M-Cache-2_33-GHz-1333-MHz-FSB Intel Xeon 5140] host shows the following <tt>/proc/cpuinfo</tt> when the [http://www.carlthompson.net/Software/CPUSpeed CPUSpeed] service is running on !RedHat Enterprise Linux:
+<pre>
+processor       : 3
+vendor_id       : GenuineIntel 
+cpu family      : 6
+model           : 15
+model name      : Intel(R) Xeon(R) CPU            5140  @ 2.33GHz
+stepping        : 6
+cpu MHz         : 249.999
+...
+</pre>
+
+Run "<tt>dmidecode --type Processor</tt>" to reveal clock capability:
+<pre>
+Processor Information
+        Socket Designation: Proc 1
+        Type: Central Processor
+        Family: Xeon
+        Manufacturer: Intel
+...
+        External Clock: 1333 MHz
+        Max Speed: 4800 MHz
+        Current Speed: 2333 MHz
+...
+</pre>
+
 On Windows the default timing mechanism follows the SQL Server development team in using the multi-media timers.  It is possible to use the query performance counter API but as MSDN states that the counter frequency cannot change whilst the system is running this may lead to instabilities with modern processor dynamic frequency technologies.
 
 
