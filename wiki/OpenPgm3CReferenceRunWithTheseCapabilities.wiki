@@ -40,7 +40,7 @@ An operating system calculates the current time of day based off various sources
 
 The RTC device <tt>/dev/rtc</tt> cannot be shared between multiple applications but offers a stable time source external to the TSC and is available on all systems, compared with limited availability of HPET.
 
-By default the TSC will be calibrated using <tt>nanosleep()</tt>, and can be overridden by defining <tt>RDTSC_FREQUENCY</tt> in kilohertz.  It is recommended to set this frequency or use an alternative timing mechanism on Solaris to prevent a four second delay on startup, and on modern Intel machines with SpeedStep or Turbo technology with variable clock rates.
+By default the TSC will be calibrated using <tt>nanosleep()</tt>, and can be overridden by defining <tt>RDTSC_FREQUENCY</tt> in kilohertz.  It is recommended to set this frequency or use an alternative timing mechanism on Solaris to prevent a four second delay on startup, and on modern Intel machines with !SpeedStep or Turbo technology with variable clock rates.
 
 
 <table border="1" cellpadding="5" cellspacing="0">
@@ -110,7 +110,7 @@ $ PGM_TIMER=GTOD pgmsend moo
 }}}
 
 On a Windows system, use the system performance counter.
-{{
+{{{
 C:\pgm\bin> set PGM_TIMER=TSC
 C:\pgm\bin> pgmsend moo
 }}}
