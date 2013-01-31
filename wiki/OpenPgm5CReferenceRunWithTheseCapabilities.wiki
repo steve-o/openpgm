@@ -40,7 +40,7 @@ An operating system calculates the current time of day based off various sources
 
 The RTC device <tt>/dev/rtc</tt> cannot be shared between multiple applications but offers a stable time source external to the TSC and is available on all systems, compared with limited availability of HPET.
 
-The TSC will be calibrated with a per-platform specific configuration, on Linux this will be from <tt>/proc/cpuinfo</tt> on Windows this will be the registry key <tt>HKLM/HARDWARE/DESCRIPTION/System/CentralProcessor/0/~MHz<tt>, on OS X through the system control <tt>hw.cpufrequency</tt>, on FreeBSD using <tt>hw.clockrate</tt>, and on Solaris using <i>kstat</i> and the <tt>clock_MHz</tt> key.  If calibration is unavailable or disabled then a runtime calibration will run using <tt>nanosleep()</tt> as a timing source.  The frequency can be overriden with the environment variable <tt>RDTSC_FREQUENCY</tt> set in kilohertz.  It is recommended to set this frequency or use an alternative timing mechanism on Solaris or Intel platforms with SpeedStep or Turbo technology enabled.  A dynamic clock frequency may be discovered by comparing the system reported clock frequency with the hardware capability.
+The TSC will be calibrated with a per-platform specific configuration, on Linux this will be from <tt>/proc/cpuinfo</tt> on Windows this will be the registry key <tt>HKLM/HARDWARE/DESCRIPTION/System/!CentralProcessor/0/~MHz</tt>, on OS X through the system control <tt>hw.cpufrequency</tt>, on FreeBSD using <tt>hw.clockrate</tt>, and on Solaris using <i>kstat</i> and the <tt>clock_MHz</tt> key.  If calibration is unavailable or disabled then a runtime calibration will run using <tt>nanosleep()</tt> as a timing source.  The frequency can be overriden with the environment variable <tt>RDTSC_FREQUENCY</tt> set in kilohertz.  It is recommended to set this frequency or use an alternative timing mechanism on Solaris or Intel platforms with [http://en.wikipedia.org/wiki/SpeedStep SpeedStep] or [http://en.wikipedia.org/wiki/Intel_Turbo_Boost Turbo Boost] technology enabled.  A dynamic clock frequency may be discovered by comparing the system reported clock frequency with the hardware capability.
 
 On Windows the default timing mechanism follows the SQL Server development team in using the multi-media timers.  It is possible to use the query performance counter API but as MSDN states that the counter frequency cannot change whilst the system is running this may lead to instabilities with modern processor dynamic frequency technologies.
 
@@ -62,14 +62,14 @@ On Windows the default timing mechanism follows the SQL Server development team 
 <td><tt>RTC</tt></td>
 <td>Read from <tt>/dev/rtc</tt> for current time, a 8192 Hz timer providing 122us resolution.</td>
 </tr><tr>
-<td><tt>TSC</tt>`*`</td>
+<td><tt>TSC</tt></td>
 <td>Call <tt>RDTSC</tt> and normalize with a calibrated count of core ticks.</td>
 </tr><tr>
 <td><tt>HPET</tt></td>
 <td>Read from the <tt>HPET</tt> device which handles femtosecond length pulses.</td>
 </tr><tr>
 <td><tt>GETTIMEOFDAY</tt>`*`</td>
-<td>Use <tt>gettimeofday (tv, NULL)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/gettimeofday.2.html gettimeofday(2)] for further details.</td>
+<td>Use <tt>gettimeofday (tv, NULL)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/gettimeofday.2.html gettimeofday(2)] for further details.  [https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_MRG/1.3/html/Realtime_Tuning_Guide/sect-Realtime_Tuning_Guide-General_System_Tuning-gettimeofday_speedup.html gettimeofday function call speedup] is enabled by default on MRG kernels but consequences will occur with [https://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_MRG/1.3/html/Realtime_Tuning_Guide/sect-Realtime_Tuning_Guide-Realtime_Specific_Tuning-RT_Specific_gettimeofday_speedup.html millisecond coalescing] if PGM protocol values are not appropriately set.</td>
 </tr><tr>
 <td><tt>MMTIME</tt>`*`</td>
 <td>Use Windows multi-media timers, lower resolution than other timers but offers greater stability and low cost for frequent usage.</td>
@@ -118,7 +118,7 @@ $ PGM_TIMER=GTOD pgmsend moo
 }}}
 
 On a Windows system, use the system performance counter.
-{{
+{{{
 C:\pgm\bin> set PGM_TIMER=TSC
 C:\pgm\bin> pgmsend moo
 }}}
