@@ -36,7 +36,7 @@ Memory management for running under a profiler such as Valgrind is configurable 
 
 On Microsoft Windows platforms <tt>pgm_init()</tt> will request 1ms minimum resolution timers via the <tt>[http://msdn.microsoft.com/en-us/library/dd757624(v=vs.85).aspx timeBeginPeriod()]</tt> function.  The resolution period is relinquished on shutdown of the PGM engine via <tt>[OpenPgm5CReferencePgmShutdown pgm_shutdown()]</tt>.
 
-The timer mechanism is configurable via the <tt>[OpenPgmCReferenceRunWithTheseCapabilities PGM_TIMER]</tt> environment variable.
+The timer mechanism is configurable via the <tt>[OpenPgm5CReferenceRunWithTheseCapabilities PGM_TIMER]</tt> environment variable.
 
 The PGM protocol number will be read from any system supported name services, for example <tt>/etc/protocols</tt>.  If not configured in the system, or the system does not support such a database the protocol number will default to 113.
 

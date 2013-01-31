@@ -1,4 +1,4 @@
-﻿#summary OpenPGM C Reference : Run With These Capabilities
+﻿#summary OpenPGM 5 : C Reference : Run With These Capabilities
 #labels Phase-Implementation
 
 === Capabilities ===
@@ -30,7 +30,7 @@ OpenPGM C programs require system capabilities from this list in order to functi
 </tr>
 </table>
 
-*`*` Clock selection* is specified by two system environment variables <tt>PGM_TIMER</tt> governing how to get the current time, and <tt>PGM_SLEEP</tt>^†^ governing how to wait for an interval of time.
+*`*` Clock selection* is specified by one system environment variable <tt>PGM_TIMER</tt> governing how to get the current time.
 
 
 === Clock Selection ===
@@ -40,7 +40,9 @@ An operating system calculates the current time of day based off various sources
 
 The RTC device <tt>/dev/rtc</tt> cannot be shared between multiple applications but offers a stable time source external to the TSC and is available on all systems, compared with limited availability of HPET.
 
-On Linux TSC is calibrated using the method defined by <tt>PGM_SLEEP</tt>, and either value can be overridden by defining <tt>RDTSC_FREQUENCY</tt> in kilohertz.  It is recommended to set this frequency or use an alternative timing mechanism on Solaris, and on modern Intel machines with SpeedStep or Turbo technology with variable clock rates.
+The TSC will be calibrated with a per-platform specific configuration, on Linux this will be from <tt>/proc/cpuinfo</tt> on Windows this will be the registry key <tt>HKLM/HARDWARE/DESCRIPTION/System/CentralProcessor/0/~MHz<tt>, on OS X through the system control <tt>hw.cpufrequency</tt>, on FreeBSD using <tt>hw.clockrate</tt>, and on Solaris using <i>kstat</i> and the <tt>clock_MHz</tt> key.  If calibration is unavailable or disabled then a runtime calibration will run using <tt>nanosleep()</tt> as a timing source.  The frequency can be overriden with the environment variable <tt>RDTSC_FREQUENCY</tt> set in kilohertz.  It is recommended to set this frequency or use an alternative timing mechanism on Solaris or Intel platforms with SpeedStep or Turbo technology enabled.  A dynamic clock frequency may be discovered by comparing the system reported clock frequency with the hardware capability.
+
+On Windows the default timing mechanism follows the SQL Server development team in using the multi-media timers.  It is possible to use the query performance counter API but as MSDN states that the counter frequency cannot change whilst the system is running this may lead to instabilities with modern processor dynamic frequency technologies.
 
 
 <table border="1" cellpadding="5" cellspacing="0">
@@ -61,7 +63,7 @@ On Linux TSC is calibrated using the method defined by <tt>PGM_SLEEP</tt>, and e
 <td>Read from <tt>/dev/rtc</tt> for current time, a 8192 Hz timer providing 122us resolution.</td>
 </tr><tr>
 <td><tt>TSC</tt>`*`</td>
-<td>Call <tt>RDTSC</tt> and normalize with a RTC calibrated count of core ticks.  On Windows uses the APIC PM timer or HPET timer via [http://msdn.microsoft.com/en-us/library/ms644904(VS.85).aspx QueryPerformanceCounter].</td>
+<td>Call <tt>RDTSC</tt> and normalize with a calibrated count of core ticks.</td>
 </tr><tr>
 <td><tt>HPET</tt></td>
 <td>Read from the <tt>HPET</tt> device which handles femtosecond length pulses.</td>
@@ -69,39 +71,15 @@ On Linux TSC is calibrated using the method defined by <tt>PGM_SLEEP</tt>, and e
 <td><tt>GETTIMEOFDAY</tt>`*`</td>
 <td>Use <tt>gettimeofday (tv, NULL)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/gettimeofday.2.html gettimeofday(2)] for further details.</td>
 </tr><tr>
-<td colspan="2"><h3>PGM_SLEEP^†^</h3></td>
+<td><tt>MMTIME</tt>`*`</td>
+<td>Use Windows multi-media timers, lower resolution than other timers but offers greater stability and low cost for frequent usage.</td>
 </tr><tr>
-<td><tt>CLOCK_NANOSLEEP</tt></td>
-<td>Use <tt>clock_nanosleep (clk_id, TIMER_ABSTIME, tp, NULL)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/clock_nanosleep.2.html clock_nanoslepe(2)] for further details.</td>
-</tr><tr>
-<td><tt>NANO_SLEEP</tt></td>
-<td>Use <tt>nanosleep (tp, rem)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/nanosleep.2.html nanosleep(2)] for further details.</td>
-</tr><tr>
-<td><tt>RTC</tt></td>
-<td>Read interrupts from <tt>/dev/rtc</tt> until requested time has elapsed.</td>
-</tr><tr>
-<td><tt>TSC</tt></td>
-<td>Repeatedly call <tt>RDTSC</tt> interleaving with [http://library.gnome.org/devel/glib/stable/glib-Threads.html#g-thread-yield g_thread_yield()] to allow other threads to execute.</td>
-</tr><tr>
-<td><tt>HPET</tt></td>
-<td>Repeatedly read from the HPET interleaving with [http://library.gnome.org/devel/glib/stable/glib-Threads.html#g-thread-yield g_thread_yield()] to allow other threads to execute.</td>
-</tr><tr>
-<td><tt>PPOLL</tt></td>
-<td>Use <tt>ppoll (usec)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/poll.2.html ppoll(2)] for further details.</td>
-</tr><tr>
-<td><tt>USLEEP</tt>`*` or <tt>MICROSLEEP</tt></td>
-<td>Use <tt>usleep (usec)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man3/usleep.3.html usleep(3)] for further details.</td>
-</tr><tr>
-<td><tt>MSLEEP</tt>`*`</td>
-<td>Use <tt>Sleep (msec)</tt>, see [http://msdn.microsoft.com/en-us/library/ms686298(VS.85).aspx Sleep] for further details.</td>
-</tr><tr>
-<td><tt>SELECT</tt></td>
-<td>Use <tt>select (usec)</tt>, see [http://www.kernel.org/doc/man-pages/online/pages/man2/select.2.html select(2)] for further details.</td>
+<td><tt>QPC</tt></td>
+<td>Use Windows Performance Counters, dependent upon accurate drivers and suitable "BIOS support" per the word of MSDN.  Windows selects the "best" underlying hardware timing mechanism to use, can be a combination of APIC, HPET and TSC for interpolation.</td>
 </tr>
 </table>
 
 `*` Default settings.
-`†` Removed in OpenPGM version 3.0.
 
 === Examples ===
 Use the PGM protocol via raw sockets using the <tt>CAP_NET_RAW</tt> capability,
@@ -109,19 +87,19 @@ Use the PGM protocol via raw sockets using the <tt>CAP_NET_RAW</tt> capability,
 $ sudo execcap 'cap_net_raw=ep' pgmsend moo
 }}}
 
-On a single core Intel system, use TSC and <tt>usleep</tt>.
+On a single core Intel system, use TSC.
 {{{
-$ PGM_TIMER=TSC PGM_SLEEP=USLEEP pgmsend moo
+$ PGM_TIMER=TSC pgmsend moo
 }}}
 or,
 {{{
 $ pgmsend moo
 }}}
 
-On a multi-core Intel system with HPET device, use HPET and <tt>usleep</tt>.
+On a multi-core Intel system with HPET device, use HPET.
 {{{
 $ sudo chmod a+r /dev/hpet
-$ PGM_TIMER=HPET PGM_SLEEP=USLEEP pgmsend moo
+$ PGM_TIMER=HPET pgmsend moo
 }}}
 or,
 {{{
@@ -129,38 +107,25 @@ $ sudo chmod a+r /dev/hpet
 $ PGM_TIMER=HPET pgmsend moo
 }}}
 
-On a hyper-threaded Intel system without HPET device, use the RTC device and <tt>usleep</tt>.
-{{{
-$ PGM_TIMER=RTC PGM_SLEEP=USLEEP pgmsend moo
-}}}
-or,
+On a hyper-threaded Intel system without HPET device, use the RTC device.
 {{{
 $ PGM_TIMER=RTC pgmsend moo
 }}}
 
-On a multi-core system without HPET and for multiple applications, use <tt>gettimeofday</tt> and <tt>usleep</tt>.
-{{{
-$ PGM_TIMER=GTOD PGM_SLEEP=USLEEP pgmsend moo
-}}}
-or,
+On a multi-core system without HPET and for multiple applications, use <tt>gettimeofday</tt>.
 {{{
 $ PGM_TIMER=GTOD pgmsend moo
 }}}
 
-On a Windows system, use the system performance counter and <tt>Sleep</tt>.
-{{{
+On a Windows system, use the system performance counter.
+{{
 C:\pgm\bin> set PGM_TIMER=TSC
-C:\pgm\bin> set PGM_SLEEP=MSLEEP
-C:\pgm\bin> pgmsend moo
-}}}
-or,
-{{{
 C:\pgm\bin> pgmsend moo
 }}}
 
 On a Solaris system with a 3.2Ghz core, set the TSC frequency first.
 {{{
-$ RDTSC_FREQUENCY=3200 PGM_TIMER=TSC PGM_SLEEP=USLEEP pgmsend moo
+$ RDTSC_FREQUENCY=3200 PGM_TIMER=TSC pgmsend moo
 }}}
 or,
 {{{

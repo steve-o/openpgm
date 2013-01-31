@@ -6,7 +6,7 @@
     * [OpenPgm3CReferenceIncludeTheseHeaderFiles Include these Header Files]
     * [OpenPgm3CReferenceSetTheseParameters Set these Parameters]
     * [OpenPgm3CReferenceLinkTheseLibraryFiles Link these Library Files]
-    * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]
+    * [OpenPgm3CReferenceRunWithTheseCapabilities Run with these Capabilities]
   * [OpenPgm3CReferenceMigration Migration from version 1.0]
   * [OpenPgm3CReferenceEnvironment Environment]
     * <tt>[OpenPgm3CReferencePgmInit pgm_init()]</tt>

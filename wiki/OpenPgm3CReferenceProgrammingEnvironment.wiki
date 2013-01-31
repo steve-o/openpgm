@@ -17,4 +17,4 @@ When developing or deploying OpenPGM programs, remember these steps.
 
 
 === Run ===
-  * Run with the appropriate system capabilities; see [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities].
+  * Run with the appropriate system capabilities; see [OpenPgm3CReferenceRunWithTheseCapabilities Run with these Capabilities].

@@ -24,10 +24,10 @@ This section describes the functions relating to the global dependencies of Open
 <td><tt>PGM_DEBUG</tt></td>
 <td>Debugging and memory profiling options.</td>
 </tr><tr>
-<td><tt>[OpenPgmCReferenceRunWithTheseCapabilities PGM_TIMER]</tt></td>
+<td><tt>[OpenPgm3CReferenceRunWithTheseCapabilities PGM_TIMER]</tt></td>
 <td>Timing source device.</td>
 </tr><tr>
-<td><tt>[OpenPgmCReferenceRunWithTheseCapabilities RDTSC_FREQUENCY]</tt></td>
+<td><tt>[OpenPgm3CReferenceRunWithTheseCapabilities RDTSC_FREQUENCY]</tt></td>
 <td>Frequency of system TSC.</td>
 </tr><tr>
 <td><tt>[OpenPgm3CReferencePgmInit pgm_init()]</tt></td>

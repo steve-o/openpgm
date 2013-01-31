@@ -11,4 +11,4 @@ This section presents important general information for programmers using OpenPG
   * [OpenPgm3CReferenceSetTheseParameters Set these Parameters]
   * [OpenPgm3CReferenceEvents Dispatch Protocol Events]
   * [OpenPgm3CReferenceLinkTheseLibraryFiles Link these Library Files]
-  * [OpenPgmCReferenceRunWithTheseCapabilities Run with these Capabilities]
+  * [OpenPgm3CReferenceRunWithTheseCapabilities Run with these Capabilities]
