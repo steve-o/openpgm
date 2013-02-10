@@ -236,3 +236,8 @@ Optionals
   staircase and LDPC-triangle codes.
 - XDR based messaging format as example of binary encoded messaging.
 
+Notes
+*****
+
+pgmping on multicast loop maxes out at low data rates and even exhibits high standard deviation on latency at stable rates, ~10k/s.
+

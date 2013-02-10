@@ -312,7 +312,7 @@ pgm_on_nak (
 		sock->cumulative_stats[PGM_PC_SOURCE_SELECTIVE_NAKS_RECEIVED]++;
 
 	if (PGM_UNLIKELY(!pgm_verify_nak (skb))) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected."));
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on verification."));
 		sock->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 		return FALSE;
 	}
@@ -358,12 +358,12 @@ pgm_on_nak (
 				(const struct pgm_opt_length*)(nak6 + 1) :
 				(const struct pgm_opt_length*)(nak  + 1);
 		if (PGM_UNLIKELY(opt_len->opt_type != PGM_OPT_LENGTH)) {
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected."));
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on unexpected primary PGM option type."));
 			sock->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
 		if (PGM_UNLIKELY(opt_len->opt_length != sizeof(struct pgm_opt_length))) {
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected."));
+			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on length of length option header."));
 			sock->cumulative_stats[PGM_PC_SOURCE_MALFORMED_NAKS]++;
 			return FALSE;
 		}
@@ -381,7 +381,7 @@ pgm_on_nak (
 
 /* nak list numbers */
 	if (PGM_UNLIKELY(nak_list_len > 62)) {
-		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on sequence list overrun, %d rported NAKs."), nak_list_len);
+		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Malformed NAK rejected on sequence list overrun, %d reported NAKs."), nak_list_len);
 		return FALSE;
 	}
 		
