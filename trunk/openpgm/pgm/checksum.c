@@ -37,7 +37,11 @@ static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 
 
-/* endian independent checksum routine
+/* Endian independent checksum routine.
+ *
+ * Avoid direct usage of reg8 & reg16 operators as latency cannot be eliminated
+ * on Ivy Bridge Intel microarchitecture.  Similarly punt to the compiler to avoid
+ * partial register stalls.
  */
 
 static
@@ -48,30 +52,36 @@ do_csum_8bit (
 	uint32_t	csum
 	)
 {
-	uint_fast32_t acc;
-	uint16_t src;
-	const uint8_t* buf;
+	uint_fast32_t acc = csum;
+	const uint8_t* buf = (const uint8_t*)addr;
 
-	acc = csum;
-	buf = (const uint8_t*)addr;
-	while (len > 1) {
+	while (len >= sizeof (uint16_t)) {
 /* first byte as most significant */
-		src  = (*buf++) << 8;
+		uint_fast16_t word16 = (*buf++) << 8;
 /* second byte as least significant */
-		src |= (*buf++);
+		word16 |= (*buf++);
 		acc += src;
 		len -= 2;
 	}
 /* trailing odd byte */
 	if (len > 0) {
-		src = (*buf) << 8;
-		acc += src;
+		const uint_fast16_t word16 = (*buf) << 8;
+		acc += word16;
 	}
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
 	return htons ((uint16_t)acc);
 }
 
+/* Checksum and copy.  The theory being that cache locality benefits
+ * calculation of the checksum whilst reading to copy.  The concern
+ * however is that string operations may execute significantly faster
+ * allowing a basic pipeline model to be preferred.
+ *
+ * Each CPU generation exhibits different characteristics, especially
+ * with introduction of operators that can use wider data paths.
+ */
 static
 uint16_t
 do_csumcpy_8bit (
@@ -81,32 +91,39 @@ do_csumcpy_8bit (
 	uint32_t	     csum
 	)
 {
-	uint_fast32_t acc;
-	const uint8_t*restrict srcbuf;
-	uint8_t*restrict dstbuf;
-	uint_fast16_t val16;
+	uint_fast32_t acc = csum;
+	const uint8_t*restrict src = (const uint8_t*restrict)srcaddr;
+	uint8_t*restrict dst = (uint8_t*restrict)dstaddr;
 
-	acc = csum;
-	srcbuf = (const uint8_t*restrict)srcaddr;
-	dstbuf = (uint8_t*restrict)dstaddr;
-	while (len > 1) {
+	while (len >= sizeof (uint16_t)) {
 /* first byte as most significant */
-		val16  = (*dstbuf++ = *srcbuf++) << 8;
+		uint_fast16_t word16 = (*dst++ = *src++) << 8;
 /* second byte as least significant */
-		val16 |= (*dstbuf++ = *srcbuf++);
-		acc += val16;
+		word16 |= (*dst++ = *src++);
+		acc += t;
 		len -= 2;
 	}
 /* trailing odd byte */
 	if (len > 0) {
-		val16 = (*dstbuf = *srcbuf) << 8;
-		acc += val16;
+		const uint_fast16_t word16 = (*dst = *src) << 8;
+		acc += word16;
 	}
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
 	return htons ((uint16_t)acc);
 }
 
+/* When handling 16-bit words do not assume the pointer provided is aligned on
+ * a word.  Aligned reads will also perform faster on platforms that support
+ * unaligned word accesses.
+ *
+ * Per Intel Rule #17,
+ * http://www.intel.com/content/dam/doc/manual/64-ia-32-architectures-optimization-manual.pdf
+ *
+ * A Pentium 4 can predict exit branch for 16 or fewer iterations.  Conversely
+ * the Pentium M recommends not unrolling above 64 iterations.
+ */
 static
 uint16_t
 do_csum_16bit (
@@ -115,16 +132,13 @@ do_csum_16bit (
 	uint32_t	csum
 	)
 {
-	uint_fast32_t acc;
-	const uint8_t* buf;
-	uint16_t remainder;
+	uint_fast32_t acc = csum;
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;
 	uint_fast16_t count8;
 	bool is_odd;
 
-	acc = csum;
-	buf = (const uint8_t*)addr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
 	is_odd = ((uintptr_t)buf & 1);
@@ -140,20 +154,21 @@ do_csum_16bit (
 		acc += ((const uint16_t*)buf)[ 1 ];
 		acc += ((const uint16_t*)buf)[ 2 ];
 		acc += ((const uint16_t*)buf)[ 3 ];
-		buf  = &buf[ 8 ];
+		buf += 8;
 	}
 	len %= 8;
 /* final 7 bytes */
-	while (len > 1) {
-		acc += ((const uint16_t*)buf)[ 0 ];
-		buf  = &buf[ 2 ];
-		len -= 2;
+	while (len >= sizeof (uint16_t)) {
+		const uint_fast16_t word16 = *(const uint16_t*)buf;
+		acc += word16;
+		len -= 2; buf += 2;
 	}
 /* trailing odd byte */
 	if (len > 0) {
 		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
@@ -170,49 +185,44 @@ do_csumcpy_16bit (
 	uint32_t	     csum
 	)
 {
-	uint_fast32_t acc;
-	const uint8_t*restrict srcbuf;
-	uint8_t*restrict dstbuf;
-	uint16_t remainder;
+	uint_fast32_t acc = csum;
+	const uint8_t*restrict src = (const uint8_t*restrict)srcaddr;
+	uint8_t*restrict dst = (uint8_t*restrict)dstaddr;
+	uint16_t remainder = 0;
 	uint_fast16_t count8;
 	bool is_odd;
 
-	acc = csum;
-	srcbuf = (const uint8_t*restrict)srcaddr;
-	dstbuf = (uint8_t*restrict)dstaddr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
 	is_odd = ((uintptr_t)srcbuf & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
-		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		((uint8_t*restrict)&remainder)[1] = *dst++ = *src++;
 		len--;
 	}
 /* 8-byte unrolls, anything larger than 16-byte or less than 8 loses performance */
 	count8 = len >> 3;
 	while (count8--) {
-		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-		acc += ((uint16_t*restrict)dstbuf)[ 1 ] = ((const uint16_t*restrict)srcbuf)[ 1 ];
-		acc += ((uint16_t*restrict)dstbuf)[ 2 ] = ((const uint16_t*restrict)srcbuf)[ 2 ];
-		acc += ((uint16_t*restrict)dstbuf)[ 3 ] = ((const uint16_t*restrict)srcbuf)[ 3 ];
-		srcbuf = &srcbuf[ 8 ];
-		dstbuf = &dstbuf[ 8 ];
+		acc += ((uint16_t*restrict)dst)[ 0 ] = ((const uint16_t*restrict)src)[ 0 ];
+		acc += ((uint16_t*restrict)dst)[ 1 ] = ((const uint16_t*restrict)src)[ 1 ];
+		acc += ((uint16_t*restrict)dst)[ 2 ] = ((const uint16_t*restrict)src)[ 2 ];
+		acc += ((uint16_t*restrict)dst)[ 3 ] = ((const uint16_t*restrict)src)[ 3 ];
+		src += 8; dst += 8;
 	}
 	len %= 8;
 /* final 7 bytes */
-	while (len > 1) {
-		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-		srcbuf = &srcbuf[ 2 ];
-		dstbuf = &dstbuf[ 2 ];
-		len -= 2;
+	while (len >= sizeof (uint16_t)) {
+		const uint_fast16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+		acc += word16;
+		len -= 2; src += 2; dst += 2;
 	}
 /* trailing odd byte */
 	if (len > 0) {
-		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
+		((uint8_t*restrict)&remainder)[0] = *dst = *src;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
@@ -228,16 +238,13 @@ do_csum_32bit (
 	uint32_t	csum
 	)
 {
-	uint_fast32_t acc;
-	const uint8_t* buf;
-	uint16_t remainder;
+	uint_fast32_t acc = csum;
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;
 	uint_fast16_t count;
 	bool is_odd;
 
-	acc = csum;
-	buf = (const uint8_t*)addr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
 	is_odd = ((uintptr_t)buf & 1);
@@ -251,29 +258,27 @@ do_csum_32bit (
 	if (count)
 	{
 		if ((uintptr_t)buf & 2) {
-			acc += ((const uint16_t*)buf)[ 0 ];
-			buf  = &buf[ 2 ];
-			count--;
-			len -= 2;
+			const uint_fast16_t t = *(const uint16_t*)buf;
+			acc += t;
+			count--; len -= 2; buf += 2;
 		}
 /* 32-bit words */
 		count >>= 1;
 		if (count)
 		{
-			uint32_t carry = 0;
 			while (count) {
-				acc += carry;
-				acc += ((const uint32_t*)buf)[ 0 ];
-				carry = ((const uint32_t*)buf)[ 0 ] > acc;
-				buf  = &buf[ 4 ];
-				count--;
+				const uint_fast32_t word32 = *(const uint32_t*)buf;
+				acc += word32;
+/* detect carry without native adc operator */
+				if (acc < word32) acc++;
+				count--; buf += 4;
 			}
-			acc += carry;
 			acc  = (acc >> 16) + (acc & 0xffff);
 		}
 		if (len & 2) {
-			acc += ((const uint16_t*)buf)[ 0 ];
-			buf  = &buf[ 2 ];
+			const uint_fast32_t t = *(const uint32_t*)buf;
+			acc += t;
+			buf += 2;
 		}
 	}
 /* trailing odd byte */
@@ -281,6 +286,7 @@ do_csum_32bit (
 		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
@@ -297,64 +303,56 @@ do_csumcpy_32bit (
 	uint32_t	     csum
 	)
 {
-	uint_fast32_t acc;
-	const uint8_t*restrict srcbuf;
-	uint8_t*restrict dstbuf;
-	uint16_t remainder;
+	uint_fast32_t acc = csum;
+	const uint8_t*restrict src = (const uint8_t*restrict)srcaddr;
+	uint8_t*restrict dst = (uint8_t*restrict)dstaddr;
+	uint16_t remainder = 0;
 	uint_fast16_t count;
 	bool is_odd;
 
-	acc = csum;
-	srcbuf = (const uint8_t*restrict)srcaddr;
-	dstbuf = (uint8_t*restrict)dstaddr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
-	is_odd = ((uintptr_t)srcbuf & 1);
+	is_odd = ((uintptr_t)src & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
-		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		((uint8_t*restrict)&remainder)[1] = *dst++ = *src++;
 		len--;
 	}
 /* 16-bit words */
 	count = len >> 1;
 	if (count)
 	{
-		if ((uintptr_t)srcbuf & 2) {
-			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-			srcbuf = &srcbuf[ 2 ];
-			dstbuf = &dstbuf[ 2 ];
-			count--;
-			len -= 2;
+		if ((uintptr_t)src & 2) {
+			const uint_fast16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+			acc += word16;
+			count--; len -= 2; src += 2; dst += 2;
 		}
 /* 32-bit words */
 		count >>= 1;
 		if (count)
 		{
-			uint32_t carry = 0;
 			while (count) {
-				acc += carry;
-				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
-				carry = ((const uint32_t*restrict)dstbuf)[ 0 ] > acc;
-				srcbuf = &srcbuf[ 4 ];
-				dstbuf = &dstbuf[ 4 ];
-				count--;
+				const uint_fast32_t word32 = *(const uint32_t*restrict)src;
+				*(uint32_t*restrict)dst = word32;
+				acc += word32;
+				if (acc < word32) acc++;
+				count--; src += 4; dst += 4;
 			}
-			acc += carry;
 			acc  = (acc >> 16) + (acc & 0xffff);
 		}
 		if (len & 2) {
-			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-			srcbuf = &srcbuf[ 2 ];
-			dstbuf = &dstbuf[ 2 ];
+			const uint_fast16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+			acc += word16;
+			src += 2; dst += 2;
 		}
 	}
 /* trailing odd byte */
 	if (len & 1) {
-		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
+		((uint8_t*restrict)&remainder)[0] = *dst = *src;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc += (acc >> 16);
 	if (PGM_UNLIKELY(is_odd))
@@ -373,16 +371,13 @@ do_csum_64bit (
 	uint32_t	csum
 	)
 {
-	uint_fast64_t acc;
-	const uint8_t* buf;
-	uint16_t remainder;
+	uint_fast64_t acc = csum;
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;
 	uint_fast16_t count;
 	bool is_odd;
 
-	acc = csum;
-	buf = (const uint8_t*)addr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
 	is_odd = ((uintptr_t)buf & 1);
@@ -396,44 +391,41 @@ do_csum_64bit (
 	if (count)
 	{
 		if ((uintptr_t)buf & 2) {
-			acc += ((const uint16_t*)buf)[ 0 ];
-			buf  = &buf[ 2 ];
-			count--;
-			len -= 2;
+			const uint_fast16_t word16 = *(const uint16_t*)buf;
+			acc += word16;
+			count--; len -= 2; buf += 2;
 		}
 /* 32-bit words */
 		count >>= 1;
 		if (count)
 		{
 			if ((uintptr_t)buf & 4) {
-				acc += ((const uint32_t*)buf)[ 0 ];
-				buf  = &buf[ 4 ];
-				count--;
-				len -= 4;
+				const uint_fast32_t word32 = *(const uint32_t*)buf;
+				acc += word32;
+				count--; len -= 4; buf += 4;
 			}
 /* 64-bit words */
 			count >>= 1;
 			if (count)
 			{
-				uint_fast64_t carry = 0;
 				while (count) {
-					acc += carry;
-					acc += ((const uint64_t*)buf)[ 0 ];
-					carry = ((const uint64_t*)buf)[ 0 ] > acc;
-					buf  = &buf[ 8 ];
-					count--;
+					const uint_fast64_t word64 = *(const uint64_t*)buf;
+					acc += word64;
+					if (acc < word64) acc++;
+					count--; buf += 8;
 				}
-				acc += carry;
 				acc  = (acc >> 32) + (acc & 0xffffffff);
 			}
 			if (len & 4) {
-				acc += ((const uint32_t*)buf)[ 0 ];
-				buf  = &buf[ 4 ];
+				const uint_fast32_t word32 = *(const uint32_t*)buf;
+				acc += word32;
+				buf += 4;
 			}
 		}
 		if (len & 2) {
-			acc += ((const uint16_t*)buf)[ 0 ];
-			buf  = &buf[ 2 ];
+			const uint_fast16_t word16 = *(const uint16_t*)buf;
+			acc += word16;
+			buf += 2;
 		}
 	}
 /* trailing odd byte */
@@ -441,6 +433,7 @@ do_csum_64bit (
 		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 32) + (acc & 0xffffffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -459,24 +452,20 @@ do_csumcpy_64bit (
 	uint32_t	     csum
 	)
 {
-	uint_fast64_t acc;
-	const uint8_t* restrict srcbuf;
-	uint8_t* restrict dstbuf;
-	uint16_t remainder;
+	uint_fast64_t acc = csum;
+	const uint8_t* restrict src = (const uint8_t*restrict)srcaddr;
+	uint8_t* restrict dstbuf = (uint8_t*restrict)dstaddr;
+	uint16_t remainder = 0;
 	uint_fast16_t count;
 	bool is_odd;
 
-	acc = csum;
-	srcbuf = (const uint8_t*restrict)srcaddr;
-	dstbuf = (uint8_t*restrict)dstaddr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
-	is_odd = ((uintptr_t)srcbuf & 1);
+	is_odd = ((uintptr_t)src & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
-		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		((uint8_t*restrict)&remainder)[1] = *dst++ = *src++;
 		len--;
 	}
 /* 16-bit words */
@@ -484,90 +473,78 @@ do_csumcpy_64bit (
 	if (count)
 	{
 		if ((uintptr_t)srcbuf & 2) {
-			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-			srcbuf = &srcbuf[ 2 ];
-			dstbuf = &dstbuf[ 2 ];
-			count--;
-			len -= 2;
+			const uint_fast16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+			acc += word16;
+			count--; len -= 2; src += 2; dst += 2;
 		}
 /* 32-bit words */
 		count >>= 1;
 		if (count)
 		{
 			if ((uintptr_t)srcbuf & 4) {
-				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
-				srcbuf = &srcbuf[ 4 ];
-				dstbuf = &dstbuf[ 4 ];
-				count--;
-				len -= 4;
+				const uint_fast32_t word32 = *(uint32_t*restrict)dst = *(const uint32_t*restrict)src;
+				acc += word32;
+				count--; len -= 4; src += 4; dst += 4;
 			}
 /* 64-bit words */
 			count >>= 1;
 			if (count)
 			{
 /* 64-byte blocks */
-				uint_fast64_t carry = 0;
 				uint_fast16_t count64 = count >> 3;
 				if (count64)
 				{
-					carry = 0;
 					while (count64) {
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 0 ] = ((const uint64_t*restrict)srcbuf)[ 0 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 0 ] > acc;
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 1 ] = ((const uint64_t*restrict)srcbuf)[ 1 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 1 ] > acc;
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 2 ] = ((const uint64_t*restrict)srcbuf)[ 2 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 2 ] > acc;
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 3 ] = ((const uint64_t*restrict)srcbuf)[ 3 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 3 ] > acc;
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 4 ] = ((const uint64_t*restrict)srcbuf)[ 4 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 4 ] > acc;
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 5 ] = ((const uint64_t*restrict)srcbuf)[ 5 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 5 ] > acc;
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 6 ] = ((const uint64_t*restrict)srcbuf)[ 6 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 6 ] > acc;
-						acc += carry;
-						acc += ((uint64_t*restrict)dstbuf)[ 7 ] = ((const uint64_t*restrict)srcbuf)[ 7 ];
-						carry  = ((const uint64_t*restrict)dstbuf)[ 7 ] > acc;
-						srcbuf = &srcbuf[ 64 ];
-						dstbuf = &dstbuf[ 64 ];
-						count64--;
+						uint_fast64_t word64;
+						word64 = ((uint64_t*restrict)dst)[ 0 ] = ((const uint64_t*restrict)src)[ 0 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						word64 = ((uint64_t*restrict)dst)[ 1 ] = ((const uint64_t*restrict)src)[ 1 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						word64 = ((uint64_t*restrict)dst)[ 2 ] = ((const uint64_t*restrict)src)[ 2 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						word64 = ((uint64_t*restrict)dst)[ 3 ] = ((const uint64_t*restrict)src)[ 3 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						word64 = ((uint64_t*restrict)dst)[ 4 ] = ((const uint64_t*restrict)src)[ 4 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						word64 = ((uint64_t*restrict)dst)[ 5 ] = ((const uint64_t*restrict)src)[ 5 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						word64 = ((uint64_t*restrict)dst)[ 6 ] = ((const uint64_t*restrict)src)[ 6 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						word64 = ((uint64_t*restrict)dst)[ 7 ] = ((const uint64_t*restrict)src)[ 7 ];
+						acc += word64;
+						if (acc < word64) acc++;
+						count64--; src += 64; dst += 64;
 					}
-					acc += carry;
 					acc  = (acc >> 32) + (acc & 0xffffffff);
 					count %= 8;
 				}
 
 /* last 56 bytes */
-				carry = 0;
 				while (count) {
-					acc += carry;
-					acc += ((uint64_t*restrict)dstbuf)[ 0 ] = ((const uint64_t*restrict)srcbuf)[ 0 ];
-					carry = ((const uint64_t*restrict)dstbuf)[ 0 ] > acc;
-					srcbuf = &srcbuf[ 8 ];
-					dstbuf = &dstbuf[ 8 ];
-					count--;
+					const uint64_t word64 = *(uint64_t*restrict)dst = *(const uint64_t*restrict)src;
+					acc += word64;
+					if (acc < word64) acc++;
+					count--; src += 8; dst += 8;
 				}
-				acc += carry;
 				acc  = (acc >> 32) + (acc & 0xffffffff);
 			}
 			if (len & 4) {
-				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
-				srcbuf = &srcbuf[ 4 ];
-				dstbuf = &dstbuf[ 4 ];
+				const uint32_t word32 = *(uint32_t*restrict)dst = *(const uint32_t*restrict)src;
+				acc += word32;
+				src += 4; dst += 4;
 			}
 		}
 		if (len & 2) {
-			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-			srcbuf = &srcbuf[ 2 ];
-			dstbuf = &dstbuf[ 2 ];
+			const uint16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+			acc += word16;
+			src += 2; dst += 2;
 		}
 	}
 /* trailing odd byte */
@@ -575,6 +552,7 @@ do_csumcpy_64bit (
 		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 32) + (acc & 0xffffffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -585,7 +563,10 @@ do_csumcpy_64bit (
 }
 
 #if defined(__amd64) || defined(__x86_64__)
-/* simd instructions unique to AMD/Intel 64-bit, so always little endian.
+/* SIMD instructions unique to AMD/Intel 64-bit, so always little endian.
+ *
+ * TODO: TLB priming and prefetch with cache line size (128 bytes).
+ * TODO: 8-byte software versus 16-byte hardware prefetch.
  */
 
 static
@@ -596,16 +577,13 @@ do_csum_vector (
 	uint32_t	csum
 	)
 {
-	uint64_t acc;			/* fixed size for asm */
-	const uint8_t* buf;
-	uint16_t remainder;		/* fixed size for endian swap */
+	uint64_t acc = csum;		/* fixed size for asm */
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;		/* fixed size for endian swap */
 	uint_fast16_t count;
 	bool is_odd;
 
-	acc = csum;
-	buf = (const uint8_t*)addr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
 /* align first byte */
@@ -619,46 +597,45 @@ do_csum_vector (
 	if (count)
 	{
 		if ((uintptr_t)buf & 2) {
-			acc += ((const uint16_t*)buf)[ 0 ];
-			buf  = &buf[ 2 ];
-			count--;
-			len -= 2;
+			const uint16_t word16 = *(const uint16_t*)buf;
+			acc += word16;
+			count--; len -= 2; buf += 2;
 		}
 /* 32-bit words */
 		count >>= 1;
 		if (count)
 		{
 			if ((uintptr_t)buf & 4) {
-				acc += ((const uint32_t*)buf)[ 0 ];
-				buf  = &buf[ 4 ];
-				count--;
-				len -= 4;
+				const uint32_t word32 = *(const uint32_t*)buf;
+				acc += word32;
+				count--; len -= 4; buf += 4;
 			}
 /* 64-bit words */
 			count >>= 1;
 			if (count)
 			{
-				uint64_t carry = 0;
 				while (count) {
+					uint64_t carry = 0;
 					__asm__ volatile ("addq %1, %0\n\t"
 							  "adcq %2, %0"
 					     		: "=r" (acc)
 							: "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc)
 							: "cc"  );
-					buf  = &buf[ 8 ];
-					count--;
+					if (carry) acc++;
+					count--; buf += 8;
 				}
-				acc += carry;
 				acc  = (acc >> 32) + (acc & 0xffffffff);
 			}
 			if (len & 4) {
-				acc += ((const uint32_t*)buf)[ 0 ];
-				buf  = &buf[ 4 ];
+				const uint32_t word32 = *(const uint32_t*)buf;
+				acc += word32;
+				buf += 4;
 			}
 		}
 		if (len & 2) {
-			acc += ((const uint16_t*)buf)[ 0 ];
-			buf  = &buf[ 2 ];
+			const uint16_t word16 = *(const uint16_t*)buf;
+			acc += word16;
+			buf += 2;
 		}
 	}
 /* trailing odd byte */
@@ -666,6 +643,7 @@ do_csum_vector (
 		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 32) + (acc & 0xffffffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -684,30 +662,24 @@ do_csumcpy_vector (
 	uint32_t	     csum
 	)
 {
-	uint64_t acc;			/* fixed size for asm */
-	const uint8_t*restrict srcbuf;
-	uint8_t*restrict dstbuf;
-	uint16_t remainder;		/* fixed size for endian swap */
+	uint64_t acc = csum;		/* fixed size for asm */
+	const uint8_t*restrict src = (const uint8_t*restrict)srcaddr;
+	uint8_t*restrict dst = (uint8_t*restrict)dstaddr;
+	uint16_t remainder = 0;		/* fixed size for endian swap */
 	uint_fast16_t count;
 	bool is_odd;
 
-	acc = csum;
-	srcbuf = (const uint8_t*restrict)srcaddr;
-	dstbuf = (uint8_t*restrict)dstaddr;
-	remainder = 0;
-
+/* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
 /* fill cache line with source buffer, invalidate destination buffer,
  * perversly for testing high temporal locality is better than no locality,
  * whilst in production no locality may be preferred depending on skb re-use.
  */
-	pgm_prefetch (srcbuf);
-	pgm_prefetchw (dstbuf);
 /* align first byte */
-	is_odd = ((uintptr_t)srcbuf & 1);
+	is_odd = ((uintptr_t)src & 1);
 	if (PGM_UNLIKELY(is_odd)) {
-		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		((uint8_t*restrict)&remainder)[1] = *dst++ = *src++;
 		len--;
 	}
 /* 16-bit words */
@@ -715,35 +687,29 @@ do_csumcpy_vector (
 	if (count)
 	{
 		if ((uintptr_t)srcbuf & 2) {
-			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-			srcbuf = &srcbuf[ 2 ];
-			dstbuf = &dstbuf[ 2 ];
-			count--;
-			len -= 2;
+			const uint16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+			acc += word16;
+			count--; len -= 2; src += 2; dst += 2;
 		}
 /* 32-bit words */
 		count >>= 1;
 		if (count)
 		{
-			if ((uintptr_t)srcbuf & 4) {
-				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
-				srcbuf = &srcbuf[ 4 ];
-				dstbuf = &dstbuf[ 4 ];
-				count--;
-				len -= 4;
+			if ((uintptr_t)src & 4) {
+				const uint32_t word32 = *(uint32_t*restrict)dst = *(const uint32_t*restrict)src;
+				acc += word32;
+				count--; len -= 4; src += 4; dst += 4;
 			}
 /* 64-bit words */
 			count >>= 1;
 			if (count)
 			{
 /* 64-byte blocks */
-				uint64_t carry = 0;
 				uint_fast16_t count64 = count >> 3;
 
 				while (count64)
 				{
-					pgm_prefetch (&srcbuf[ 64 ]);
-					pgm_prefetchw (&dstbuf[ 64 ]);
+					uint64_t carry = 0;
 					__asm__ volatile ("movq 0*8(%1), %%r8\n\t"	/* load */
 							  "movq 1*8(%1), %%r9\n\t"
 							  "movq 2*8(%1), %%r10\n\t"
@@ -770,43 +736,43 @@ do_csumcpy_vector (
 							  "movq %%r14, 6*8(%2)\n\t"
 							  "movq %%r15, 7*8(%2)"
 							: "=r" (acc)
-							: "r" (srcbuf), "r" (dstbuf), "r" (carry), "0" (acc)
+							: "r" (src), "r" (dst), "r" (carry), "0" (acc)
 							: "cc", "memory", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"  );
-					srcbuf = &srcbuf[ 64 ];
-					dstbuf = &dstbuf[ 64 ];
-					count64--;
+					if (carry) acc++;
+					count64--; src += 64; dst += 64;
 				}
 				count %= 8;
 /* last 56 bytes */
 				while (count) {
+					uint64_t carry = 0;
 					__asm__ volatile ("addq %1, %0\n\t"
 							  "adcq %2, %0"
 							: "=r" (acc)
-							: "m" (*(const uint64_t*restrict)srcbuf), "r" (carry), "0" (acc)
+							: "m" (*(const uint64_t*restrict)src), "r" (carry), "0" (acc)
 							: "cc"  );
-					srcbuf  = &srcbuf[ 8 ];
-					count--;
+					if (carry) acc++;
+					count--; src += 8;
 				}
-				acc += carry;
 				acc  = (acc >> 32) + (acc & 0xffffffff);
 			}
 			if (len & 4) {
-				acc += ((uint32_t*restrict)dstbuf)[ 0 ] = ((const uint32_t*restrict)srcbuf)[ 0 ];
-				srcbuf = &srcbuf[ 4 ];
-				dstbuf = &dstbuf[ 4 ];
+				const uint32_t word32 = *(uint32_t*restrict)dst = *(const uint32_t*restrict)src;
+				acc += word32;
+				src += 4; dst += 4;
 			}
 		}
 		if (len & 2) {
-			acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
-			srcbuf = &srcbuf[ 2 ];
-			dstbuf = &dstbuf[ 2 ];
+			const uint16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+			acc += word16;
+			src += 2; dst += 2;
 		}
 	}
 /* trailing odd byte */
 	if (len & 1) {
-		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
+		((uint8_t*restrict)&remainder)[0] = *dst = *src;
 	}
 	acc += remainder;
+/* fold accumulator down to 16-bits */
 	acc  = (acc >> 32) + (acc & 0xffffffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
 	acc  = (acc >> 16) + (acc & 0xffff);
@@ -854,6 +820,7 @@ pgm_inet_checksum (
 /* pre-conditions */
 	pgm_assert (NULL != addr);
 
+/* invert to get the ones-complement. */
 	return ~do_csum (addr, len, csum);
 }
 
