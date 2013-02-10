@@ -116,6 +116,12 @@ pgm_atomic_add32 (
 /* 32-bit word increment.
  *
  * 	*atomic++;
+ *
+ * Per Intel's rule #33: 
+ * http://www.intel.com/content/dam/doc/manual/64-ia-32-architectures-optimization-manual.pdf
+ *
+ * INC and DEC instructions should be replaced with ADD and SUB because false dependencies
+ * are created on earlier instructions that set flags.
  */
 
 static inline
