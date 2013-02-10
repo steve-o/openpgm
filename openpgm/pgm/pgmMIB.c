@@ -7,6 +7,9 @@
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
 
+#ifdef HAVE_CONFIG_H
+#	include <config.h>
+#endif
 #include <impl/i18n.h>
 #include <impl/framework.h>
 #include <impl/receiver.h>
