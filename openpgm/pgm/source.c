@@ -1127,36 +1127,29 @@ send_odata (
 
         STATE(skb)->pgm_header->pgm_checksum    = 0;
 	data = STATE(skb)->pgm_data + 1;
+/* congestion control option header indicating elected peer for ACKs. */
 	if (sock->use_pgmcc) {
 		struct pgm_opt_header	   *opt_header;
 		struct pgm_opt_length	   *opt_len;
 		struct pgm_opt_pgmcc_data  *pgmcc_data;
-		struct pgm_opt6_pgmcc_data *pgmcc_data6;
-
+		const size_t opt_pgmcc_data_len = ((AF_INET6 == sock->acker_nla.ss_family) ?
+							sizeof (struct pgm_opt6_pgmcc_data) :
+							sizeof (struct pgm_opt_pgmcc_data));
 		opt_len = data;
 		opt_len->opt_type	= PGM_OPT_LENGTH;
 		opt_len->opt_length	= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length = htons ((uint16_t)(sizeof(struct pgm_opt_length) +
-							sizeof(struct pgm_opt_header) +
-							((AF_INET6 == sock->acker_nla.ss_family) ?
-								sizeof(struct pgm_opt6_pgmcc_data) :
-								sizeof(struct pgm_opt_pgmcc_data))  ));
+		opt_len->opt_total_length = htons ((uint16_t)(sizeof (struct pgm_opt_length) +
+							sizeof (struct pgm_opt_header) +
+							opt_pgmcc_data_len));
 		opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type	= PGM_OPT_PGMCC_DATA | PGM_OPT_END;
-		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
-					  ((AF_INET6 == sock->acker_nla.ss_family) ?
-						sizeof(struct pgm_opt6_pgmcc_data) :
-						sizeof(struct pgm_opt_pgmcc_data));
+		opt_header->opt_length	= sizeof (struct pgm_opt_header) +
+						opt_pgmcc_data_len;
 		pgmcc_data  = (struct pgm_opt_pgmcc_data *)(opt_header + 1);
-		pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
-
 		pgmcc_data->opt_tstamp = htonl ((uint32_t)pgm_to_msecs (STATE(skb)->tstamp));
 /* acker nla */
 		pgm_sockaddr_to_nla ((struct sockaddr*)&sock->acker_nla, (char*)&pgmcc_data->opt_nla_afi);
-		if (AF_INET6 == sock->acker_nla.ss_family)
-			data = (char*)pgmcc_data6 + sizeof(struct pgm_opt6_pgmcc_data);
-		else
-			data = (char*)pgmcc_data  + sizeof(struct pgm_opt_pgmcc_data);
+		data = (char*)opt_header + opt_header->opt_length;
 	}
 	const size_t   pgm_header_len		= (char*)data - (char*)STATE(skb)->pgm_header;
 	const uint32_t unfolded_header		= pgm_csum_partial (STATE(skb)->pgm_header, (uint16_t)pgm_header_len, 0);
@@ -1189,7 +1182,7 @@ send_odata (
  */
 retry_send:
 
-/* congestion control */
+/* congestion control: early exit on empty token bucket */
 	if (sock->use_pgmcc &&
 	    sock->tokens < pgm_fp8 (1))
 	{
@@ -1222,30 +1215,30 @@ retry_send:
 /* fall through silently on other errors */
 	}
 
-/* save unfolded odata for retransmissions */
-	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
-
+/* success */
 	sock->is_apdu_eagain = FALSE;
+/* SPM heartbeats decay from last sent data packet */
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
+/* congestion control: remove token from bucket */
 	if (sock->use_pgmcc) {
 		sock->tokens -= pgm_fp8 (1);
 		sock->ack_expiry = STATE(skb)->tstamp + sock->ack_expiry_ivl;
 	}
-
+/* save unfolded odata for retransmissions */
+	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
+/* increment socket statistics */
 	if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
 		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
 	}
-
-/* check for end of transmission group */
+/* check for end of transmission group for pro-active packets */
 	if (sock->use_proactive_parity) {
 		const uint32_t odata_sqn = ntohl (STATE(skb)->pgm_data->data_sqn);
 		const uint32_t tg_sqn_mask = 0xffffffff << sock->tg_sqn_shift;
 		if (!((odata_sqn + 1) & ~tg_sqn_mask))
 			pgm_schedule_proactive_nak (sock, odata_sqn & tg_sqn_mask);
 	}
-
 /* remove applications reference to skbuff */
 	pgm_free_skb (STATE(skb));
 	if (bytes_written)
@@ -1310,30 +1303,25 @@ send_odata_copy (
 
 	STATE(skb)->pgm_header->pgm_checksum	= 0;
 	data = STATE(skb)->pgm_data + 1;
+/* congestion control option header indicating elected peer for ACKs. */
 	if (sock->use_pgmcc) {
 		struct pgm_opt_header		*opt_header;
 		struct pgm_opt_length		*opt_len;
 		struct pgm_opt_pgmcc_data	*pgmcc_data;
-/* unused */
-//		struct pgm_opt6_pgmcc_data	*pgmcc_data6;
-
+		const size_t opt_pgmcc_data_len = ((AF_INET6 == sock->acker_nla.ss_family) ?
+							sizeof (struct pgm_opt6_pgmcc_data) :
+							sizeof (struct pgm_opt_pgmcc_data));
 		opt_len = data;
 		opt_len->opt_type	= PGM_OPT_LENGTH;
-		opt_len->opt_length	= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length = htons ((uint16_t)(sizeof(struct pgm_opt_length) +
-							sizeof(struct pgm_opt_header) +
-							((AF_INET6 == sock->acker_nla.ss_family) ?
-								sizeof(struct pgm_opt6_pgmcc_data) :
-								sizeof(struct pgm_opt_pgmcc_data))  ));
+		opt_len->opt_length	= sizeof (struct pgm_opt_length);
+		opt_len->opt_total_length = htons ((uint16_t)(sizeof (struct pgm_opt_length) +
+							sizeof (struct pgm_opt_header) +
+							opt_pgmcc_data_len));
 		opt_header = (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type	= PGM_OPT_PGMCC_DATA | PGM_OPT_END;
-		opt_header->opt_length	= sizeof(struct pgm_opt_header) +
-					  ((AF_INET6 == sock->acker_nla.ss_family) ?
-						sizeof(struct pgm_opt6_pgmcc_data) :
-						sizeof(struct pgm_opt_pgmcc_data));
+		opt_header->opt_length	= sizeof (struct pgm_opt_header) +
+						opt_pgmcc_data_len;
 		pgmcc_data  = (struct pgm_opt_pgmcc_data *)(opt_header + 1);
-//		pgmcc_data6 = (struct pgm_opt6_pgmcc_data*)(opt_header + 1);
-
 		pgmcc_data->opt_reserved = 0;
 		pgmcc_data->opt_tstamp = htonl ((uint32_t)pgm_to_msecs (STATE(skb)->tstamp));
 /* acker nla */
@@ -1367,7 +1355,7 @@ send_odata_copy (
 	}
 retry_send:
 
-/* congestion control */
+/* congestion control: early exit on empty token bucket */
 	if (sock->use_pgmcc && 
 	    sock->tokens < pgm_fp8 (1))
 	{
@@ -1400,26 +1388,26 @@ retry_send:
 /* fall through silently on other errors */
 	}
 
+/* success */
+	sock->is_apdu_eagain = FALSE;
+/* SPM heartbeats decay from last sent data packet */
+	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
+/* congestion control: remove token from bucket */
 	if (sock->use_pgmcc) {
 		sock->tokens -= pgm_fp8 (1);
 		pgm_trace (PGM_LOG_ROLE_CONGESTION_CONTROL,_("PGMCC tokens-- (T:%u W:%u)"),
 		 	   pgm_fp8tou (sock->tokens), pgm_fp8tou (sock->cwnd_size));
 		sock->ack_expiry = STATE(skb)->tstamp + sock->ack_expiry_ivl;
 	}
-
 /* save unfolded odata for retransmissions */
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
-
-	sock->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-
+/* increment socket statistics */
 	if (PGM_LIKELY((size_t)sent == tpdu_length)) {
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += tsdu_length;
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
 		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
 	}
-
-/* check for end of transmission group */
+/* check for end of transmission group for pro-active packets */
 	if (sock->use_proactive_parity) {
 		const uint32_t odata_sqn = ntohl (STATE(skb)->pgm_data->data_sqn);
 		const uint32_t tg_sqn_mask = 0xffffffff << sock->tg_sqn_shift;
@@ -1572,18 +1560,18 @@ retry_send:
 /* fall through silently on other errors */
 	}
 
+/* success */
+	sock->is_apdu_eagain = FALSE;
+/* SPM heartbeats decay from last sent data packet */
+	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
 /* save unfolded odata for retransmissions */
 	pgm_txw_set_unfolded_checksum (STATE(skb), STATE(unfolded_odata));
-
-	sock->is_apdu_eagain = FALSE;
-	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-
+/* increment socket statistics */
 	if (PGM_LIKELY((size_t)sent == STATE(skb)->len)) {
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += STATE(tsdu_length);
 		sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  ++;
 		pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)(tpdu_length + sock->iphdr_len));
 	}
-
 /* check for end of transmission group */
 	if (sock->use_proactive_parity) {
 		const uint32_t odata_sqn   = ntohl (STATE(skb)->pgm_data->data_sqn);
@@ -1760,9 +1748,11 @@ retry_send:
 	} while ( STATE(data_bytes_offset)  < apdu_length);
 	pgm_assert( STATE(data_bytes_offset) == apdu_length );
 
+/* success */
 	sock->is_apdu_eagain = FALSE;
+/* SPM heartbeats decay from last sent data packet */
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-
+/* increment socket statistics */
 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
@@ -2169,9 +2159,11 @@ retry_one_apdu_send:
 	} while ( STATE(data_bytes_offset)  < STATE(apdu_length) );
 	pgm_assert( STATE(data_bytes_offset) == STATE(apdu_length) );
 
+/* success */
 	sock->is_apdu_eagain = FALSE;
+/* SPM heartbeats decay from last sent data packet */
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-
+/* increment socket statistics */
 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
@@ -2422,9 +2414,11 @@ retry_send:
 	}
 #endif
 
+/* success */
 	sock->is_apdu_eagain = FALSE;
+/* SPM heartbeats decay from last sent data packet */
 	reset_heartbeat_spm (sock, STATE(skb)->tstamp);
-
+/* increment socket statistics */
 	pgm_atomic_add32 (&sock->cumulative_stats[PGM_PC_SOURCE_BYTES_SENT], (uint32_t)bytes_sent);
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_MSGS_SENT]  += packets_sent;
 	sock->cumulative_stats[PGM_PC_SOURCE_DATA_BYTES_SENT] += data_bytes_sent;
