@@ -108,8 +108,10 @@ enum pgm_type_e {
 
 #define PGM_OPT_INVALID		    0x7f	/* option invalidated */
 
-/* byte alignment for packet memory maps */
-#if defined( __GNUC__ ) && !defined( __sun ) && !defined( __CYGWIN__ )
+/* byte alignment for packet memory maps 
+ * pack broken on GCC pre-3.5: http://gcc.gnu.org/bugzilla/show_bug.cgi?id=7054
+ */
+#if (defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )
 #	pragma pack(push)
 #endif
 #pragma pack(1)
@@ -443,7 +445,7 @@ struct pgm_opt6_path_nla {
 };
 
 
-#if defined( __GNUC__ ) && !defined( __sun ) && !defined( __CYGWIN__ )
+#if (defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )
 #	pragma pack(pop)
 #else
 #	pragma pack()

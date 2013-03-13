@@ -1,27 +1,31 @@
 # -*- mode: python -*-
 # OpenPGM build script
 
+import platform
 import os
 import time
 import sys
 
 EnsureSConsVersion( 0, 97 )
 SConsignFile('scons.signatures');
+SConsignFile('scons.signatures'+ '-' + platform.system() + '-' + platform.machine());
 
 opt = Options(None, ARGUMENTS)
 opt.AddOptions (
 	(EnumOption ('BUILD', 'build environment', 'debug', ('release', 'debug', 'profile'))),
 	(EnumOption ('BRANCH', 'branch prediction', 'none', ('none', 'profile', 'seed'))),
+	(EnumOption ('WITH_GETTEXT', 'l10n support via libintl', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_GLIB', 'Build GLib dependent modules', 'false', ('true', 'false'))),
 	(EnumOption ('COVERAGE', 'test coverage', 'none', ('none', 'full'))),
 	(EnumOption ('WITH_HISTOGRAMS', 'Runtime statistical information', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_HTTP', 'HTTP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_SNMP', 'SNMP administration', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_CHECK', 'Check test system', 'false', ('true', 'false'))),
 	(EnumOption ('WITH_TEST', 'Network test system', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_CC', 'C++ Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_EXAMPLES', 'Examples', 'true', ('true', 'false'))),
 	(EnumOption ('WITH_NCURSES', 'NCURSES examples', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false'))),
-	(EnumOption ('WITH_PLUS', 'libpgmplus GPL library', 'false', ('true', 'false'))),
+	(EnumOption ('WITH_PROTOBUF', 'Google Protocol Buffer examples', 'false', ('true', 'false')))
 )
 
 #-----------------------------------------------------------------------------
@@ -46,15 +50,15 @@ conf = Configure(env, custom_tests = { 'CheckPKGConfig' : CheckPKGConfig,
 
 if not conf.CheckPKGConfig('0.15.0'):
 	print 'pkg-config >= 0.15.0 not found.'
-	Exit(1)
+#	Exit(1)
 
 if not conf.CheckPKG('glib-2.0 >= 2.10'):
 	print 'glib-2.0 >= 2.10 not found.'
-	Exit(1)
+#	Exit(1)
 
 if not conf.CheckPKG('gthread-2.0'):
 	print 'gthread-2.0 not found.'
-	Exit(1)
+#	Exit(1)
 
 env = conf.Finish();
 
@@ -83,36 +87,88 @@ env = Environment(ENV = os.environ,
 				'-Wnested-externs',
 				'-Winline',
 			'-pedantic',
+# C99
 			'-std=gnu99',
-			'--param', 'max-inline-insns-single=600',
+			'-D_XOPEN_SOURCE=600',
+			'-D_BSD_SOURCE',
+# re-entrant libc
 			'-D_REENTRANT',
-			'-D_GNU_SOURCE',
-			'-D__need_IOV_MAX',
-			'-DCONFIG_16BIT_CHECKSUM',
-			'-DCONFIG_HAVE_PROC',
-			'-DCONFIG_HAVE_BACKTRACE',
-			'-DCONFIG_HAVE_PSELECT',
-			'-DCONFIG_HAVE_POLL',
-			'-DCONFIG_HAVE_EPOLL',
-			'-DCONFIG_HAVE_CLOCK_GETTIME',
-			'-DCONFIG_HAVE_CLOCK_NANOSLEEP',
-			'-DCONFIG_HAVE_NANOSLEEP',
-			'-DCONFIG_HAVE_USLEEP',
-			'-DCONFIG_HAVE_RTC',
-			'-DCONFIG_HAVE_TSC',
-			'-DCONFIG_HAVE_GETIFADDRS',
-			'-DCONFIG_HAVE_GETHOSTBYNAME2',
-			'-DCONFIG_HAVE_GETPROTOBYNAME_R',
-			'-DCONFIG_HAVE_MCAST_JOIN',
-			'-DCONFIG_HAVE_IP_MREQN',
-			'-DCONFIG_HAVE_IP_MSFILTER',
-			'-DCONFIG_HAVE_DSO_VISIBILITY',
-			'-DCONFIG_BIND_INADDR_ANY',
-			'-DCONFIG_GALOIS_MUL_LUT',
+# POSIX spinlocks
+			'-DHAVE_PTHREAD_SPINLOCK',
+# NSS protocol lookup
+			'-DHAVE_GETPROTOBYNAME_R',
+#			'-DGETPROTOBYNAME_R_STRUCT_PROTOENT_P',
+# NSS networks lookup, IPv4 only
+			'-DHAVE_GETNETENT',
+# variadic macros
+ 			'-DHAVE_ISO_VARARGS',
+#			'-DHAVE_GNUC_VARARGS',
+# stack memory api header
+			'-DHAVE_ALLOCA_H',
+# optimium checksum implementation
+#			'-DUSE_8BIT_CHECKSUM',
+			'-DUSE_16BIT_CHECKSUM',
+#			'-DUSE_32BIT_CHECKSUM',
+#			'-DUSE_64BIT_CHECKSUM',
+#			'-DUSE_VECTOR_CHECKSUM',
+# useful /proc system
+			'-DHAVE_PROC_CPUINFO',
+# example: crash handling
+			'-DHAVE_BACKTRACE',
+# timing
+			'-DHAVE_FTIME',
+			'-DHAVE_GETTIMEOFDAY',
+			'-DHAVE_CLOCK_GETTIME',
+			'-DHAVE_PSELECT',
+			'-DHAVE_DEV_RTC',
+			'-DHAVE_RDTSC',
+# event handling
+			'-DHAVE_POLL',
+			'-DHAVE_EPOLL_CTL',
+# interface enumeration
+			'-DHAVE_GETIFADDRS',
+			'-DHAVE_STRUCT_IFADDRS_IFR_NETMASK',
+# win32 cmsg
+#			'-DHAVE_WSACMSGHDR',
+# multicast
+			'-DHAVE_STRUCT_GROUP_REQ',
+			'-DHAVE_STRUCT_IP_MREQN',
+			'-DHAVE_STRUCT_IP_MSFILTER',
+# sprintf
+			'-DHAVE_SPRINTF_GROUPING',
+			'-DHAVE_VASPRINTF',
+# symbol linking scope
+			'-DHAVE_DSO_VISIBILITY',
+# socket binding
+			'-DUSE_BIND_INADDR_ANY',
+# IP header order as per IP(4) on FreeBSD
+#			'-DHAVE_HOST_ORDER_IP_LEN',
+#			'-DHAVE_HOST_ORDER_IP_OFF',
+# ticket based spinlocks
+			'-DUSE_TICKET_SPINLOCK',
+# dumb read-write spinlock
+			'-DUSE_DUMB_RWSPINLOCK',
+# optimum galois field multiplication
+			'-DUSE_GALOIS_MUL_LUT',
+# GNU getopt
+			'-DHAVE_GETOPT',
+# temporary for pgmping
+#			'-DCONFIG_WITH_HEATMAP',
+#			'-DCONFIG_WITH_BUSYWAIT',
+#			'-DCONFIG_HAVE_SCHEDPARAM'
 		 ],
-	LINKFLAGS = [	'-pipe',
-			'-lm'
-		    ]
+	LINKFLAGS = [	'-pipe'
+		    ],
+	LIBS = [
+			'pthread',
+# histogram math
+			'm',
+# clock_gettime()
+			'rt'
+		],
+	PROTOBUF_CCFLAGS = '-I/protobuf-2.3.0/include',
+	PROTOBUF_LIBS = '/protobuf-2.3.0/lib/libprotobuf.a',
+	PROTOBUF_PROTOC = '/protobuf-2.3.0/bin/protoc'
 )
 opt.Update (env)
 
@@ -135,10 +191,10 @@ release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = '-ggdb', LINKFLAGS = '-gdb')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-gdb')
 
 profile = env.Clone(BUILD = 'profile')
-profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
+profile.Append(CCFLAGS = ['-O0','-pg'], LINKFLAGS = '-pg')
 
 thirtytwo = release.Clone(BUILD = 'thirtytwo')
 thirtytwo.Append(CCFLAGS = '-m32', LINKFLAGS = '-m32')
@@ -159,17 +215,22 @@ else:
 Import('env')
 
 # vanilla environment
-env.ParseConfig('PKG_CONFIG_PATH=/usr/evolution28/lib/pkgconfig:/usr/lib/pkconfig pkg-config --cflags --libs glib-2.0 gthread-2.0');
+if env['WITH_GLIB'] == 'true':
+	env['GLIB_FLAGS'] = env.ParseConfig('PKG_CONFIG_PATH=/usr/evolution28/lib/pkgconfig:/usr/lib/pkconfig pkg-config --cflags --libs glib-2.0 gthread-2.0');
+else:
+	env['GLIB_FLAGS'] = '';
+
+# l10n
+if env['WITH_GETTEXT'] == 'true':
+	env.Append(CCFLAGS = '-DHAVE_GETTEXT');
 
 # instrumentation
 if env['WITH_HTTP'] == 'true' and env['WITH_HISTOGRAMS'] == 'true':
-	env.Append(CCFLAGS = '-DCONFIG_HISTOGRAMS');
+	env.Append(CCFLAGS = '-DUSE_HISTOGRAMS');
 
 # managed environment for libpgmsnmp, libpgmhttp
-env['SNMP_FLAGS'] = { 
-        'CCFLAGS'       : [],
-        'LIBS'          : [ 'netsnmpagent', 'netsnmpmibs', 'netsnmphelpers', 'netsnmp' ],
-};
+if env['WITH_SNMP'] == 'true':
+	env['SNMP_FLAGS'] = env.ParseFlags('!net-snmp-config --cflags --agent-libs');
 
 def CheckSNMP(context):
 	context.Message('Checking Net-SNMP...');
@@ -235,15 +296,9 @@ else:
 
 if conf.CheckEventFD():
 	print 'Enabling kernel eventfd notification mechanism.';
-	conf.env.Append(CCFLAGS = '-DCONFIG_EVENTFD');
+	conf.env.Append(CCFLAGS = '-DHAVE_EVENTFD');
 
 env = conf.Finish();
-
-# DSO visibility flags
-if '-DCONFIG_HAVE_DSO_VISIBILITY' in env['CCFLAGS']:
-	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=G_GNUC_INTERNAL')
-else:
-	env.Append(CCFLAGS = '-DPGM_GNUC_INTERNAL=')
 
 # add builder to create PIC static libraries for including in shared libraries
 action_list = [ Action("$ARCOM", "$ARCOMSTR") ];
@@ -261,14 +316,15 @@ env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
 
 #-----------------------------------------------------------------------------
 
-ref_node = 'ref/' + env['BUILD'] + '/';
+ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '/';
 BuildDir(ref_node, '.', duplicate=0)
 
 env.Append(CPPPATH = os.getcwd() + '/include');
 env.Append(LIBPATH = os.getcwd() + '/' + ref_node);
 
+if env['WITH_GLIB'] == 'true':
+	SConscript(ref_node + 'SConscript.libpgmex');
 SConscript(ref_node + 'SConscript.libpgm');
-SConscript(ref_node + 'SConscript.libpgmex');
 if env['WITH_HTTP'] == 'true':
 	SConscript(ref_node + 'SConscript.libpgmhttp');
 if env['WITH_SNMP'] == 'true':
