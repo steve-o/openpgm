@@ -1,6 +1,12 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  * 
- * 32-bit atomic operations.
+ * 32-bit atomic operations.  A complex mix of inline assembler and compiler
+ * intrinsics.  Native x86 code uses fetch-and-add instruction which is proven
+ * faster than Solaris intrinsics that all use compare-and-swap (CAS):
+ * https://blogs.oracle.com/dave/entry/atomic_fetch_and_add_vs
+ *
+ * AMD Opteron revision E memory-barrier bug is ignored as obsolete hardware.
+ * https://bugzilla.kernel.org/show_bug.cgi?id=11305
  *
  * NB: XADD requires 80486 microprocessor.
  *
@@ -51,6 +57,7 @@ pgm_atomic_exchange_and_add32 (
 	)
 {
 #if defined( __GNUC__ ) && ( defined( __i386__ ) || defined( __x86_64__ ) )
+/* GCC assembler */
 	uint32_t result;
 	__asm__ volatile ("lock; xaddl %0, %1"
 		        : "=r" (result), "=m" (*atomic)
@@ -58,6 +65,7 @@ pgm_atomic_exchange_and_add32 (
 		        : "memory", "cc"  );
 	return result;
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
+/* GCC-compatible assembler */
 	uint32_t result = val;
 	__asm__ volatile ("lock; xaddl %0, %1"
 		       :: "r" (result), "m" (*atomic)  );
@@ -131,12 +139,12 @@ pgm_atomic_inc32 (
 	)
 {
 #if defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))
-	__asm__ volatile ("lock; incl %0"
+	__asm__ volatile ("lock; addl $1, %0"
 		        : "+m" (*atomic)
 		        :
 		        : "memory", "cc"  );
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
-	__asm__ volatile ("lock; incl %0"
+	__asm__ volatile ("lock; addl $1, %0"
 		       :: "m" (*atomic)  );
 #elif defined( __sun )
 	atomic_inc_32 (atomic);
@@ -161,13 +169,12 @@ pgm_atomic_dec32 (
 	)
 {
 #if defined( __GNUC__ ) && (defined( __i386__ ) || defined( __x86_64__ ))
-	__asm__ volatile ("lock; decl %0"
+	__asm__ volatile ("lock; subl $1, %0"
 		        : "+m" (*atomic)
 		        :
 		        : "memory", "cc"  );
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
-	__asm__ volatile ("lock\n\t"
-			  "decl %0"
+	__asm__ volatile ("lock; subl $1, %0"
 		       :: "m" (*atomic)  );
 #elif defined( __sun )
 	atomic_dec_32 (atomic);
