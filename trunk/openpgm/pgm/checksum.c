@@ -60,7 +60,7 @@ do_csum_8bit (
 		uint_fast16_t word16 = (*buf++) << 8;
 /* second byte as least significant */
 		word16 |= (*buf++);
-		acc += src;
+		acc += word16;
 		len -= 2;
 	}
 /* trailing odd byte */
@@ -100,7 +100,7 @@ do_csumcpy_8bit (
 		uint_fast16_t word16 = (*dst++ = *src++) << 8;
 /* second byte as least significant */
 		word16 |= (*dst++ = *src++);
-		acc += t;
+		acc += word16;
 		len -= 2;
 	}
 /* trailing odd byte */
@@ -195,7 +195,7 @@ do_csumcpy_16bit (
 /* empty buffer */
 	if (PGM_UNLIKELY(len == 0))
 		return (uint16_t)acc;
-	is_odd = ((uintptr_t)srcbuf & 1);
+	is_odd = ((uintptr_t)src & 1);
 /* align first byte */
 	if (PGM_UNLIKELY(is_odd)) {
 		((uint8_t*restrict)&remainder)[1] = *dst++ = *src++;
@@ -454,7 +454,7 @@ do_csumcpy_64bit (
 {
 	uint_fast64_t acc = csum;
 	const uint8_t* restrict src = (const uint8_t*restrict)srcaddr;
-	uint8_t* restrict dstbuf = (uint8_t*restrict)dstaddr;
+	uint8_t* restrict dst = (uint8_t*restrict)dstaddr;
 	uint16_t remainder = 0;
 	uint_fast16_t count;
 	bool is_odd;
@@ -472,7 +472,7 @@ do_csumcpy_64bit (
 	count = len >> 1;
 	if (count)
 	{
-		if ((uintptr_t)srcbuf & 2) {
+		if ((uintptr_t)src & 2) {
 			const uint_fast16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
 			acc += word16;
 			count--; len -= 2; src += 2; dst += 2;
@@ -481,7 +481,7 @@ do_csumcpy_64bit (
 		count >>= 1;
 		if (count)
 		{
-			if ((uintptr_t)srcbuf & 4) {
+			if ((uintptr_t)src & 4) {
 				const uint_fast32_t word32 = *(uint32_t*restrict)dst = *(const uint32_t*restrict)src;
 				acc += word32;
 				count--; len -= 4; src += 4; dst += 4;
@@ -549,7 +549,7 @@ do_csumcpy_64bit (
 	}
 /* trailing odd byte */
 	if (len & 1) {
-		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
+		((uint8_t*restrict)&remainder)[0] = *dst = *src;
 	}
 	acc += remainder;
 /* fold accumulator down to 16-bits */
@@ -686,7 +686,7 @@ do_csumcpy_vector (
 	count = len >> 1;
 	if (count)
 	{
-		if ((uintptr_t)srcbuf & 2) {
+		if ((uintptr_t)src & 2) {
 			const uint16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
 			acc += word16;
 			count--; len -= 2; src += 2; dst += 2;
