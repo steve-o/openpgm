@@ -16,10 +16,10 @@ OpenPGM C programs must link the appropriate library files.
 <td>All OpenPGM programs must use this link flag.</td>
 </tr><tr>
 <td><tt>-lm</tt></td>
-<td>Required for support of histogram math enabled via <tt>-DCONFIG_HISTOGRAMS</tt>.</td>
+<td>Required for support of histogram math enabled via <tt>-DUSE_HISTOGRAMS</tt>.</td>
 </tr><tr>
 <td><tt>-lrt</tt></td>
-<td>Required for <tt>clock_gettime()</tt> support.</td>
+<td>Required for <tt>clock_gettime()</tt> support.  No longer required with GLIBC 2.17+.</td>
 </tr><tr>
 <td><tt>-lresolv -lsocket -lnsl</tt></td>
 <td>Required for Solaris socket support.</td>
@@ -122,5 +122,3 @@ Library dependencies are automagically pulled in through the compilers support f
 <td><a href="http://miru.hk/wiki/msvc2010-libpath.png"><img src="http://miru.hk/wiki/320px-msvc2010-libpath.png"/><br/><br/><img align="right" src="http://miru.hk/wiki/magnify-clip.png"/></a>Additional Library Directories</td>
 </tr>
 </table>
-
-
