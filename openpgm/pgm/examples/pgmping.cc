@@ -772,10 +772,11 @@ on_startup (
 			g_error ("setting PGM_MULTICAST_HOPS = %d", multicast_hops);
 			goto err_abort;
 		}
+/* ToS only exists for IPv4 */
 		if (AF_INET6 != sa_family) {
+/* Some platforms require additional privilege for setting ToS */
 			if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_TOS, &dscp, sizeof(dscp))) {
-				g_error ("setting PGM_TOS = 0x%x", dscp);
-				goto err_abort;
+				g_warning ("setting PGM_TOS = 0x%x", dscp);
 			}
 		}
 		if (!pgm_setsockopt (g_sock, IPPROTO_PGM, PGM_NOBLOCK, &nonblocking, sizeof(nonblocking))) {
