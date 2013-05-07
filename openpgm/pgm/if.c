@@ -613,6 +613,26 @@ parse_interface (
 			check_ifname = TRUE;
 			break;
 
+#ifndef _WIN32
+/* Windows does not implement EAI_SYSTEM, everything is in the WSA domain.
+ * Ubuntu 13.04 returns EAI_SYSTEM+ENOENT on IPv4 whilst IPv6 on a non-
+ * capable network returns EAI_SYSTEM+ETIMEDOUT for dual-stack "wlan0".
+ */
+		case EAI_SYSTEM:
+			if (ENOENT == errno || ETIMEDOUT == errno) {
+				check_ifname = TRUE;
+			} else {
+				pgm_set_error (error,
+					     PGM_ERROR_DOMAIN_IF,
+					     pgm_error_from_eai_errno (eai, errno),
+					     _("Internet host resolution system error: %s(%d)"),
+					     pgm_strerror_s (errbuf, sizeof (errbuf), errno),
+					     errno);
+				return FALSE;
+			}
+			break;
+#endif
+
 		default:
 			pgm_set_error (error,
 				     PGM_ERROR_DOMAIN_IF,
