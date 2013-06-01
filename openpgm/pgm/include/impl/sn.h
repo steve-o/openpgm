@@ -1,6 +1,11 @@
 /* vim:ts=8:sts=4:sw=4:noai:noexpandtab
  * 
- * serial number arithmetic: rfc 1982
+ * Serial number arithmetic: rfc 1982.
+ *
+ * Note C99 spec 6.3.1.8p2 states that binary operator operands should
+ * be promoted to the larger size and preserve value.  Some C89 compilers
+ * however truncate high order bits and thus this code explicitly checks
+ * for expected result instead of trusting the compilers boolean cast.
  *
  * Copyright (c) 2006-2010 Miru Limited.
  *
