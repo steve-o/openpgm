@@ -990,7 +990,7 @@ _pgm_getadaptersaddresses (
 						prefixLength);
 					prefixLength = 128;
 				}
-				for (ULONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
+				for (LONG i = prefixLength, j = 0; i > 0; i -= 8, ++j)
 				{
 					((struct sockaddr_in6*)ift->_ifa.ifa_netmask)->sin6_addr.s6_addr[ j ] = i >= 8 ? 0xff : (ULONG)(( 0xffU << ( 8 - i ) ) & 0xffU );
 				}
