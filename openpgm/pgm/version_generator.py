@@ -6,14 +6,14 @@ import time
 
 build_date = time.strftime ("%Y-%m-%d")
 build_time = time.strftime ("%H:%M:%S")
-build_rev = filter (str.isdigit, "$Revision$")
+build_rev = ''.join (list (filter (str.isdigit, "$Revision$")))
 
-print """
+print ("""
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  * 
  * OpenPGM version.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Copyright (c) 2006-2014 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -41,15 +41,15 @@ print """
 
 const unsigned pgm_major_version = 5;
 const unsigned pgm_minor_version = 2;
-const unsigned pgm_micro_version = 125;
-const char* pgm_build_date = "%s";
-const char* pgm_build_time = "%s";
-const char* pgm_build_system = "%s";
-const char* pgm_build_machine = "%s";
-const char* pgm_build_revision = "%s";
+const unsigned pgm_micro_version = 126;
+const char* pgm_build_date = "{0}";
+const char* pgm_build_time = "{1}";
+const char* pgm_build_system = "{2}";
+const char* pgm_build_machine = "{3}";
+const char* pgm_build_revision = "{4}";
 
 
 /* eof */
-"""%(build_date, build_time, platform.system(), platform.machine(), build_rev)
+""".format (build_date, build_time, platform.system(), platform.machine(), build_rev))
 
 # end of file

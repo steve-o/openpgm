@@ -248,6 +248,22 @@ main ()
 	context.Result (result);
 	return result;
 
+def CheckStrErrorReturnsCharP (context):
+	context.Message ('Checking for whether strerror_r returns char *...');
+	source = """
+#include <string.h>
+int
+main ()
+{
+	char buf[100];
+	char x = *strerror_r (0, buf, sizeof (buf));
+	char *p = strerror_r (0, buf, sizeof (buf));
+	return !p || x;
+}
+	"""
+	result = context.TryRun (source, '.c');
+	context.Result (result[0]);
+	return result[0];
 
 def AutoConf (env):
 	settings = {};
@@ -264,7 +280,8 @@ def AutoConf (env):
 						'CheckIpLengthHostOrder': CheckIpLengthHostOrder,
 						'CheckIpOffsetHostOrder': CheckIpOffsetHostOrder,
 						'CheckTicketSpinlock': CheckTicketSpinlock,
-						'CheckDumbRwSpinlock': CheckDumbRwSpinlock
+						'CheckDumbRwSpinlock': CheckDumbRwSpinlock,
+						'CheckStrErrorReturnsCharP': CheckStrErrorReturnsCharP
 						 });
 	# AC_CHECK_FUNCS
 	settings['HAVE_CLOCK_GETTIME'] = conf.CheckFunc ('clock_gettime');
@@ -302,6 +319,9 @@ def AutoConf (env):
 	settings['USE_TICKET_SPINLOCK'] = conf.CheckTicketSpinlock();
 	settings['USE_DUMB_RWSPINLOCK'] = conf.CheckDumbRwSpinlock();
 	settings['HAVE_GETOPT'] = conf.CheckFunc ('getopt');
+	settings['HAVE_STRERROR_R'] = conf.CheckFunc ('strerror_r');
+	settings['STRERROR_R_CHAR_P'] = conf.CheckStrErrorReturnsCharP();
+	settings['HAVE_GNU_STRERROR_R'] = settings['STRERROR_R_CHAR_P'];
 
 	conf.CheckLibWithHeader ('pthread', 'pthread.h', 'c');
 	conf.CheckLib ( library='m', symbol='sqrt' );
