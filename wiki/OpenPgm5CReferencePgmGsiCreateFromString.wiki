@@ -31,7 +31,7 @@ Create a GSI based on MD5 of provided string.
 <td>Text string.</td>
 </tr><tr>
 <td><tt>length</tt></td>
-<td>Length of <tt>str</tt>, or 0 for NULL terminated string.</td>
+<td>Length of <tt>str</tt>, or -1 for NULL terminated string.</td>
 </tr>
 </table>
 
@@ -42,7 +42,7 @@ On success, <tt>true</tt> is returned.  On invalid parameters, <tt>false</tt> is
 === Example ===
 {{{
  pgm_gsi_t gsi;
- if (!pgm_gsi_create_from_string (&gsi, "29 Acacia Road", 0)) {
+ if (!pgm_gsi_create_from_string (&gsi, "29 Acacia Road", -1)) {
    fprintf (stderr, "Invalid parameters.\n");
    return EXIT_FAILURE;
  }
