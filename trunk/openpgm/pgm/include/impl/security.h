@@ -164,7 +164,7 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 {
 #if   defined( _CRT_SECURE_NO_WARNINGS )
 	if (0 != strerror_s (buffer, size, errnum))
-		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error %d"), errnum);
+		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error #%d"), errnum);
 	return buffer;
 #elif defined( _WIN32 )
 	pgm_strncpy_s (buffer, size, strerror (errnum), _TRUNCATE);
@@ -175,7 +175,7 @@ pgm_strerror_s (char *buffer, size_t size, int errnum)
 #else
 /* XSI-compliant */
 	if (0 != strerror_r (errnum, buffer, size))
-		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error %d"), errnum);
+		pgm_snprintf_s (buffer, size, _TRUNCATE, _("Unknown error #%d"), errnum);
 	return buffer;
 #endif
 }
