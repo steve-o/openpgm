@@ -1,8 +1,17 @@
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
  *
- * PGM checksum routines
+ * PGM checksum and checksum-copy routines.
  *
- * Copyright (c) 2006-2011 Miru Limited.
+ * Checksum performance is typically proportional to clock speed independent
+ * of chipset.  Counter to this memcpy() performance on Nehalem and newer 
+ * chipsets can be significantly more efficient per bit when running a 
+ * checksum-copy.
+ *
+ * TBD: Intel ADX enables acceleration of checksumming for instances such as
+ * IPoIB by multi-precision add-carry instruction extensions:
+ * https://lkml.org/lkml/2013/10/11/534
+ *
+ * Copyright (c) 2006-2014 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
