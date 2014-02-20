@@ -174,9 +174,10 @@ int
 main ()
 {
 #if defined( __APPLE__ ) || defined( __NetBSD__ ) || defined( __FreeBSD__ )
+	return 0;
+#else
 	fail fail fail
 #endif
-	return 0;
 }
 	"""
 	result = context.TryCompile (source, '.c');
