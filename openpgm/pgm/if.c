@@ -807,20 +807,9 @@ skip_inet_network:
 			if ((ir->ir_flags & IFF_LOOPBACK) || !(ir->ir_flags & IFF_MULTICAST))
 				continue;
 
-/* check for multiple interfaces */
-			if (interface_matches++) {
-				pgm_set_error (error,
-					     PGM_ERROR_DOMAIN_IF,
-					     PGM_ERROR_NOTUNIQ,
-					     _("Network interface name not unique %s%s%s"),
-					     ifname ? "\"" : "", ifname ? ifname : "(null)", ifname ? "\"" : "");
-				pgm_freeifaddrs (ifap);
-				return FALSE;
-			}
-
+			interface_matches++;
 			ir->ir_interface = ifindex;
 			pgm_strncpy_s (ir->ir_name, IF_NAMESIZE, ifa->ifa_name, _TRUNCATE);
-			memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 			continue;
 		}
 	}
@@ -1139,7 +1128,7 @@ parse_receive_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*   restrict	entity,		/* NULL terminated */
 	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
-	pgm_list_t**  restrict	recv_list,	/* <struct group_source_req*> */
+	pgm_list_t**  restrict	recv_list,	/* <struct pgm_group_source_req*> */
 	pgm_error_t** restrict	error
 	)
 {
@@ -1155,16 +1144,18 @@ parse_receive_entity (
 		(const void*)recv_list,
 		(const void*)error);
 
-	struct group_source_req* recv_gsr;
+	struct pgm_group_source_req* recv_gsr;
 	struct interface_req* primary_interface = (struct interface_req*)pgm_memdup ((*interface_list)->data, sizeof(struct interface_req));
 
 /* the empty entity */
 	if (NULL == entity)
 	{
 /* default receive object */
-		recv_gsr = pgm_new0 (struct group_source_req, 1);
+		recv_gsr = pgm_new0 (struct pgm_group_source_req, 1);
 		recv_gsr->gsr_interface = primary_interface->ir_interface;
 		recv_gsr->gsr_group.ss_family = family;
+		memcpy (&recv_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr *)&primary_interface->ir_addr));
+		
 
 /* track IPv6 scope from any resolved interface */
 		unsigned scope_id = 0;
@@ -1202,6 +1193,7 @@ parse_receive_entity (
 					}
 
 					recv_gsr->gsr_interface = ir.ir_interface;
+					memcpy (&recv_gsr->gsr_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
 					memcpy (&primary_interface->ir_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
 					scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
 				}
@@ -1211,6 +1203,7 @@ parse_receive_entity (
 /* use interface address family for multicast group */
 				recv_gsr->gsr_interface = primary_interface->ir_interface;
 				recv_gsr->gsr_group.ss_family = primary_interface->ir_addr.ss_family;
+				memcpy (&recv_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&primary_interface->ir_addr));
 				scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&primary_interface->ir_addr);
 			}
 		}
@@ -1238,6 +1231,7 @@ parse_receive_entity (
 				}
 
 				recv_gsr->gsr_interface = ir.ir_interface;
+				memcpy (&recv_gsr->gsr_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
 				scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
 			}
 		}
@@ -1282,9 +1276,10 @@ parse_receive_entity (
 	while (tokens && tokens[j])
 	{
 /* default receive object */
-		recv_gsr = pgm_new0 (struct group_source_req, 1);
+		recv_gsr = pgm_new0 (struct pgm_group_source_req, 1);
 		recv_gsr->gsr_interface = primary_interface->ir_interface;
 		recv_gsr->gsr_group.ss_family = family;
+		memcpy (&recv_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&primary_interface->ir_addr));
 
 		if (AF_UNSPEC == recv_gsr->gsr_group.ss_family)
 		{
@@ -1327,6 +1322,7 @@ parse_receive_entity (
 				}
 
 				recv_gsr->gsr_interface = ir.ir_interface;
+				memcpy (&recv_gsr->gsr_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
 				((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
 			}
 		}
@@ -1361,8 +1357,8 @@ parse_send_entity (
 	int			family,		/* AF_UNSPEC | AF_INET | AF_INET6 */
 	const char*   restrict	entity,		/* null = empty entity */
 	pgm_list_t**  restrict	interface_list,	/* <struct interface_req*> */
-	pgm_list_t**  restrict	recv_list,	/* <struct group_source_req*> */
-	pgm_list_t**  restrict	send_list,	/* <struct group_source_req*> */
+	pgm_list_t**  restrict	recv_list,	/* <struct pgm_group_source_req*> */
+	pgm_list_t**  restrict	send_list,	/* <struct pgm_group_source_req*> */
 	pgm_error_t** restrict	error
 	)
 {
@@ -1381,19 +1377,20 @@ parse_send_entity (
 		(const void*)send_list,
 		(const void*)error);
 
-	struct group_source_req* send_gsr;
+	struct pgm_group_source_req* send_gsr;
 	const struct interface_req* primary_interface = (struct interface_req*)(*interface_list)->data;
 
 	if (entity == NULL)
 	{
-		send_gsr = pgm_memdup ((*recv_list)->data, sizeof(struct group_source_req));
+		send_gsr = pgm_memdup ((*recv_list)->data, sizeof(struct pgm_group_source_req));
 		*send_list = pgm_list_append (*send_list, send_gsr);
 		return TRUE;
 	}
 
 /* default send object */
-	send_gsr = pgm_new0 (struct group_source_req, 1);
+	send_gsr = pgm_new0 (struct pgm_group_source_req, 1);
 	send_gsr->gsr_interface = primary_interface->ir_interface;
+	memcpy (&send_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&primary_interface->ir_addr));
 	if (!parse_group (family, entity, (struct sockaddr*)&send_gsr->gsr_group, error))
 	{
 		pgm_prefix_error (error,
@@ -1420,6 +1417,7 @@ parse_send_entity (
 
 			send_gsr->gsr_interface = ir.ir_interface;
 			((struct sockaddr_in6*)&send_gsr->gsr_group)->sin6_scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
+			memcpy (&send_gsr->gsr_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
 		}
 	}
 
@@ -1499,8 +1497,8 @@ bool
 network_parse (
 	const char*   restrict	network,		/* NULL terminated */
 	int			family,			/* AF_UNSPEC | AF_INET | AF_INET6 */
-	pgm_list_t**  restrict	recv_list,		/* <struct group_source_req*> */
-	pgm_list_t**  restrict	send_list,		/* <struct group_source_req*> */
+	pgm_list_t**  restrict	recv_list,		/* <struct pgm_group_source_req*> */
+	pgm_list_t**  restrict	send_list,		/* <struct pgm_group_source_req*> */
 	pgm_error_t** restrict	error
 	)
 {
@@ -1734,7 +1732,7 @@ free_lists:
 	return FALSE;
 }
 
-/* create group_source_req as used by pgm_transport_create which specify port, address & interface.
+/* create pgm_group_source_req as used by pgm_transport_create which specify port, address & interface.
  * gsr_source is copied from gsr_group for ASM, caller needs to populate gsr_source for SSM.
  *
  * returns TRUE on success, returns FALSE on error and sets error appropriately.
@@ -1750,8 +1748,8 @@ pgm_getaddrinfo (
 {
 	struct pgm_addrinfo_t* ai;
 	const int family = hints ? hints->ai_family : AF_UNSPEC;
-	pgm_list_t* recv_list = NULL;	/* <struct group_source_req*> */
-	pgm_list_t* send_list = NULL;	/* <struct group_source_req*> */
+	pgm_list_t* recv_list = NULL;	/* <struct pgm_group_source_req*> */
+	pgm_list_t* send_list = NULL;	/* <struct pgm_group_source_req*> */
 
 	pgm_return_val_if_fail (NULL != network, FALSE);
 	pgm_return_val_if_fail (AF_UNSPEC == family || AF_INET == family || AF_INET6 == family, FALSE);
@@ -1776,21 +1774,21 @@ pgm_getaddrinfo (
 	const size_t recv_list_len = pgm_list_length (recv_list);
 	const size_t send_list_len = pgm_list_length (send_list);
 	ai = pgm_malloc0 (sizeof(struct pgm_addrinfo_t) + 
-			 (recv_list_len + send_list_len) * sizeof(struct group_source_req));
+			 (recv_list_len + send_list_len) * sizeof(struct pgm_group_source_req));
 	ai->ai_recv_addrs_len = (uint32_t)recv_list_len;
 	ai->ai_recv_addrs = (void*)((char*)ai + sizeof(struct pgm_addrinfo_t));
 	ai->ai_send_addrs_len = (uint32_t)send_list_len;
-	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct group_source_req));
+	ai->ai_send_addrs = (void*)((char*)ai->ai_recv_addrs + recv_list_len * sizeof(struct pgm_group_source_req));
 
 	size_t i = 0;
 	while (recv_list) {
-		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct group_source_req));
+		memcpy (&ai->ai_recv_addrs[i++], recv_list->data, sizeof(struct pgm_group_source_req));
 		pgm_free (recv_list->data);
 		recv_list = pgm_list_delete_link (recv_list, recv_list);
 	}
 	i = 0;
 	while (send_list) {
-		memcpy (&ai->ai_send_addrs[i++], send_list->data, sizeof(struct group_source_req));
+		memcpy (&ai->ai_send_addrs[i++], send_list->data, sizeof(struct pgm_group_source_req));
 		pgm_free (send_list->data);
 		send_list = pgm_list_delete_link (send_list, send_list);
 	}

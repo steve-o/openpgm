@@ -2166,7 +2166,9 @@ pgm_bind3 (
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Binding receive socket to IN6ADDR_ANY"));
 	}
 #else
-	if (!pgm_if_indextoaddr (recv_req->ir_interface,
+	if (recv_req->ir_address.ss_family != AF_UNSPEC)
+		memcpy(&recv_addr, &recv_req->ir_address, pgm_sockaddr_len (recv_req->ir_address));
+	else if (!pgm_if_indextoaddr (recv_req->ir_interface,
 			         sock->family,
 				 recv_req->ir_scope_id,
 			         &recv_addr.sa,
@@ -2221,7 +2223,9 @@ pgm_bind3 (
 /* keep a copy of the original address source to re-use for router alert bind */
 	memset (&send_addr, 0, sizeof(send_addr));
 
-	if (!pgm_if_indextoaddr (send_req->ir_interface,
+	if (send_req->ir_address.ss_family != AF_UNSPEC)
+		memcpy(&send_addr, &send_req->ir_address, pgm_sockaddr_len ((struct sockaddr *)&send_req->ir_address));
+	else if (!pgm_if_indextoaddr (send_req->ir_interface,
 				 sock->family,
 				 send_req->ir_scope_id,
 				 (struct sockaddr*)&send_addr,
