@@ -18,7 +18,12 @@ available at www.ietf.org.
 %package devel
 Summary:  Development files and static library for the OpenPGM library
 Group:    Development/Libraries
-Requires: %{name} = %{version}-%{release}, pkgconfig
+Requires: %{name} = %{version}-%{release}
+%ifos aix5.2 || %ifos aix5.3 || %ifos aix6.1 || %ifos aix7.1
+Requires: pkg-config
+%else
+Requires: pkgconfig
+%endif
 
 %description devel
 OpenPGM is an open source implementation of the 
@@ -41,10 +46,14 @@ This package contains OpenPGM related development libraries and header files.
 %makeinstall
 
 %post
+%ifos linux
 /sbin/ldconfig
+%endif
 
 %postun
+%ifos linux
 /sbin/ldconfig
+%endif
 
 %clean
 [ "%{buildroot}" != "/" ] && %{__rm} -rf %{buildroot}
@@ -53,8 +62,13 @@ This package contains OpenPGM related development libraries and header files.
 %defattr(-,root,root,-)
 
 # libraries
+%ifos aix5.2 || %ifos aix5.3 || %ifos aix6.1 || %ifos aix7.1
+%{_libdir}/libpgm.a
+%{_libdir}/libpgm-@RELEASE_INFO@.a
+%else
 %{_libdir}/libpgm-@RELEASE_INFO@.so.0
 %{_libdir}/libpgm-@RELEASE_INFO@.so.0.0.@VERSION_MICRO@
+%endif
 
 %files devel
 %defattr(-,root,root,-)
@@ -81,11 +95,18 @@ This package contains OpenPGM related development libraries and header files.
 %{_includedir}/pgm-@RELEASE_INFO@/pgm/wininttypes.h
 %{_includedir}/pgm-@RELEASE_INFO@/pgm/zinttypes.h
 
+%ifos aix5.2 || %ifos aix5.3 || %ifos aix6.1 || %ifos aix7.1
+%{_libdir}/libpgm.la
+%else
 %{_libdir}/libpgm.a
 %{_libdir}/libpgm.la
 %{_libdir}/libpgm.so
+%endif
 %{_libdir}/pkgconfig/openpgm-@RELEASE_INFO@.pc
 
 %changelog
+* Thu Sep 12 2013 Jim Hague <jim.hague@acm.org>
+- Adapting for AIX
+
 * Fri Apr 8 2011 Mikko Koppanen <mikko@kuut.io> 5.1.116-1
 - Initial packaging

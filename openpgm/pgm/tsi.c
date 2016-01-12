@@ -112,7 +112,7 @@ pgm_tsi_equal (
 		pgm_tsi_t	tsi;
 		uint32_t	l[2];
 		uint64_t	ll;
-	} *restrict u1 = p1, *restrict u2 = p2;
+	} *u1 = p1, *u2 = p2;
 
 /* pre-conditions */
 	pgm_assert (NULL != p1);

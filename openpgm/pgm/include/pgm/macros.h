@@ -35,7 +35,7 @@
  * http://gcc.gnu.org/onlinedocs/gcc/Function-Attributes.html
  */
 
-#if !defined(__APPLE__) && ((__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96))
+#if !defined(__APPLE__) && !defined(_AIX) && ((__GNUC__ > 2) || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96))
 
 /* No side-effects except return value, may follow pointers and read globals */
 #	define PGM_GNUC_PURE			__attribute__((__pure__))
