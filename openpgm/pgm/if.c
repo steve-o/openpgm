@@ -31,6 +31,9 @@
 #include <ctype.h>
 #include <stdio.h>
 #ifndef _WIN32
+#ifdef _AIX
+#       define IP_MULTICAST
+#endif
 #	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <netdb.h>		/* _GNU_SOURCE for EAI_NODATA */
@@ -63,7 +66,11 @@ struct interface_req {
 #endif
 
 /* ff08::1 */
+#ifdef _AIX
+#define IF6_DEFAULT_INIT { { .u6_addr8 = { 0xff,8,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
+#else
 #define IF6_DEFAULT_INIT { { { 0xff,8,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
+#endif
 const struct in6_addr if6_default_group_addr = IF6_DEFAULT_INIT;
 
 

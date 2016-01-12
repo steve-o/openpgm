@@ -33,6 +33,8 @@
 
 #if defined( __sun )
 #	include <atomic.h>
+#elif defined( _AIX ) && ( !defined( __GNUC__ ) ||  (__GNUC__ * 100 + __GNUC_MINOR__ < 401 ))
+#	include <sys/atomic_op.h>
 #elif defined( __APPLE__ )
 #	include <libkern/OSAtomic.h>
 #elif defined( _MSC_VER )
@@ -81,6 +83,8 @@ pgm_atomic_exchange_and_add32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 /* GCC 4.0.1 intrinsic */
 	return __sync_fetch_and_add (atomic, val);
+#elif defined( _AIX )
+	return fetch_and_add((atomic_p)atomic, val);
 #elif defined( _WIN32 )
 /* Windows intrinsic */
 	return _InterlockedExchangeAdd ((volatile LONG*)atomic, val);
@@ -116,6 +120,8 @@ pgm_atomic_add32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 /* interchangable with __sync_fetch_and_add () */
 	__sync_add_and_fetch (atomic, val);
+#elif defined( _AIX )
+	fetch_and_add((atomic_p)atomic, val);
 #elif defined( _WIN32 )
 	_InterlockedExchangeAdd ((volatile LONG*)atomic, val);
 #endif
@@ -152,6 +158,8 @@ pgm_atomic_inc32 (
 	OSAtomicIncrement32Barrier ((volatile int32_t*)atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, 1);
+#elif defined( _AIX )
+	fetch_and_add((atomic_p)atomic, 1);
 #elif defined( _WIN32 )
 	_InterlockedIncrement ((volatile LONG*)atomic);
 #endif
@@ -182,6 +190,8 @@ pgm_atomic_dec32 (
 	OSAtomicDecrement32Barrier ((volatile int32_t*)atomic);
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 	pgm_atomic_add32 (atomic, (uint32_t)-1);
+#elif defined( _AIX )
+	fetch_and_add((atomic_p)atomic, -1);
 #elif defined( _WIN32 )
 	_InterlockedDecrement ((volatile LONG*)atomic);
 #endif

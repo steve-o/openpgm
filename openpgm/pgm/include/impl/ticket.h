@@ -36,6 +36,8 @@ typedef union pgm_ticket_t pgm_ticket_t;
 
 #if defined( __sun )
 #	include <atomic.h>
+#elif defined( _AIX ) && ( !defined( __GNUC__ ) ||  (__GNUC__ * 100 + __GNUC_MINOR__ < 401 ))
+#	include <sys/atomic_op.h>
 #elif defined( __APPLE__ )
 #	include <libkern/OSAtomic.h>
 #elif defined( _WIN32 )
@@ -83,7 +85,7 @@ union pgm_ticket_t {
 #define pgm_tkt_ticket	pgm_un.pgm_un_ticket
 #define pgm_tkt_user	pgm_un.pgm_un_user
 
-#if (defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )
+#if ((defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )) || defined(__xlc__) || defined(__xlC__)
 #	pragma pack(pop)
 #else
 #	pragma pack()
@@ -138,6 +140,8 @@ pgm_atomic_compare_and_exchange32 (
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 /* GCC 4.0.1 intrinsic */
 	return __sync_bool_compare_and_swap (atomic, oldval, newval);
+#elif defined( _AIX )
+	return compare_and_swap ((int *)atomic, (int *)&oldval, newval);
 #elif defined( _WIN32 )
 /* Windows intrinsic */
 	const uint32_t original = _InterlockedCompareExchange ((volatile LONG*)atomic, newval, oldval);
@@ -215,6 +219,8 @@ pgm_atomic_add16 (
 	__sync_add_and_fetch (atomic, val);
 #	elif defined( __APPLE__ )
 #		error "There is no OSAtomicAdd16Barrier() on Darwin."
+#	elif defined( _AIX )
+	fetch_and_add_h((atomic_h)atomic, val);
 #	elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
 	_ReadWriteBarrier();
@@ -258,6 +264,8 @@ pgm_atomic_fetch_and_add16 (
 	return __sync_fetch_and_add (atomic, val);
 #	elif defined( __APPLE__ )
 #		error "There is no OSAtomicAdd16Barrier() on Darwin."
+#	elif defined( _AIX )
+	return fetch_and_add_h((atomic_h)atomic, val);
 #	elif defined( _WIN32 )
 /* there is no _InterlockedExchangeAdd16() */
 	uint16_t result;

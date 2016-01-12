@@ -28,6 +28,10 @@
 #endif
 #include <errno.h>
 #ifndef _WIN32
+#ifdef _AIX
+#   define IP_MULTICAST
+#   define _USE_IRS
+#endif
 #	include <netdb.h>
 #endif
 #include <impl/i18n.h>
