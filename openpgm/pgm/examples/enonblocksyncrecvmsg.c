@@ -293,12 +293,7 @@ on_startup (void)
 	struct pgm_interface_req_t if_req;
 	memset (&if_req, 0, sizeof(if_req));
 	if_req.ir_interface = res->ai_recv_addrs[0].gsr_interface;
-	if_req.ir_scope_id  = 0;
-	if (AF_INET6 == sa_family) {
-		struct sockaddr_in6 sa6;
-		memcpy (&sa6, &res->ai_recv_addrs[0].gsr_group, sizeof(sa6));
-		if_req.ir_scope_id = sa6.sin6_scope_id;
-	}
+	memcpy (&if_req.ir_address, &res->ai_send_addrs[0].gsr_addr, sizeof(struct sockaddr_storage));
 	if (!pgm_bind3 (g_sock,
 			&addr, sizeof(addr),
 			&if_req, sizeof(if_req),	/* tx interface */

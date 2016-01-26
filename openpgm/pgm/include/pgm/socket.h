@@ -55,15 +55,26 @@ struct pgm_sockaddr_t {
 struct pgm_addrinfo_t {
 	sa_family_t				ai_family;
 	uint32_t				ai_recv_addrs_len;
-	struct group_source_req* restrict	ai_recv_addrs;
+	struct pgm_group_source_req* restrict	ai_recv_addrs;
 	uint32_t				ai_send_addrs_len;
-	struct group_source_req* restrict	ai_send_addrs;
+	struct pgm_group_source_req* restrict	ai_send_addrs;
+};
+
+struct pgm_group_source_req
+{
+	uint32_t		gsr_interface;	/* interface index */
+	struct sockaddr_storage	gsr_group;	/* group address */
+	struct sockaddr_storage	gsr_source;	/* group source */
+	struct sockaddr_storage	gsr_addr;	/* interface address */
 };
 
 struct pgm_interface_req_t {
 	uint32_t				ir_interface;
 	uint32_t				ir_scope_id;
+	struct sockaddr_storage			ir_address;
 };
+
+#define	PGM_HAS_IR_ADDRESS	1
 
 struct pgm_fecinfo_t {
 	uint8_t					block_size;
