@@ -37,6 +37,9 @@ struct pgm_fecinto_t;
 #	include <sys/epoll.h>
 #endif
 #ifndef _WIN32
+#ifdef _AIX
+#   define IP_MULTICAST
+#endif
 #	include <sys/select.h>
 #	include <sys/socket.h>
 #endif

@@ -4,6 +4,7 @@
 #  Ubuntu 10 : v2.65
 #   OSX 10.6 : v2.61
 # Solaris 10 : v2.59
+#        AIX : v2.69
 AC_PREREQ([2.61])
 AC_INIT([OpenPGM], [m4_esyscmd([perl version.pl %major.%minor.%micro])], [openpgm-dev@googlegroups.com], [openpgm], [http://code.google.com/p/openpgm/])
 AC_CONFIG_SRCDIR([reed_solomon.c])
@@ -26,6 +27,7 @@ AC_SUBST([VERSION_MICRO], [m4_esyscmd([perl version.pl %micro])])
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C99
+AM_PROG_AS
 AC_PROG_LIBTOOL
 AC_PATH_PROG(PERL, perl)
 AC_PATH_PROG(PYTHON, python)
@@ -40,6 +42,7 @@ AC_SUBST(PYTHON)
 # Apply system specific rules.
 AC_CANONICAL_HOST
 CFLAGS="$CFLAGS -D_REENTRANT"
+AM_CONDITIONAL([AIX_XLC], [false])
 case "$host_os" in
 linux*)
 	CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_BSD_SOURCE"
@@ -51,6 +54,12 @@ solaris*)
 	AC_SEARCH_LIBS([inet_aton], [resolv])
 	AC_SEARCH_LIBS([kstat_open], [kstat])
 	;;
+aix*)
+	if test "x$GCC" != "xyes"; then
+		AM_CONDITIONAL([AIX_XLC], [true])
+		CCASFLAGS="$CCASFLAGS -qarch=ppc"
+	fi
+        ;;
 *)
 	;;
 esac
@@ -86,9 +95,7 @@ AC_TYPE_UINT8_T
 # Checks for library functions.
 # TODO: gettext() fails out-of-the-box from AutoConf.
 #AM_GNU_GETTEXT
-AC_FUNC_MALLOC
 AC_FUNC_MMAP
-AC_FUNC_REALLOC
 AC_FUNC_STRERROR_R
 AC_CHECK_FUNCS([atexit clock_gettime floor ftime gethostbyaddr gethostbyname gethostname gettimeofday inet_ntoa memmove memset regcomp select setenv setlocale socket sqrt stpcpy strcasecmp strchr strdup strerror strncasecmp strpbrk strrchr strstr strtol strtoul strtoull])
 
@@ -100,6 +107,26 @@ AC_COMPILE_IFELSE(
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DHAVE_PTHREAD_SPINLOCK"],
 	[AC_MSG_RESULT([no])])
+# sa_len struct sockaddr?
+AC_MSG_CHECKING([for sa_len member in struct sockaddr])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[#include <sys/types.h>
+#include <sys/socket.h>]],			\
+		[[struct sockaddr sa;
+		  sa.sa_len = 0;]])],
+	[AC_MSG_RESULT([yes])
+		CFLAGS="$CFLAGS -DHAVE_SOCKADDR_SA_LEN"],
+	[AC_MSG_RESULT([no])])
+# __ss_family and __ss_len in struct sockaddr_storage?
+AC_MSG_CHECKING([for __ss_family member in struct sockaddr_storage])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[#include <sys/socket.h>]],
+		[[struct sockaddr_storage s;
+		  s.__ss_family = 0;]])],
+	[AC_MSG_RESULT([yes])
+		AC_DEFINE_UNQUOTED(ss_family, __ss_family,
+				   [For systems that have __ss_family as member of 'struct sockaddr_storage'])],
+	[AC_MSG_RESULT([no])])
 # NSS protocol lookup
 AC_CHECK_FUNCS([getprotobyname_r])
 if test "x$ac_cv_func_getprotobyname_r" = "xyes"; then
@@ -109,6 +136,13 @@ AC_COMPILE_IFELSE(
 		[[struct protoent *pe = getprotobyname_r ((const char*)0, (struct protoent*)0, (char*)0, (int)0);]])],
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DGETPROTOBYNAME_R_STRUCT_PROTOENT_P"],
+	[AC_MSG_RESULT([no])])
+AC_MSG_CHECKING([whether getprotobyname_r takes 3 parameters])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM([[#include <netdb.h>]],
+		[[getprotobyname_r ((const char*)0, (struct protoent*)0, (struct protoent_data*)0);]])],
+	[AC_MSG_RESULT([yes])
+		CFLAGS="$CFLAGS -DHAVE_GETPROTOBYNAME_R3"],
 	[AC_MSG_RESULT([no])])
 fi
 # NSS networks lookup, IPv4 only
@@ -149,14 +183,15 @@ AC_CHECK_FUNCS([pselect])
 AC_CHECK_FILES([/dev/rtc])
 AC_MSG_CHECKING([for RDTSC instruction])
 case "$host_os" in
-darwin*)
+darwin* | aix*)
 	AC_MSG_RESULT([no])
 	;;
 *)
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM(,[[unsigned long lo, hi;
 __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));]])],
-	[AC_MSG_RESULT([yes])
+:1
+[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DHAVE_RDTSC"],
 	[AC_MSG_RESULT([no])])
 	;;
@@ -292,6 +327,8 @@ AC_COMPILE_IFELSE(
 /* GCC assembler */
 #elif defined( __sun )
 /* Solaris intrinsic */
+#elif defined( _AIX )
+/* AIX intrinsic */
 #elif defined( __APPLE__ )
 /* Darwin intrinsic */
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )

@@ -42,6 +42,9 @@
 #if defined( __sun )
 #	include <sys/sockio.h>
 #endif
+#if defined( _AIX )
+#	include <sys/ioctl.h>
+#endif
 #if defined( _WIN32 )
 #	include <ws2tcpip.h>
 #	include <iphlpapi.h>		/* must be after Winsock2.h on early SDKs */
@@ -350,7 +353,6 @@ _pgm_getifaddrs (
 		return FALSE;
 	}
 
-/* process IPv4 interfaces */
 	char buf[ DEFAULT_BUFFER_SIZE ];
 	struct ifconf ifc;
 	ifc.ifc_buf = buf;
@@ -405,6 +407,7 @@ _pgm_getifaddrs (
 /* alloc a contiguous block for entire list */
 	struct _pgm_ifaddrs_t* ifa = pgm_new0 (struct _pgm_ifaddrs_t, if_count);
 	struct _pgm_ifaddrs_t* ift = ifa;
+	struct _pgm_ifaddrs_t* ift_prev = NULL;
 	struct ifreq *ifr  = ifc.ifc_req;
 	struct ifreq *ifr_end = (struct ifreq *)&ifc.ifc_buf[ifc.ifc_len];
 
@@ -412,98 +415,68 @@ _pgm_getifaddrs (
 
 	while (ifr < ifr_end)
 	{
-/* name */
-		pgm_debug ("AF_INET/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
-		ift->_ifa.ifa_name = ift->_name;
-		pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, ifr->ifr_name, _TRUNCATE);
+#ifdef HAVE_SOCKADDR_SA_LEN
+		size_t inc = sizeof(struct ifreq);
+		if ( ifr->ifr_addr.sa_len > sizeof(ifr->ifr_addr) )
+			inc += ifr->ifr_addr.sa_len - sizeof(ifr->ifr_addr);
+#endif
 
-/* flags */
-		if (SOCKET_ERROR != ioctlsocket (sock, SIOCGIFFLAGS, ifr)) {
-			ift->_ifa.ifa_flags = ifr->ifr_flags;
-		} else {
-			pgm_warn (_("SIOCGIFFLAGS failed on interface %s%s%s"),
-				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
-		}
+		if ( ifr->ifr_addr.sa_family == AF_INET ||
+		     ifr->ifr_addr.sa_family == AF_INET6 ) {
+#	ifdef HAVE_IPV6_SIOCGIFADDR
+			SOCKET s = (ifr->ifr_addr.sa_family == AF_INET) ? sock : sock6;
+#else
+			SOCKET s = sock;
+#endif
+
+/* name */
+			pgm_debug ("AF_INET%s/name:%s",
+				   ifr->ifr_addr.sa_family == AF_INET6 ? "6" : "",
+				   ifr->ifr_name ? ifr->ifr_name : "(null)");
+			ift->_ifa.ifa_name = ift->_name;
+			pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, ifr->ifr_name, _TRUNCATE);
 
 /* address */
-		if (SOCKET_ERROR != ioctlsocket (sock, SIOCGIFADDR, ifr)) {
 			ift->_ifa.ifa_addr = (void*)&ift->_addr;
 			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
-		} else {
-			pgm_warn (_("SIOCGIFADDR failed on interface %s%s%s"),
-				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
-		}
-
-/* netmask */
-		if (SOCKET_ERROR != ioctlsocket (sock, SIOCGIFNETMASK, ifr)) {
-			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
-#	ifdef HAVE_STRUCT_IFADDRS_IFR_NETMASK
-			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
-#	else
-			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
-#	endif
-		} else {
-			pgm_warn (_("SIOCGIFNETMASK failed on interface %s%s%s"),
-				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
-		}
-
-		++ifr;
-		if (ifr < ifr_end) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
-		}
-	}
-
-#	ifdef HAVE_IPV6_SIOCGIFADDR
-/* repeat everything for IPv6 */
-	ifr  = ifc6.ifc_req;
-	ifr_end = (struct ifreq *)&ifc6.ifc_buf[ifc6.ifc_len];
-
-	while (ifr < ifr_end)
-	{
-		if (ift != ifa) {
-			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
-			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
-		}
-
-/* name */
-		pgm_debug ("AF_INET6/name:%s", ifr->ifr_name ? ifr->ifr_name : "(null)");
-		ift->_ifa.ifa_name = ift->_name;
-		pgm_strncpy_s (ift->_ifa.ifa_name, IF_NAMESIZE, ifr->ifr_name, _TRUNCATE);
 
 /* flags */
-		if (SOCKET_ERROR != ioctlsocket (sock6, SIOCGIFFLAGS, ifr)) {
-			ift->_ifa.ifa_flags = ifr->ifr_flags;
-		} else {
-			pgm_warn (_("SIOCGIFFLAGS failed on interface %s%s%s"),
-				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
-		}
-
-/* address, note this does not work on Linux as struct ifreq is too small for an IPv6 address */
-		if (SOCKET_ERROR != ioctlsocket (sock6, SIOCGIFADDR, ifr)) {
-			ift->_ifa.ifa_addr = (void*)&ift->_addr;
-			memcpy (ift->_ifa.ifa_addr, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
-		} else {
-			pgm_warn (_("SIOCGIFADDR failed on interface %s%s%s"),
-				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
-		}
+			if (SOCKET_ERROR != ioctlsocket (s, SIOCGIFFLAGS, ifr)) {
+				ift->_ifa.ifa_flags = ifr->ifr_flags;
+			} else {
+				pgm_warn (_("SIOCGIFFLAGS failed on interface %s%s%s"),
+					  ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
+			}
 
 /* netmask */
-		if (SOCKET_ERROR != ioctlsocket (sock6, SIOCGIFNETMASK, ifr)) {
-			ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
-#		ifdef HAVE_STRUCT_IFADDRS_IFR_NETMASK
-			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
-#		else
-			memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
-#		endif
-		} else {
-			pgm_warn (_("SIOCGIFNETMASK failed on interface %s%s%s"),
-				ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
+			if (SOCKET_ERROR != ioctlsocket (s, SIOCGIFNETMASK, ifr)) {
+				ift->_ifa.ifa_netmask = (void*)&ift->_netmask;
+#	ifdef HAVE_STRUCT_IFADDRS_IFR_NETMASK
+				memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_netmask, pgm_sockaddr_len(&ifr->ifr_netmask));
+#	else
+				memcpy (ift->_ifa.ifa_netmask, &ifr->ifr_addr, pgm_sockaddr_len(&ifr->ifr_addr));
+#	endif
+			} else {
+				pgm_warn (_("SIOCGIFNETMASK failed on interface %s%s%s"),
+					  ifr->ifr_name ? "\"" : "", ifr->ifr_name ? ifr->ifr_name : "(null)", ifr->ifr_name ? "\"" : "");
+			}
+
+			ift_prev = ift;
+			ift->_ifa.ifa_next = (struct pgm_ifaddrs_t*)(ift + 1);
+			ift = (struct _pgm_ifaddrs_t*)(ift->_ifa.ifa_next);
 		}
 
+#ifdef HAVE_SOCKADDR_SA_LEN
+		ifr = (struct ifreq *)((char *)ifr + inc);
+#else
 		++ifr;
+#endif
 	}
 
+	if ( ift_prev )
+		ift_prev->_ifa.ifa_next = NULL;
+
+#	ifdef HAVE_IPV6_SIOCGIFADDR
 	if (SOCKET_ERROR == closesocket (sock6)) {
 		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];

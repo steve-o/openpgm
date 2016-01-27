@@ -54,6 +54,10 @@ libpgm_noinst_la_SOURCES = \
 	histogram.c \
 	version.c
 
+if AIX_XLC
+libpgm_noinst_la_SOURCES += fetch_and_add_h.s
+endif
+
 share_includedir = $(includedir)/pgm-@RELEASE_INFO@/pgm
 share_include_HEADERS = \
 	include/pgm/atomic.h \

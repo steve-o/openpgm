@@ -104,6 +104,9 @@ pgm_sockaddr_len (
 	const struct sockaddr*	sa
 	)
 {
+#ifdef HAVE_SOCKADDR_SA_LEN
+	return MAX(sa->sa_len, sizeof(struct sockaddr));
+#else
 	socklen_t sa_len;
 	switch (sa->sa_family) {
 	case AF_INET:	sa_len = sizeof(struct sockaddr_in); break;
@@ -111,6 +114,7 @@ pgm_sockaddr_len (
 	default:	sa_len = 0; break;
 	}
 	return sa_len;
+#endif /* HAVE_SOCKADDR_SA_LEN */
 }
 
 PGM_GNUC_INTERNAL

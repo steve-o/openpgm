@@ -295,7 +295,7 @@ pgm_str_equal (
 	const void* restrict p2
 	)
 {
-	const char *restrict s1 = p1, *restrict s2 = p2;
+	const char *s1 = p1, *s2 = p2;
 	return (strcmp (s1, s2) == 0);
 }
 
