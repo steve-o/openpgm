@@ -142,7 +142,7 @@ struct pgm_udphdr
 
 PGM_STATIC_ASSERT(sizeof(struct pgm_udphdr) == 8);
 
-#if (defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )
+#if ((defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )) || defined (__xlc__) || defined(__xlC__)
 #	pragma pack(pop)
 #else
 #	pragma pack()

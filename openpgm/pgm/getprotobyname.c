@@ -59,6 +59,12 @@ _pgm_native_getprotobyname (
 	struct protoent protobuf;
 	if (NULL == (pe = getprotobyname_r (name, &protobuf, buf, BUFSIZ)))
 		return NULL;
+#elif defined(HAVE_GETPROTOBYNAME_R3)
+	struct protoent protobuf;
+	struct protoent_data protodata;
+	if (0 != getprotobyname_r (name, &protobuf, &protodata))
+		return NULL;
+	pe = &protobuf;
 #elif defined( HAVE_GETPROTOBYNAME_R )
 	char buf[BUFSIZ];
 	struct protoent protobuf;
@@ -83,6 +89,9 @@ _pgm_native_getprotobyname (
 	}
 	*q = NULL;
 	proto.p_proto = pe->p_proto;
+#if defined(HAVE_GETPROTOBYNAME_R3)
+	endprotoent_r(&protodata);
+#endif /* HAVE_GETPROTOBYNAME_R3 */
 	return &proto;
 }
 

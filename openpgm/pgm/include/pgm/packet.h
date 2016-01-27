@@ -28,7 +28,13 @@
 #ifndef _WIN32
 #	include <sys/socket.h>
 #	include <netinet/in.h>
+#ifdef _AIX
+#define	_IP_FIRSTFOUR_ONLY
+#endif
 #	include <netinet/ip.h>
+#ifdef _AIX
+#undef	_IP_FIRSTFOUR_ONLY
+#endif
 #endif
 #include <pgm/types.h>
 
@@ -445,7 +451,7 @@ struct pgm_opt6_path_nla {
 };
 
 
-#if (defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )
+#if ((defined( __GNUC__ ) && ( __GNUC__ >= 4 )) && !defined( __sun ) && !defined( __CYGWIN__ )) || defined( __xlc__ ) || defined( __xlC__ )
 #	pragma pack(pop)
 #else
 #	pragma pack()
