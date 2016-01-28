@@ -33,7 +33,7 @@
 #endif
 #include <impl/framework.h>
 
-#ifdef USE_SIMD_CHECKSUM
+#ifdef __SSE2__
 #	include <x86intrin.h>
 #endif
 
@@ -828,11 +828,24 @@ do_csum_simd (
 	}
 /* 128-bit, 16-byte stride */
 	count16 = len >> 4;
-	__m128i sum = _mm_setzero_si128();
+	const __m128i zero = _mm_setzero_si128();
+	__m128i sum = zero;
 	while (count16--) {
 		__m128i tmp = _mm_load_si128((const __m128i*)buf);			// load 128-bit blob
-		__m128i lo = _mm_unpacklo_epi16 (tmp, _mm_setzero_si128());
-		__m128i hi = _mm_unpackhi_epi16 (tmp, _mm_setzero_si128());
+
+/* marginal gain with zero constant over _mm_setzero_si128(), however there is no _mm_cvtepu16_epi32
+ * that operates on the high 64-bits of tmp.  Note that adding SSE calls will only make performance
+ * worse, i.e. the following is slower:
+ *
+ * __m128i hi = _mm_cvtepu16_epi32 (_mm_srli_si128 (tmp, 8));
+ */
+#ifdef __SSE4_2__
+		__m128i lo = _mm_cvtepu16_epi32 (tmp);		/* lower bits only */
+		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
+#else
+		__m128i lo = _mm_unpacklo_epi16 (tmp, zero);
+		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
+#endif
 
 		sum = _mm_add_epi32 (sum, lo);
 		sum = _mm_add_epi32 (sum, hi);
