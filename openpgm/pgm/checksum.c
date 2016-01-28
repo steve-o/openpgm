@@ -3,7 +3,7 @@
  * PGM checksum and checksum-copy routines.
  *
  * Checksum performance is typically proportional to clock speed independent
- * of chipset.  Counter to this memcpy() performance on Nehalem and newer 
+ * of chipset.	Counter to this memcpy() performance on Nehalem and newer 
  * chipsets can be significantly more efficient per bit when running a 
  * checksum-copy.
  *
@@ -11,7 +11,7 @@
  * IPoIB by multi-precision add-carry instruction extensions:
  * https://lkml.org/lkml/2013/10/11/534
  *
- * Copyright (c) 2006-2014 Miru Limited.
+ * Copyright (c) 2006-2016 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -33,6 +33,10 @@
 #endif
 #include <impl/framework.h>
 
+#ifdef USE_SIMD_CHECKSUM
+#	include <x86intrin.h>
+#endif
+
 
 /* locals */
 
@@ -43,6 +47,7 @@ static uint16_t do_csum_32bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+static uint16_t do_csum_simd (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 
 
@@ -84,7 +89,7 @@ do_csum_8bit (
 }
 
 /* Checksum and copy.  The theory being that cache locality benefits
- * calculation of the checksum whilst reading to copy.  The concern
+ * calculation of the checksum whilst reading to copy.	The concern
  * however is that string operations may execute significantly faster
  * allowing a basic pipeline model to be preferred.
  *
@@ -95,7 +100,7 @@ static
 uint16_t
 do_csumcpy_8bit (
 	const void* restrict srcaddr,
-	void*       restrict dstaddr,
+	void*	    restrict dstaddr,
 	uint16_t	     len,
 	uint32_t	     csum
 	)
@@ -275,17 +280,17 @@ do_csum_32bit (
 		count >>= 1;
 		if (count)
 		{
-			while (count) {
+			while (count--) {
 				const uint_fast32_t word32 = *(const uint32_t*)buf;
 				acc += word32;
 /* detect carry without native adc operator */
 				if (acc < word32) acc++;
-				count--; buf += 4;
+				buf += 4;
 			}
 			acc  = (acc >> 16) + (acc & 0xffff);
 		}
 		if (len & 2) {
-			const uint_fast32_t t = *(const uint32_t*)buf;
+			const uint_fast16_t t = *(const uint16_t*)buf;
 			acc += t;
 			buf += 2;
 		}
@@ -307,7 +312,7 @@ static
 uint16_t
 do_csumcpy_32bit (
 	const void* restrict srcaddr,
-	void*       restrict dstaddr,
+	void*	    restrict dstaddr,
 	uint16_t	     len,
 	uint32_t	     csum
 	)
@@ -341,12 +346,12 @@ do_csumcpy_32bit (
 		count >>= 1;
 		if (count)
 		{
-			while (count) {
+			while (count--) {
 				const uint_fast32_t word32 = *(const uint32_t*restrict)src;
 				*(uint32_t*restrict)dst = word32;
 				acc += word32;
 				if (acc < word32) acc++;
-				count--; src += 4; dst += 4;
+				src += 4; dst += 4;
 			}
 			acc  = (acc >> 16) + (acc & 0xffff);
 		}
@@ -627,9 +632,9 @@ do_csum_vector (
 					uint64_t carry = 0;
 					__asm__ volatile ("addq %1, %0\n\t"
 							  "adcq %2, %0"
-					     		: "=r" (acc)
+							: "=r" (acc)
 							: "m" (*(const uint64_t*)buf), "r" (carry), "0" (acc)
-							: "cc"  );
+							: "cc"	);
 					if (carry) acc++;
 					count--; buf += 8;
 				}
@@ -666,7 +671,7 @@ static
 uint16_t
 do_csumcpy_vector (
 	const void* restrict srcaddr,
-	void* restrict       dstaddr,
+	void* restrict	     dstaddr,
 	uint16_t	     len,
 	uint32_t	     csum
 	)
@@ -746,7 +751,7 @@ do_csumcpy_vector (
 							  "movq %%r15, 7*8(%2)"
 							: "=r" (acc)
 							: "r" (src), "r" (dst), "r" (carry), "0" (acc)
-							: "cc", "memory", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"  );
+							: "cc", "memory", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"	);
 					if (carry) acc++;
 					count64--; src += 64; dst += 64;
 				}
@@ -758,7 +763,7 @@ do_csumcpy_vector (
 							  "adcq %2, %0"
 							: "=r" (acc)
 							: "m" (*(const uint64_t*restrict)src), "r" (carry), "0" (acc)
-							: "cc"  );
+							: "cc"	);
 					if (carry) acc++;
 					count--; src += 8;
 				}
@@ -791,6 +796,158 @@ do_csumcpy_vector (
 	return (uint16_t)acc;
 }
 
+static
+uint16_t
+do_csum_simd (
+	const void*	addr,
+	uint16_t	len,
+	uint32_t	csum
+	)
+{
+	uint_fast64_t acc = csum;		/* fixed size for asm */
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;			/* fixed size for endian swap */
+	uint_fast16_t count2;
+	uint_fast16_t count16;
+	bool is_odd;
+
+	if (PGM_UNLIKELY(len == 0))
+		return (uint16_t)acc;
+/* align first byte */
+	is_odd = ((uintptr_t)buf & 1);
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*)&remainder)[1] = *buf++;
+		len--;
+	}
+/* drain upto 14-bytes to align on 128-bit strides */
+	count2 = (0x10 - ((uintptr_t)buf & 0xf)) >> 1;
+	while (count2--) {
+		acc += ((const uint16_t*)buf)[ 0 ];
+		buf += 2;
+		len -= 2;
+	}
+/* 128-bit, 16-byte stride */
+	count16 = len >> 4;
+	__m128i sum = _mm_setzero_si128();
+	while (count16--) {
+		__m128i tmp = _mm_load_si128((const __m128i*)buf);			// load 128-bit blob
+		__m128i lo = _mm_unpacklo_epi16 (tmp, _mm_setzero_si128());
+		__m128i hi = _mm_unpackhi_epi16 (tmp, _mm_setzero_si128());
+
+		sum = _mm_add_epi32 (sum, lo);
+		sum = _mm_add_epi32 (sum, hi);
+		buf += 16;
+	}
+
+// add all 32-bit components together
+	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 8));
+	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 4));
+	acc += _mm_cvtsi128_si32 (sum);
+	len %= 16;
+/* final 15 bytes */
+	count2 = len >> 1;
+	while (count2--) {
+		acc += ((const uint16_t*)buf)[ 0 ];
+		buf += 2;
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return (uint16_t)acc;
+}
+
+static
+uint16_t
+do_csumcpy_simd (
+	const void* restrict srcaddr,
+	void* restrict	     dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint64_t acc;			/* fixed size for asm */
+	const uint8_t*restrict srcbuf;
+	uint8_t*restrict dstbuf;
+	uint16_t remainder;		/* fixed size for endian swap */
+	uint_fast16_t count2;
+	uint_fast16_t count16;
+	bool is_odd;
+
+	acc = csum;
+	srcbuf = (const uint8_t*restrict)srcaddr;
+	dstbuf = (uint8_t*restrict)dstaddr;
+	remainder = 0;
+
+	if (PGM_UNLIKELY(len == 0))
+		return (uint16_t)acc;
+/* fill cache line with source buffer, invalidate destination buffer,
+ * perversly for testing high temporal locality is better than no locality,
+ * whilst in production no locality may be preferred depending on skb re-use.
+ */
+	pgm_prefetch (srcbuf);
+	pgm_prefetchw (dstbuf);
+/* align first byte */
+	is_odd = ((uintptr_t)srcbuf & 1);
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		len--;
+	}
+/* drain upto 14-bytes to align on 128-bit strides */
+	count2 = (0x10 - ((uintptr_t)srcbuf & 0xf)) >> 1;
+	while (count2--) {
+		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+		srcbuf = &srcbuf[ 2 ];
+		dstbuf = &dstbuf[ 2 ];
+		len -= 2;
+	}
+/* 128-bit, 16-byte stride */
+	count16 = len >> 4;
+	__m128i sum = _mm_setzero_si128();
+	while (count16--) {
+		__m128i tmp = _mm_load_si128((const __m128i*)srcbuf);			// load 128-bit blob
+		__m128i lo = _mm_unpacklo_epi16 (tmp, _mm_setzero_si128());
+		__m128i hi = _mm_unpackhi_epi16 (tmp, _mm_setzero_si128());
+
+		sum = _mm_add_epi32 (sum, lo);
+		sum = _mm_add_epi32 (sum, hi);
+		_mm_store_si128((__m128i*)dstbuf, tmp);
+		srcbuf = &srcbuf[ 16 ];
+		dstbuf = &dstbuf[ 16 ];
+	}
+
+// add all 32-bit components together
+	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 8));
+	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 4));
+	acc += _mm_cvtsi128_si32 (sum);
+	len %= 16;
+/* final 15 bytes */
+	count2 = len >> 1;
+	while (count2--) {
+		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+		srcbuf = &srcbuf[ 2 ];
+		dstbuf = &dstbuf[ 2 ];
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return (uint16_t)acc;
+}
 #endif
 
 static inline
@@ -811,6 +968,8 @@ do_csum (
 	return do_csum_64bit (addr, len, csum);
 #elif defined( USE_VECTOR_CHECKSUM )
 	return do_csum_vector (addr, len, csum);
+#elif defined( USE_SIMD_CHECKSUM )
+	return do_csum_simd (addr, len, csum);
 #else
 #	error "checksum routine undefined"
 #endif
@@ -885,6 +1044,8 @@ pgm_compat_csum_partial_copy (
 	return do_csumcpy_64bit (src, dst, len, csum);
 #	elif defined( USE_VECTOR_CHECKSUM )
 	return do_csumcpy_vector (src, dst, len, csum);
+#	elif defined( USE_SIMD_CHECKSUM )
+	return do_csumcpy_simd (src, dst, len, csum);
 #	else
 	memcpy (dst, src, len);
 	return pgm_csum_partial (dst, len, csum);
