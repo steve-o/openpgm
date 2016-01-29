@@ -4,6 +4,10 @@
  * socket implementation may manage separate numerical spaces for each
  * address family.
  *
+ * DEPRECATED:  This API is invalid on modern Linux and AIX systems due to
+ * implementation of IP aliasing which permits multiple addresses assigned
+ * to a single interface index.
+ *
  * Copyright (c) 2006-2011 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
