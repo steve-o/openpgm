@@ -47,7 +47,12 @@ static uint16_t do_csum_32bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+#endif
+#ifdef __SSE2__
 static uint16_t do_csum_simd (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+#endif
+#ifdef __AVX2__
+static uint16_t do_csum_avx (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 
 
@@ -576,7 +581,7 @@ do_csumcpy_64bit (
 	return (uint16_t)acc;
 }
 
-#if defined(__amd64) || defined(__x86_64__)
+#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 /* SIMD instructions unique to AMD/Intel 64-bit, so always little endian.
  *
  * TODO: TLB priming and prefetch with cache line size (128 bytes).
@@ -795,7 +800,9 @@ do_csumcpy_vector (
 		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
 	return (uint16_t)acc;
 }
+#endif
 
+#ifdef __SSE2__
 static
 uint16_t
 do_csum_simd (
@@ -963,6 +970,163 @@ do_csumcpy_simd (
 }
 #endif
 
+#ifdef __AVX2__
+static
+uint16_t
+do_csum_avx (
+	const void*	addr,
+	uint16_t	len,
+	uint32_t	csum
+	)
+{
+	uint_fast64_t acc = csum;		/* fixed size for asm */
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;			/* fixed size for endian swap */
+	uint_fast16_t count2;
+	uint_fast16_t count32;
+	bool is_odd;
+
+	if (PGM_UNLIKELY(len == 0))
+		return (uint16_t)acc;
+/* align first byte */
+	is_odd = ((uintptr_t)buf & 1);
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*)&remainder)[1] = *buf++;
+		len--;
+	}
+/* drain upto 31-bytes to align on 256-bit strides */
+	count2 = (0x20 - ((uintptr_t)buf & 0x1f)) >> 1;
+	while (count2--) {
+		acc += ((const uint16_t*)buf)[ 0 ];
+		buf += 2;
+		len -= 2;
+	}
+/* 256-bit, 32-byte stride */
+	count32 = len >> 5;
+	const __m256i zero = _mm256_setzero_si256();
+	__m256i sum = zero;
+	while (count32--) {
+		__m256i tmp = _mm256_load_si256((const __m256i*)buf);			// load 256-bit blob
+
+		__m256i lo = _mm256_unpacklo_epi16 (tmp, zero);
+		__m256i hi = _mm256_unpackhi_epi16 (tmp, zero);
+
+		sum = _mm256_add_epi32 (sum, lo);
+		sum = _mm256_add_epi32 (sum, hi);
+		buf += 32;
+	}
+
+// add all 32-bit components together
+	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 8));
+	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 4));
+	acc += _mm256_extract_epi32 (sum, 0) + _mm256_extract_epi32 (sum, 4);
+	len %= 32;
+/* final 31 bytes */
+	count2 = len >> 1;
+	while (count2--) {
+		acc += ((const uint16_t*)buf)[ 0 ];
+		buf += 2;
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return (uint16_t)acc;
+}
+
+static
+uint16_t
+do_csumcpy_avx (
+	const void* restrict srcaddr,
+	void* restrict	     dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint64_t acc;			/* fixed size for asm */
+	const uint8_t*restrict srcbuf;
+	uint8_t*restrict dstbuf;
+	uint16_t remainder;		/* fixed size for endian swap */
+	uint_fast16_t count2;
+	uint_fast16_t count32;
+	bool is_odd;
+
+	acc = csum;
+	srcbuf = (const uint8_t*restrict)srcaddr;
+	dstbuf = (uint8_t*restrict)dstaddr;
+	remainder = 0;
+
+	if (PGM_UNLIKELY(len == 0))
+		return (uint16_t)acc;
+/* fill cache line with source buffer, invalidate destination buffer,
+ * perversly for testing high temporal locality is better than no locality,
+ * whilst in production no locality may be preferred depending on skb re-use.
+ */
+	pgm_prefetch (srcbuf);
+	pgm_prefetchw (dstbuf);
+/* align first byte */
+	is_odd = ((uintptr_t)srcbuf & 1);
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*restrict)&remainder)[1] = *dstbuf++ = *srcbuf++;
+		len--;
+	}
+/* drain upto 31-bytes to align on 256-bit strides */
+	count2 = (0x20 - ((uintptr_t)srcbuf & 0x1f)) >> 1;
+	while (count2--) {
+		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+		srcbuf = &srcbuf[ 2 ];
+		dstbuf = &dstbuf[ 2 ];
+		len -= 2;
+	}
+/* 256-bit, 32-byte stride */
+	count32 = len >> 5;
+	__m256i sum = _mm256_setzero_si256();
+	while (count32--) {
+		__m256i tmp = _mm256_load_si256((const __m256i*)srcbuf);			// load 128-bit blob
+		__m256i lo = _mm256_unpacklo_epi16 (tmp, _mm256_setzero_si256());
+		__m256i hi = _mm256_unpackhi_epi16 (tmp, _mm256_setzero_si256());
+
+		sum = _mm256_add_epi32 (sum, lo);
+		sum = _mm256_add_epi32 (sum, hi);
+		_mm256_store_si256((__m256i*)dstbuf, tmp);
+		srcbuf = &srcbuf[ 32 ];
+		dstbuf = &dstbuf[ 32 ];
+	}
+
+// add all 32-bit components together
+	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 8));
+	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 4));
+	acc += _mm256_extract_epi32 (sum, 0) + _mm256_extract_epi32 (sum, 4);
+	len %= 32;
+/* final 15 bytes */
+	count2 = len >> 1;
+	while (count2--) {
+		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
+		srcbuf = &srcbuf[ 2 ];
+		dstbuf = &dstbuf[ 2 ];
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return (uint16_t)acc;
+}
+#endif
+
 static inline
 uint16_t
 do_csum (
@@ -983,6 +1147,8 @@ do_csum (
 	return do_csum_vector (addr, len, csum);
 #elif defined( USE_SIMD_CHECKSUM )
 	return do_csum_simd (addr, len, csum);
+#elif defined( USE_AVX_CHECKSUM )
+	return do_csum_avx (addr, len, csum);
 #else
 #	error "checksum routine undefined"
 #endif
@@ -1059,6 +1225,8 @@ pgm_compat_csum_partial_copy (
 	return do_csumcpy_vector (src, dst, len, csum);
 #	elif defined( USE_SIMD_CHECKSUM )
 	return do_csumcpy_simd (src, dst, len, csum);
+#	elif defined( USE_AVX_CHECKSUM )
+	return do_csumcpy_avx (src, dst, len, csum);
 #	else
 	memcpy (dst, src, len);
 	return pgm_csum_partial (dst, len, csum);
