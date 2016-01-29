@@ -11,6 +11,10 @@
  * IPoIB by multi-precision add-carry instruction extensions:
  * https://lkml.org/lkml/2013/10/11/534
  *
+ * TBD: AVX-512 acceleration.
+ *
+ * TBD: Checksum HCA acceleration via IB_DEVICE_RAW_IP_CSUM and similar.
+ *
  * Copyright (c) 2006-2016 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
@@ -1126,6 +1130,17 @@ do_csumcpy_avx (
 	return (uint16_t)acc;
 }
 #endif
+
+/* TBD: AVX-512 for Skylake and newer architectures.
+ *
+ *	_mm512_setzero_si512()
+ *	_mm512_load_si512()		- 64-byte alignment
+ *	_mm512_unpacklo_epi16()
+ *	_mm512_unpackhi_epi16()
+ *	_mm512_add_epi32()
+ *	_mm512_srli_si512()
+ *	_mm512_extract_epi32()
+ */
 
 static inline
 uint16_t
