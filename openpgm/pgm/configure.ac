@@ -331,6 +331,8 @@ AC_COMPILE_IFELSE(
 /* AIX intrinsic */
 #elif defined( __APPLE__ )
 /* Darwin intrinsic */
+#elif defined( __NetBSD__ )
+/* NetBSD intrinsic */
 #elif defined( __GNUC__ ) && ( __GNUC__ * 100 + __GNUC_MINOR__ >= 401 )
 /* GCC 4.0.1 intrinsic */
 #elif defined( _WIN32 )

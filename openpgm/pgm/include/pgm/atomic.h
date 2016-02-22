@@ -37,6 +37,8 @@
 #	include <sys/atomic_op.h>
 #elif defined( __APPLE__ )
 #	include <libkern/OSAtomic.h>
+#elif defined( __NetBSD__ )
+#	include <sys/atomic.h>
 #elif defined( _MSC_VER )
 /* not implemented in MinGW */
 #	include <intrin.h>
@@ -72,8 +74,8 @@ pgm_atomic_exchange_and_add32 (
 	__asm__ volatile ("lock; xaddl %0, %1"
 		       :: "r" (result), "m" (*atomic)  );
 	return result;
-#elif defined( __sun )
-/* Solaris intrinsic */
+#elif defined( __sun ) || defined(__NetBSD__)
+/* Solaris and NetBSD intrinsic */
 	const uint32_t nv = atomic_add_32_nv (atomic, (int32_t)val);
 	return nv - val;
 #elif defined( __APPLE__ )
@@ -113,7 +115,7 @@ pgm_atomic_add32 (
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
 	__asm__ volatile ("lock; addl %1, %0"
 		       :: "r" (val), "m" (*atomic)  );
-#elif defined( __sun )
+#elif defined( __sun ) || defined( __NetBSD__ )
 	atomic_add_32 (atomic, (int32_t)val);
 #elif defined( __APPLE__ )
 	OSAtomicAdd32Barrier ((int32_t)val, (volatile int32_t*)atomic);
@@ -152,7 +154,7 @@ pgm_atomic_inc32 (
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
 	__asm__ volatile ("lock; addl $1, %0"
 		       :: "m" (*atomic)  );
-#elif defined( __sun )
+#elif defined( __sun ) || defined( __NetBSD__ )
 	atomic_inc_32 (atomic);
 #elif defined( __APPLE__ )
 	OSAtomicIncrement32Barrier ((volatile int32_t*)atomic);
@@ -184,7 +186,7 @@ pgm_atomic_dec32 (
 #elif (defined( __SUNPRO_C ) || defined( __SUNPRO_CC )) && (defined( __i386 ) || defined( __amd64 ))
 	__asm__ volatile ("lock; subl $1, %0"
 		       :: "m" (*atomic)  );
-#elif defined( __sun )
+#elif defined( __sun ) || defined( __NetBSD__ )
 	atomic_dec_32 (atomic);
 #elif defined( __APPLE__ )
 	OSAtomicDecrement32Barrier ((volatile int32_t*)atomic);
