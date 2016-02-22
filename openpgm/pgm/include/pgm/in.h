@@ -34,7 +34,7 @@
 /* section 5.1 of RFC 3678: basic (delta-based) protocol-independent multicast
  * source filter APIs.
  *
- * required for OSX 10.6 and earlier.
+ * required for OSX 10.6 and earlier, and NetBSD.
  */
 struct group_req
 {
@@ -53,7 +53,7 @@ struct group_source_req
 
 /* section 8.2 of RFC 3678: protocol-independent full-state operations.
  *
- * required for OSX and FreeBSD.
+ * required for OSX, FreeBSD and NetBSD.
  */
 struct group_filter
 {

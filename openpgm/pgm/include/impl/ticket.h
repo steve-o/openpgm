@@ -40,6 +40,8 @@ typedef union pgm_ticket_t pgm_ticket_t;
 #	include <sys/atomic_op.h>
 #elif defined( __APPLE__ )
 #	include <libkern/OSAtomic.h>
+#elif defined( __NetBSD__ )
+#	include <sys/atomic.h>
 #elif defined( _WIN32 )
 #	define VC_EXTRALEAN
 #	define WIN32_LEAN_AND_MEAN
@@ -130,8 +132,8 @@ pgm_atomic_compare_and_exchange32 (
 			: "r" (newval),  "a" (oldval)
 			: "memory", "cc"  );
 	return (bool)result;
-#elif defined( __sun )
-/* Solaris intrinsic */
+#elif defined( __sun ) || defined( _NetBSD__ )
+/* Solaris and NetBSD intrinsic */
 	const uint32_t original = atomic_cas_32 (atomic, oldval, newval);
 	return (oldval == original);
 #elif defined( __APPLE__ )
@@ -219,6 +221,8 @@ pgm_atomic_add16 (
 	__sync_add_and_fetch (atomic, val);
 #	elif defined( __APPLE__ )
 #		error "There is no OSAtomicAdd16Barrier() on Darwin."
+#	elif defined( __NetBSD__ )
+#		error "There is no atomic_add_16() on NetBSD."
 #	elif defined( _AIX )
 	fetch_and_add_h((atomic_h)atomic, val);
 #	elif defined( _WIN32 )
@@ -264,6 +268,8 @@ pgm_atomic_fetch_and_add16 (
 	return __sync_fetch_and_add (atomic, val);
 #	elif defined( __APPLE__ )
 #		error "There is no OSAtomicAdd16Barrier() on Darwin."
+#	elif defined( __NetBSD__ )
+#		error "There is no atomic_add_16_nv() on NetBSD."
 #	elif defined( _AIX )
 	return fetch_and_add_h((atomic_h)atomic, val);
 #	elif defined( _WIN32 )
