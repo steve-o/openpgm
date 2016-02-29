@@ -262,6 +262,7 @@ pgm_drop_superuser (void)
 {
 #ifndef _WIN32
 	if (0 == getuid()) {
+		setgroups(0, NULL);
 		setuid((gid_t)65534);
 		setgid((uid_t)65534);
 	}
