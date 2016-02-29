@@ -817,11 +817,16 @@ pgm_tsc_init (
  */
 	FILE	*fp = fopen ("/proc/cpuinfo", "r");
 	char	buffer[1024], *flags = NULL;
+	int	tmp_tsc_mhz = 0;
+	bool	ret = FALSE;
 	if (fp)
 	{
 		while (!feof(fp) && fgets (buffer, sizeof(buffer), fp))
 		{
-			if (strstr (buffer, "flags")) {
+			if (strstr (buffer, "cpu MHz")) {
+				const char *p = strchr (buffer, ':');
+				if (p) tmp_tsc_mhz = atoi (p + 1) * 1000;
+			} else if (strstr (buffer, "flags")) {
 				flags = strchr (buffer, ':');
 				break;
 			}
@@ -832,14 +837,18 @@ pgm_tsc_init (
 		pgm_warn (_("Linux kernel reports no Time Stamp Counter (TSC)."));
 /* force both to stable clocks even though one might be OK */
 		pgm_time_update_now	= pgm_gettimeofday_update;
-		return TRUE;
-	}
-	if (!strstr (flags, " constant_tsc")) {
+		ret = TRUE;
+	} else if (!strstr (flags, " constant_tsc")) {
 		pgm_warn (_("Linux kernel reports non-constant Time Stamp Counter (TSC)."));
 /* force both to stable clocks even though one might be OK */
 		pgm_time_update_now	= pgm_gettimeofday_update;
-		return TRUE;
+		ret = TRUE;
 	}
+
+/* Only return in case the kernel doesn't report 0 as cpu MHz */
+	if ((tmp_tsc_mhz != 0) && ret)
+		return TRUE;
+
 #		endif /* HAVE_PROC_CPUINFO */
 
 	pgm_time_t		start, stop, elapsed;
