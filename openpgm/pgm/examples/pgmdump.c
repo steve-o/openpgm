@@ -169,6 +169,7 @@ on_startup (
 /* drop out of setuid 0 */
 	if (0 == getuid ()) {
 		g_message ("dropping superuser privileges.");
+		setgroups(0, NULL);
 		setuid ((gid_t)65534);
 		setgid ((uid_t)65534);
 	}
