@@ -29,6 +29,9 @@
 #endif
 #include <impl/framework.h>
 
+#ifdef USE_GALOIS_SSE3
+#	include <x86intrin.h>
+#endif
 
 /* Vector GF(2⁸) plus-equals multiplication.
  *
@@ -45,7 +48,11 @@ _pgm_gf_vec_addmul (
 	)
 {
 	uint_fast16_t i;
+#ifdef USE_GALOIS_SSE3
+	uint_fast16_t count16;
+#else
 	uint_fast16_t count8;
+#endif
 
 	if (PGM_UNLIKELY(b == 0))
 		return;
@@ -54,12 +61,51 @@ _pgm_gf_vec_addmul (
         const pgm_gf8_t* gfmul_b = &pgm_gftable[ (uint16_t)b << 8 ];
 #endif
 
+/* Implementation per the Intel IPP whitepaper
+ * The Use of Finite Field GF(256) in the Performance Primitives (2008)
+ */
+#ifdef USE_GALOIS_SSE3
+	i = 0;
+	count16 = len >> 4;		/* 16-way unrolls */
+	if (count16)
+	{
+/* generate nibble size lookup table for feeding into SSE3 instruction PSHUFB */
+		struct {
+			pgm_gf8_t hi[PGM_GF_NO_ELEMENTS][16];
+			pgm_gf8_t lo[PGM_GF_NO_ELEMENTS][16];
+		} nibble_gftable;
+		for (int i = 0; i < PGM_GF_NO_ELEMENTS; i++) {
+			for (int j = 0; j < 16; j++) {
+				nibble_gftable.hi[i][j] = pgm_gfmul (i, j << 4);
+				nibble_gftable.lo[i][j] = pgm_gfmul (i, j);
+			}
+		}
+
+/* operate on GF((2^4)^2) */
+		const __m128i hi = _mm_loadu_si128 ((const __m128i*)nibble_gftable.hi[ b ]);
+		const __m128i lo = _mm_loadu_si128 ((const __m128i*)nibble_gftable.lo[ b ]);
+		const __m128i nibble_mask = _mm_set1_epi8 (0x0f);
+		while (count16--) {
+			const __m128i dst = _mm_load_si128 ((__m128i *)(&d[i]));
+			const __m128i src = _mm_load_si128 ((__m128i *)(&s[i]));
+			__m128i tmp = _mm_shuffle_epi8 (lo, _mm_and_si128 (nibble_mask, src));
+			tmp = _mm_xor_si128 (tmp, _mm_shuffle_epi8 (hi, _mm_and_si128 (nibble_mask, _mm_srli_epi64 (src, 4))));
+
+			tmp = _mm_xor_si128 (dst, tmp);
+			_mm_store_si128 ((__m128i *)(&d[i]), tmp);
+			i += 16;
+		}
+
+/* remaining */
+		len %= 16;
+	}
+#else
 	i = 0;
 	count8 = len >> 3;		/* 8-way unrolls */
 	if (count8)
 	{
 		while (count8--) {
-#ifdef USE_GALOIS_MUL_LUT
+#	ifdef USE_GALOIS_MUL_LUT
 			d[i  ] ^= gfmul_b[ s[i  ] ];
 			d[i+1] ^= gfmul_b[ s[i+1] ];
 			d[i+2] ^= gfmul_b[ s[i+2] ];
@@ -68,7 +114,7 @@ _pgm_gf_vec_addmul (
 			d[i+5] ^= gfmul_b[ s[i+5] ];
 			d[i+6] ^= gfmul_b[ s[i+6] ];
 			d[i+7] ^= gfmul_b[ s[i+7] ];
-#else
+#	else
 			d[i  ] ^= gfmul( b, s[i  ] );
 			d[i+1] ^= gfmul( b, s[i+1] );
 			d[i+2] ^= gfmul( b, s[i+2] );
@@ -77,13 +123,14 @@ _pgm_gf_vec_addmul (
 			d[i+5] ^= gfmul( b, s[i+5] );
 			d[i+6] ^= gfmul( b, s[i+6] );
 			d[i+7] ^= gfmul( b, s[i+7] );
-#endif
+#	endif
 			i += 8;
 		}
 
 /* remaining */
 		len %= 8;
 	}
+#endif
 
 	while (len--) {
 #ifdef USE_GALOIS_MUL_LUT
