@@ -48,7 +48,6 @@ pgm_rwlock_t pgm_sock_list_lock;		/* list of all sockets for admin interfaces */
 pgm_slist_t* pgm_sock_list = NULL;
 
 
-static const char* pgm_family_string (const int) PGM_GNUC_CONST;
 static const char* pgm_sock_type_string (const int) PGM_GNUC_CONST;
 static const char* pgm_protocol_string (const int) PGM_GNUC_CONST;
 
@@ -1559,44 +1558,76 @@ pgm_setsockopt (
  * later in sendto() calls, this routine only considers the interface.
  */
 	case PGM_SEND_GROUP:
-		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
-			break;
-		memcpy (&sock->send_gsr, optval, sizeof(struct group_req));
-		if (PGM_UNLIKELY(sock->family != sock->send_gsr.gsr_group.ss_family))
-			break;
+	{
+		void*     restrict tmp_optval = optval; 
+		socklen_t          tmp_optlen = optlen; 
+
+/* Use OpenPGM enhanced struct with support for multiple IP addresses per interface. */
+		if (tmp_optlen == sizeof(struct pgm_group_source_req))
+		{
+			const struct pgm_group_source_req* gsr = tmp_optval;
+			struct group_req* gr = pgm_alloca (sizeof (struct group_req));
+/* copy contents to bypass byte packing differences */
+			gr->gr_interface = gsr->gsr_interface;
+			memcpy (&gr->gr_group, &gsr->gsr_group, sizeof (struct sockaddr_storage));
+			tmp_optval = gr;
+			tmp_optlen = sizeof(struct group_req);
+		}
+		if (tmp_optlen == sizeof(struct group_req))
+		{
+			memcpy (&sock->send_gsr, tmp_optval, sizeof(struct group_req));
+			if (PGM_UNLIKELY(sock->family != sock->send_gsr.gsr_group.ss_family))
+				break;
 /* multicast group for later usage with sendto() */
-		if (sock->udp_encap_mcast_port)
-			((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
+			if (sock->udp_encap_mcast_port)
+				((struct sockaddr_in*)&sock->send_gsr.gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
 /* interface */
-		if ((SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_sock,
-								   (const struct sockaddr*)&sock->send_addr,
-								   sock->send_gsr.gsr_interface)) ||
-		    (SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_with_router_alert_sock,
-								   (const struct sockaddr*)&sock->send_addr,
-								   sock->send_gsr.gsr_interface)))
-		{
-			break;
+			if ((SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_sock,
+									   (const struct sockaddr*)&sock->send_addr,
+									   sock->send_gsr.gsr_interface)) ||
+			    (SOCKET_ERROR == pgm_sockaddr_multicast_if (sock->send_with_router_alert_sock,
+									   (const struct sockaddr*)&sock->send_addr,
+									   sock->send_gsr.gsr_interface)))
+			{
+				break;
+			}
+			else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
+			{
+				char addr[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop ((const struct sockaddr*)&sock->send_addr, addr, sizeof(addr));
+				pgm_trace (PGM_LOG_ROLE_NETWORK,_("Multicast send interface set to %s index %u"),
+					addr,
+					(unsigned)sock->send_gsr.gsr_interface);
+			}
 		}
-		else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
-		{
-			char addr[INET6_ADDRSTRLEN];
-			pgm_sockaddr_ntop ((const struct sockaddr*)&sock->send_addr, addr, sizeof(addr));
-			pgm_trace (PGM_LOG_ROLE_NETWORK,_("Multicast send interface set to %s index %u"),
-				addr,
-				(unsigned)sock->send_gsr.gsr_interface);
-		}
+	}
 		status = TRUE;
 		break;
 
 /* for any-source applications (ASM), join a new group
  */
 	case PGM_JOIN_GROUP:
-		if (PGM_UNLIKELY(optlen != sizeof(struct group_req)))
-			break;
 		if (PGM_UNLIKELY(sock->recv_gsr_len >= IP_MAX_MEMBERSHIPS))
 			break;
+	{
+		void*	  restrict tmp_optval = optval;
+		socklen_t	   tmp_optlen = optlen;
+
+/* Use OpenPGM enhanced struct with support for multiple IP addresses per interface. */
+		if (tmp_optlen == sizeof(struct pgm_group_source_req))
 		{
-			const struct group_req* gr = optval;
+			const struct pgm_group_source_req* gsr = tmp_optval;
+			struct group_req* gr = pgm_alloca (sizeof (struct group_req));
+/* copy contents to bypass byte packing differences */
+			gr->gr_interface = gsr->gsr_interface;
+			memcpy (&gr->gr_group, &gsr->gsr_group, sizeof (struct sockaddr_storage));
+			tmp_optval = gr;
+			tmp_optlen = sizeof(struct group_req);
+		}
+/* Use OS native RFC 3678 group request struct */
+		if (tmp_optlen == sizeof(struct group_req))
+		{
+			const struct group_req* gr = tmp_optval;
 /* verify not duplicate group/interface pairing */
 			for (unsigned i = 0; i < sock->recv_gsr_len; i++)
 			{
@@ -1605,7 +1636,7 @@ pgm_setsockopt (
 					(gr->gr_interface == sock->recv_gsr[i].gsr_interface ||
 					                0 == sock->recv_gsr[i].gsr_interface   ))
 				{
-#ifdef SOCKET_DEBUG
+#ifdef SOCK_DEBUG
 					char s[INET6_ADDRSTRLEN];
 					pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, s, sizeof(s));
 					if (sock->recv_gsr[i].gsr_interface) {
@@ -1617,15 +1648,21 @@ pgm_setsockopt (
 					break;
 				}
 			}
-			if (PGM_UNLIKELY(sock->family != gr->gr_group.ss_family))
-				break;
 			sock->recv_gsr[sock->recv_gsr_len].gsr_interface = gr->gr_interface;
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_group, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
 			if (sock->udp_encap_mcast_port)
 				((struct sockaddr_in*)&sock->recv_gsr[sock->recv_gsr_len].gsr_group)->sin_port = htons (sock->udp_encap_mcast_port);
 			memcpy (&sock->recv_gsr[sock->recv_gsr_len].gsr_source, &gr->gr_group, pgm_sockaddr_len ((const struct sockaddr*)&gr->gr_group));
-			if (SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, sock->family, gr))
+/* Resolved address family gr->gr_group.ss_family can be different from sock->family = AF_UNSPEC */
+			if (SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, gr->gr_group.ss_family, gr)) {
+#ifdef SOCK_DEBUG
+				char s[INET6_ADDRSTRLEN];
+				pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, s, sizeof(s));
+				pgm_error(_("Join multicast group { .gr_interface = %u, .gr_group = \"%s\" } failed."),
+					gr->gr_interface, s);
+#endif
 				break;
+			}
 			else if (PGM_UNLIKELY(pgm_log_mask & PGM_LOG_ROLE_NETWORK))
 			{
 				char addr[INET6_ADDRSTRLEN];
@@ -1636,6 +1673,7 @@ pgm_setsockopt (
 			}
 			sock->recv_gsr_len++;
 		}
+	}
 		status = TRUE;
 		break;
 
@@ -1731,7 +1769,7 @@ pgm_setsockopt (
 				{
 					if (pgm_sockaddr_cmp ((const struct sockaddr*)&gsr->gsr_source, (struct sockaddr*)&sock->recv_gsr[i].gsr_source) == 0)
 					{
-#ifdef SOCKET_DEBUG
+#ifdef SOCK_DEBUG
 						char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
 						pgm_sockaddr_ntop ((const struct sockaddr*)&gsr->gsr_group, s1, sizeof(s1));
 						pgm_sockaddr_ntop ((const struct sockaddr*)&gsr->gsr_source, s2, sizeof(s2));
@@ -2704,7 +2742,6 @@ out:
 }
 #endif /* HAVE_EPOLL_CTL */
 
-static
 const char*
 pgm_family_string (
 	const int	family

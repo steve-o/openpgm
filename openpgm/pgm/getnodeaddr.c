@@ -43,8 +43,6 @@
 
 /* globals */
 
-static const char* pgm_family_string (const sa_family_t);
-
 
 /* return node addresses, similar to getaddrinfo('..localmachine") on Win2003.
  *
@@ -292,24 +290,6 @@ pgm_get_multicast_enabled_node_addr (
 	pgm_freeifaddrs (ifap);
 	pgm_freenodeaddr (result);
 	return FALSE;
-}
-
-static
-const char*
-pgm_family_string (
-	const sa_family_t	family
-	)
-{
-	const char* c;
-
-	switch (family) {
-	case AF_UNSPEC:		c = "AF_UNSPEC"; break;
-	case AF_INET:		c = "AF_INET"; break;
-	case AF_INET6:		c = "AF_INET6"; break;
-	default: c = "(unknown)"; break;
-	}
-
-	return c;
 }
 
 /* eof */

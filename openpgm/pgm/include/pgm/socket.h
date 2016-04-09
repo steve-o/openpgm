@@ -63,6 +63,7 @@ struct pgm_addrinfo_t {
 	struct pgm_group_source_req* restrict	ai_send_addrs;
 };
 
+/* Extends RFC 3678 struct group_req, but not always binary compatible due to forced packing, e.g. OSX. */
 struct pgm_group_source_req
 {
 	uint32_t		gsr_interface;	/* interface index */
@@ -200,6 +201,8 @@ int pgm_wsapoll_info (pgm_sock_t*const restrict, WSAPOLLFD*const restrict, ULONG
 #if defined( EPOLLIN ) && defined( EPOLLOUT )
 int pgm_epoll_ctl (pgm_sock_t*const, const int, const int, const int);
 #endif
+
+const char* pgm_family_string (const int) PGM_GNUC_CONST;
 
 PGM_END_DECLS
 

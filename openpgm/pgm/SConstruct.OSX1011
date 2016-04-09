@@ -124,6 +124,8 @@ env = Environment(
 			'-DHAVE_DSO_VISIBILITY',
 # socket binding
 			'-DUSE_BIND_INADDR_ANY',
+# IPv6 socket options
+			'-D__APPLE_USE_RFC_3542',
 # IP header order as per IP(4) on FreeBSD
 			'-DHAVE_HOST_ORDER_IP_LEN',
 			'-DHAVE_HOST_ORDER_IP_OFF',
@@ -168,7 +170,8 @@ release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-gdb')
+# OSX gcc does not understand gdb flag as it is actually llvm
+debug.Append(CCFLAGS = ['-DPGM_DEBUG', '-g'], LINKFLAGS = '-g')
 
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')

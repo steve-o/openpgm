@@ -138,6 +138,7 @@ g_debug ("netaddr %s", inet_ntoa (netaddr));
 	return 0;
 
 default_none:
+	pgm_debug ("pgm_inet_network() failed.");
 	in->s_addr = INADDR_NONE;
 	return -1;
 }
@@ -191,7 +192,7 @@ pgm_inet6_network (
 	}
 	if (*p == 0) {
 		if (pgm_inet_pton (AF_INET6, s, in6)) return 0;
-		pgm_debug ("pgm_inet_pton(AF_INET6) failed on '%s'", s);
+		pgm_debug ("pgm_inet_pton(AF_INET6, \"%s\") failed.", s);
 		goto default_none;
 	}
 
@@ -237,6 +238,7 @@ pgm_inet6_network (
 	return 0;
 
 default_none:
+	pgm_debug ("pgm_inet6_network() failed.");
 	memset (in6, 0xff, sizeof(*in6));	/* equivalent to IN6ADDR_NONE */
 	return -1;
 }
@@ -283,7 +285,7 @@ pgm_sa6_network (
 			freeaddrinfo (result);
 			return 0;
 		}
-		pgm_debug ("getaddrinfo(AF_INET6) failed on '%s'", s);
+		pgm_debug ("getaddrinfo(AF_INET6, \"%s\") failed.", s);
 		goto default_none;
 	}
 
@@ -334,6 +336,7 @@ pgm_sa6_network (
 	return 0;
 
 default_none:
+	pgm_debug ("pgm_sa6_network() failed.");
 	memset (sa6, 0, sizeof(*sa6));
 	sa6->sin6_family = AF_INET6;
 	memset (&sa6->sin6_addr, 0xff, sizeof(struct in6_addr));	/* equivalent to IN6ADDR_NONE */

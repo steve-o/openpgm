@@ -308,6 +308,23 @@ on_console_ctrl (
 }
 #endif /* !_WIN32 */
 
+char*
+gsr_to_string (
+	const struct pgm_group_source_req* gsr
+	)
+{
+	char temp[1024], group[1024], source[1024], addr[1024];
+	if (0 != pgm_sockaddr_ntop (&gsr->gsr_group, group, sizeof (group)))
+		group[0] = 0;
+	if (0 != pgm_sockaddr_ntop (&gsr->gsr_source, source, sizeof (source)))
+		source[0] = 0;
+	if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
+		addr[0] = 0;
+	sprintf (temp, "{ .gsr_interface = %u, .gsr_group = \"%s\", .gsr_source = \"%s\", .gsr_addr = \"%s\" }",
+		gsr->gsr_interface, group, source, addr);
+	return temp;
+}
+
 static
 bool
 on_startup (void)
@@ -320,6 +337,19 @@ on_startup (void)
 	if (!pgm_getaddrinfo (network, NULL, &res, &pgm_err)) {
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
 		goto err_abort;
+	} else {
+		char recv_addrs[1024], send_addrs[1024];
+		recv_addrs[0] = send_addrs[0] = 0;
+		for (unsigned i = 0; i < res->ai_recv_addrs_len; i++) {
+			if (i > 0) strcat (recv_addrs, ", ");
+			strcat (recv_addrs, gsr_to_string (&res->ai_recv_addrs[i]));
+		}
+		for (unsigned i = 0; i < res->ai_send_addrs_len; i++) {
+			if (i > 0) strcat (send_addrs, ", ");
+			strcat (send_addrs, gsr_to_string (&res->ai_send_addrs[i]));
+		}
+		printf ("Network parameter: { .ai_family = \"%s\", .ai_recv_addrs = [%s], .ai_send_addrs = [%s] }\n",
+			pgm_family_string (res->ai_family), recv_addrs, send_addrs);
 	}
 
 	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;
@@ -415,8 +445,9 @@ on_startup (void)
 
 /* join IP multicast groups */
 	for (unsigned i = 0; i < res->ai_recv_addrs_len; i++)
-		pgm_setsockopt (sock, IPPROTO_PGM, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct group_req));
-	pgm_setsockopt (sock, IPPROTO_PGM, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct group_req));
+		pgm_setsockopt (sock, IPPROTO_PGM, PGM_JOIN_GROUP, &res->ai_recv_addrs[i], sizeof(struct pgm_group_source_req));
+	pgm_setsockopt (sock, IPPROTO_PGM, PGM_SEND_GROUP, &res->ai_send_addrs[0], sizeof(struct pgm_group_source_req));
+
 	pgm_freeaddrinfo (res);
 
 /* set IP parameters */
