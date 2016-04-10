@@ -948,7 +948,7 @@ _pgm_getadaptersaddresses (
 				{
 				ULONG Mask;
 				ConvertLengthToIpv4Mask (prefixLength, &Mask);
-				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( Mask );
+				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = Mask;	/* network order */
 				}
 #else
 /* NB: left-shift of full bit-width is undefined in C standard. */
