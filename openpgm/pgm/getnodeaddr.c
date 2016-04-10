@@ -80,6 +80,9 @@ pgm_getnodeaddr (
 		return FALSE;
 	}
 	hostname[NI_MAXHOST - 1] = '\0';
+#ifdef GETNODEADDR_DEBUG
+	pgm_debug("Hostname discovered as \"%s\"", hostname);
+#endif
 
 	struct addrinfo hints = {
 		.ai_family	= family,
@@ -103,7 +106,7 @@ pgm_getnodeaddr (
 		}
 
 		na = pgm_malloc0 (na_len);
-		char* p = (char*)na + na_len;	/* point to end of block */
+		char* p = (char*)na;	/* point to start of block */
 		struct addrinfo* prev = NULL;
 
 		for (ai = result; NULL != ai; ai = ai->ai_next)
@@ -112,18 +115,30 @@ pgm_getnodeaddr (
 				continue;
 			if (NULL == ai->ai_addr || 0 == ai->ai_addrlen)
 				continue;
-			p -= ai->ai_addrlen;
+			struct addrinfo* t = (struct addrinfo*)(p);
+			p += sizeof (struct addrinfo);
 			memcpy (p, ai->ai_addr, ai->ai_addrlen);
-			struct addrinfo* t = (struct addrinfo*)(p - sizeof (struct addrinfo));
 			t->ai_family	= ai->ai_family;
 			t->ai_addrlen	= ai->ai_addrlen;
 			t->ai_addr	= (struct sockaddr*)p;
-			t->ai_next	= prev;
-			prev = t;
-			p   -= sizeof (struct addrinfo);
+			p += ai->ai_addrlen;
+			t->ai_next	= (NULL == ai->ai_next) ? NULL : p;
 		}
 		freeaddrinfo (result);
 		*res = na;
+#ifdef GETNODEADDR_DEBUG
+		{
+			char list[1024], s[INET6_ADDRSTRLEN];
+			list[0] = 0;
+			for (ai = na; NULL != ai; ai = ai->ai_next) {
+				if (0 == pgm_sockaddr_ntop (ai->ai_addr, s, sizeof (s))) {
+					if (ai != na) strcat (list, ", ");
+					strcat (list, s);
+				}
+			}
+			pgm_debug("Hostname resolved as %s", list);
+		}
+#endif
 		return TRUE;
 	} else if (EAI_NONAME != e) {
 		char errbuf[1024];
@@ -132,12 +147,20 @@ pgm_getnodeaddr (
 			     pgm_error_from_eai_errno (e, errno),
 			     _("Resolving hostname address: %s"),
 			     pgm_gai_strerror_s (errbuf, sizeof (errbuf), e));
+#ifdef GETNODEADDR_DEBUG
+		if (NULL != error)
+			pgm_debug("pgm_getnodeaddr() failed: %s", (*error)->message);
+#endif
 		return FALSE;
 	} else if (AF_UNSPEC == family) {
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_IF,
 			     PGM_ERROR_NONAME,
 			     _("Resolving hostname address family."));
+#ifdef GETNODEADDR_DEBUG
+		if (NULL != error)
+			pgm_debug("pgm_getnodeaddr() failed: %s", (*error)->message);
+#endif
 		return FALSE;
 	}
 
@@ -160,6 +183,10 @@ pgm_getnodeaddr (
 			     pgm_wsastrerror (WSAGetLastError())
 #endif
 				);
+#ifdef GETNODEADDR_DEBUG
+		if (NULL != error)
+			pgm_debug("pgm_getnodeaddr() failed: %s", (*error)->message);
+#endif
 		return FALSE;
 	}
 
@@ -167,6 +194,10 @@ pgm_getnodeaddr (
 	if (!pgm_getifaddrs (&ifap, error)) {
 		pgm_prefix_error (error,
 			     _("Enumerating network interfaces: "));
+#ifdef GETNODEADDR_DEBUG
+		if (NULL != error)
+			pgm_debug("pgm_getnodeaddr() failed: %s", (*error)->message);
+#endif
 		return FALSE;
 	}
 
@@ -186,6 +217,10 @@ pgm_getnodeaddr (
 		     PGM_ERROR_DOMAIN_IF,
 		     PGM_ERROR_NONET,
 		     _("Discovering primary IPv4 network interface."));
+#ifdef GETNODEADDR_DEBUG
+	if (NULL != error)
+		pgm_debug("pgm_getnodeaddr() failed: %s", (*error)->message);
+#endif
 	return FALSE;
 ipv4_found:
 
@@ -204,6 +239,10 @@ ipv4_found:
 		     PGM_ERROR_DOMAIN_IF,
 		     PGM_ERROR_NONET,
 		     _("Discovering primary IPv6 network interface."));
+#ifdef GETNODEADDR_DEBUG
+	if (NULL != error)
+		pgm_debug("pgm_getnodeaddr() failed: %s", (*error)->message);
+#endif
 	return FALSE;
 ipv6_found:
 
