@@ -1,4 +1,5 @@
 .sconf_temp/
+build/
 config.log
 ref/
 scons.signatures-*.dblite

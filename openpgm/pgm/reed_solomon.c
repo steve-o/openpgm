@@ -194,6 +194,7 @@ _pgm_matinv (
 	const uint8_t		n
 	)
 {
+#ifndef _MSC_VER
 	uint8_t pivot_rows[ n ];
 	uint8_t pivot_cols[ n ];
 	bool pivots[ n ];
@@ -201,6 +202,15 @@ _pgm_matinv (
 
 	pgm_gf8_t identity[ n ];
 	memset (identity, 0, sizeof(identity));
+#else
+	uint8_t* pivot_rows = pgm_newa (uint8_t, n);
+	uint8_t* pivot_cols = pgm_newa (uint8_t, n);
+	bool* pivots	    = pgm_newa (bool, n);
+	memset (pivots, 0, sizeof (bool) * n);
+
+	pgm_gf8_t* identity = pgm_newa (pgm_gf8_t, n);
+	memset (identity, 0, sizeof (pgm_gf8_t) * n);
+#endif
 
 	for (uint_fast8_t i = 0; i < n; i++)
 	{
@@ -328,8 +338,13 @@ _pgm_matinv_vandermonde (
  * 1: Work out coefficients.
  */
 
+#ifndef _MSC_VER
 	pgm_gf8_t P[ n ];
 	memset (P, 0, sizeof(P));
+#else
+	pgm_gf8_t* P = pgm_newa (pgm_gf8_t, n);
+	memset (P, 0, sizeof (pgm_gf8_t) * n);
+#endif
 
 /* copy across second row, i.e. j = 2 */
 	for (uint_fast8_t i = 0; i < n; i++)
@@ -337,8 +352,13 @@ _pgm_matinv_vandermonde (
 		P[ i ] = V[ (i * n) + 1 ];
 	}
 
+#ifndef _MSC_VER
 	pgm_gf8_t alpha[ n ];
 	memset (alpha, 0, sizeof(alpha));
+#else
+	pgm_gf8_t* alpha = pgm_newa (pgm_gf8_t, n);
+	memset (alpha, 0, sizeof (pgm_gf8_t) * n);
+#endif
 
 	alpha[ n - 1 ] = P[ 0 ];
 	for (uint_fast8_t i = 1; i < n; i++)
@@ -353,7 +373,11 @@ _pgm_matinv_vandermonde (
 /* 2: Obtain numberators and denominators by synthetic division.
  */
 
+#ifndef _MSC_VER
 	pgm_gf8_t b[ n ];
+#else
+	pgm_gf8_t* b = pgm_newa (pgm_gf8_t, n);
+#endif
 	b[ n - 1 ] = 1;
 	for (uint_fast8_t j = 0; j < n; j++)
 	{
@@ -540,7 +564,11 @@ pgm_rs_decode_parity_inline (
 /* invert */
 	_pgm_matinv (rs->RM, rs->k);
 
+#ifndef _MSC_VER
 	pgm_gf8_t* repairs[ rs->k ];
+#else
+	pgm_gf8_t** repairs = pgm_newa (pgm_gf8_t*, rs->k);
+#endif
 
 /* multiply out, through the length of erasures[] */
 	for (uint_fast8_t j = 0; j < rs->k; j++)

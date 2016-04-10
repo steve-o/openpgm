@@ -238,7 +238,11 @@ write_ascii (
 	pgm_string_t*	 restrict output
 	)
 {
+#ifndef _MSC_VER
 	pgm_count_t snapshot_counts[ histogram->sample.counts_len ];
+#else
+	pgm_count_t* snapshot_counts = pgm_newa (pgm_count_t, histogram->sample.counts_len);
+#endif
 	pgm_sample_set_t snapshot = {
 		.counts		= snapshot_counts,
 		.counts_len	= histogram->sample.counts_len,

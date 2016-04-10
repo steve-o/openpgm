@@ -15,6 +15,8 @@
  *
  * TBD: Checksum HCA acceleration via IB_DEVICE_RAW_IP_CSUM and similar.
  *
+ * Reminder: MSVC does not support inline assembler with Win64.
+ *
  * Copyright (c) 2006-2016 Miru Limited.
  *
  * This library is free software; you can redistribute it and/or
@@ -49,7 +51,7 @@ static uint16_t do_csum_8bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_16bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_32bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
-#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
+#if defined(__amd64) || defined(__x86_64__)
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 #ifdef __SSE2__
@@ -585,7 +587,7 @@ do_csumcpy_64bit (
 	return (uint16_t)acc;
 }
 
-#if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
+#if defined(__amd64) || defined(__x86_64__)
 /* SIMD instructions unique to AMD/Intel 64-bit, so always little endian.
  *
  * TODO: TLB priming and prefetch with cache line size (128 bytes).

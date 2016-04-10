@@ -663,7 +663,16 @@ pgm_txw_retransmit_try_peek (
 		struct pgm_opt_header	*opt_header;
 		struct pgm_opt_length	*opt_len;
 		struct pgm_opt_fragment	*opt_fragment, null_opt_fragment;
+#ifndef _MSC_VER
+/* MSVC 2013 unsupported:
+ * error C2057: expected constant expression
+ * error C2466: cannot allocate an array of constant size 0
+ * error C2133: 'opt_src' : unknown size
+ */
 		const pgm_gf8_t		*opt_src[ window->rs.k ];
+#else
+		pgm_gf8_t               *opt_src = pgm_newa (pgm_gf8_t*, window->rs.k);
+#endif
 
 		skb->pgm_header->pgm_options |= PGM_OPT_PRESENT;
 

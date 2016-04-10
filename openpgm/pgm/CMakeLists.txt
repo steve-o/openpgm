@@ -20,10 +20,6 @@ endif(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 #-----------------------------------------------------------------------------
 # dependencies
 
-find_package(PythonInterp REQUIRED)
-find_package(Perl REQUIRED)
-find_program(PATCH_EXECUTABLE patch)
-
 include (${CMAKE_SOURCE_DIR}/cmake/Modules/TestOpenPGMVersion.cmake)
 
 #-----------------------------------------------------------------------------
@@ -152,57 +148,19 @@ add_definitions(
 #-----------------------------------------------------------------------------
 # source generators
 
-foreach (source ${c99-sources})
-	string(REGEX REPLACE "\\.c$" "" source "${source}")
-	if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${source}.c.c89.patch)
-		add_custom_command(
-			OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source}.c89.c
-			COMMAND ${CMAKE_COMMAND}
-			ARGS	-E
-				copy
-				${CMAKE_CURRENT_SOURCE_DIR}/${source}.c
-				${CMAKE_CURRENT_BINARY_DIR}/${source}.c89.c
-			COMMAND ${PATCH_EXECUTABLE}
-			ARGS	--binary
-				-i
-				${CMAKE_CURRENT_SOURCE_DIR}/${source}.c.c89.patch
-				${CMAKE_CURRENT_BINARY_DIR}/${source}.c89.c
-			DEPENDS ${source}.c
-				${CMAKE_CURRENT_SOURCE_DIR}/${source}.c.c89.patch
-		)
-	else(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${source}.c.c89.patch)
-		add_custom_command(
-			OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source}.c89.c
-			COMMAND ${CMAKE_COMMAND}
-			ARGS	-E
-				copy
-				${CMAKE_CURRENT_SOURCE_DIR}/${source}.c
-				${CMAKE_CURRENT_BINARY_DIR}/${source}.c89.c
-			DEPENDS ${source}.c
-		)
-	endif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${source}.c.c89.patch)
-	list(APPEND generated-results ${CMAKE_CURRENT_BINARY_DIR}/${source}.c89.c)
-endforeach()
-
-# generated galois tables
-add_custom_command(
-	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/galois_tables.c89.c
-	COMMAND ${PERL_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/galois_generator.pl > ${CMAKE_CURRENT_BINARY_DIR}/galois_tables.c89.c
-	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/galois_generator.pl
-)
-
 # version stamping
+add_executable(mkversion ${CMAKE_CURRENT_SOURCE_DIR}/mkversion.c)
 add_custom_command(
-	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/version.c89.c
-	COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/version_generator.py > ${CMAKE_CURRENT_BINARY_DIR}/version.c89.c
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/version_generator.py
+	OUTPUT version.c
+	COMMAND mkversion
+	ARGS > version.c
+	DEPENDS mkversion
 )
 
 set(sources
-        ${CMAKE_CURRENT_BINARY_DIR}/galois_tables.c89.c
-        ${CMAKE_CURRENT_BINARY_DIR}/version.c89.c
-        ${generated-results}
+	${c99-sources}
+	galois_tables.c
+        ${CMAKE_CURRENT_BINARY_DIR}/version.c
 )
 
 #-----------------------------------------------------------------------------
