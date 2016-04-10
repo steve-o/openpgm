@@ -48,6 +48,12 @@ add_definitions(
 	-DUSE_BIND_INADDR_ANY
 )
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+	add_definitions(
+		-DPGM_DEBUG
+	)
+endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+
 # Parallel make.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 
