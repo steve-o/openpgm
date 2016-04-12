@@ -39,7 +39,7 @@
 #include <impl/timer.h>
 
 
-//#define SOCK_DEBUG
+#define SOCK_DEBUG
 //#define SOCK_SPM_DEBUG
 
 
@@ -1656,10 +1656,13 @@ pgm_setsockopt (
 /* Resolved address family gr->gr_group.ss_family can be different from sock->family = AF_UNSPEC */
 			if (SOCKET_ERROR == pgm_sockaddr_join_group (sock->recv_sock, gr->gr_group.ss_family, gr)) {
 #ifdef SOCK_DEBUG
+				const int save_errno = pgm_get_last_sock_error();
+				char errbuf[1024];
 				char s[INET6_ADDRSTRLEN];
 				pgm_sockaddr_ntop ((const struct sockaddr*)&gr->gr_group, s, sizeof(s));
-				pgm_error(_("Join multicast group { .gr_interface = %u, .gr_group = \"%s\" } failed."),
-					gr->gr_interface, s);
+				pgm_error(_("Join multicast group { .gr_interface = %u, .gr_group = \"%s\" } failed: %s(%d)"),
+					gr->gr_interface, s,
+					pgm_sock_strerror_s (errbuf, sizeof (errbuf), save_errno), save_errno);
 #endif
 				break;
 			}
