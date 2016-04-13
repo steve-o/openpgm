@@ -44,7 +44,7 @@
 #include <pgm/if.h>
 
 
-//#define IF_DEBUG
+#define IF_DEBUG
 
 /* temporary structure to contain interface name whilst address family
  * has not been resolved.
@@ -1230,6 +1230,41 @@ parse_interface_entity (
 	return TRUE;
 }
 
+/* With type-punning safe code copy the default multicast group into the provided
+ * sockaddr pointer.  The compiler will clean up the redundancy.
+ */
+static
+bool
+set_default_multicast_group (
+	int family,
+	struct sockaddr* sa
+	)
+{
+	switch (family) {
+	case AF_INET6: {
+		struct sockaddr_in6 s6;
+		memset (&s6, 0, sizeof (s6));
+		memcpy (&s6.sin6_addr, &if6_default_group_addr, sizeof (if6_default_group_addr));
+		memcpy (sa, &s6, sizeof (s6));
+		break;
+	}
+
+	case AF_INET: {
+		struct sockaddr_in s4;
+		memset (&s4, 0, sizeof (s4));
+		s4.sin_addr.s_addr = htonl (IF_DEFAULT_GROUP);
+		memcpy (sa, &s4, sizeof (s4));
+		break;
+	}
+
+	default:
+		return FALSE;
+	}
+
+	sa->sa_family = family;
+	return TRUE;
+}
+
 /* parse a receive multicast group entity.  can contain more than one multicast group to
  * support asymmetric fan-out.
  *
@@ -1279,17 +1314,17 @@ parse_receive_entity (
 		recv_gsr->gsr_interface = primary_interface->ir_interface;
 		recv_gsr->gsr_group.ss_family = family;
 		memcpy (&recv_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr *)&primary_interface->ir_addr));
-		
-
-/* track IPv6 scope from any resolved interface */
-		unsigned scope_id = 0;
 
 /* if using unspec default group check the interface for address family
  */
 		if (AF_UNSPEC == recv_gsr->gsr_group.ss_family)
 		{
+			pgm_debug ("Entity address family is unspecified, inspecting primary interface.");
+
 			if (AF_UNSPEC == primary_interface->ir_addr.ss_family)
 			{
+				pgm_debug ("Primary interface address family unspecified.");
+
 				struct sockaddr_storage addr;
 				if (!pgm_get_multicast_enabled_node_addr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
 				{
@@ -1301,12 +1336,26 @@ parse_receive_entity (
 						pgm_debug ("parse_receive_entity() failed: %s", (*error)->message);
 					return FALSE;
 				}
+				else
+				{
+					{
+						char s[INET6_ADDRSTRLEN];
+						pgm_sockaddr_ntop (&addr, s, sizeof(s));
+						pgm_debug ("Node primary address detected as \"%s\".", s);
+					}
+					primary_interface->ir_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
+					memcpy (&primary_interface->ir_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
+				}
+
 				recv_gsr->gsr_group.ss_family = addr.ss_family;
-				scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
 
 /* was an interface actually specified */
 				if (primary_interface->ir_name[0] != '\0')
 				{
+					pgm_debug ("Resolving primary interface \"%s\" with node address multicast group family %s.",
+						primary_interface->ir_name,
+						pgm_family_string (recv_gsr->gsr_group.ss_family));
+
 					struct interface_req ir;
 					if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 					{
@@ -1319,20 +1368,31 @@ parse_receive_entity (
 							pgm_debug ("parse_receive_entity() failed: %s", (*error)->message);
 						return FALSE;
 					}
-
-					recv_gsr->gsr_interface = ir.ir_interface;
-					memcpy (&recv_gsr->gsr_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
-					memcpy (&primary_interface->ir_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
-					scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
+					else
+					{
+						{
+							char s[INET6_ADDRSTRLEN];
+							pgm_sockaddr_ntop (&ir.ir_addr, s, sizeof(s));
+							pgm_debug ("Primary interface \"%s\" address detected as \"%s\".", primary_interface->ir_name, s);
+						}
+						primary_interface->ir_interface = ir.ir_interface;
+						memcpy (&primary_interface->ir_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
+					}
 				}
+
+				recv_gsr->gsr_interface = primary_interface->ir_interface;
+				memcpy (&recv_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr *)&primary_interface->ir_addr));
 			}
 			else
 			{
+/* single address-family interface name */
+				{
+					char s[INET6_ADDRSTRLEN];
+					pgm_sockaddr_ntop (&primary_interface->ir_addr, s, sizeof(s));
+					pgm_debug ("Primary interface detected as \"%s\".", s);
+				}
 /* use interface address family for multicast group */
-				recv_gsr->gsr_interface = primary_interface->ir_interface;
 				recv_gsr->gsr_group.ss_family = primary_interface->ir_addr.ss_family;
-				memcpy (&recv_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&primary_interface->ir_addr));
-				scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&primary_interface->ir_addr);
 			}
 		}
 
@@ -1347,6 +1407,10 @@ parse_receive_entity (
 /* check if we can now resolve the interface by address family of the receive group */
 			if (primary_interface->ir_name[0] != '\0')
 			{
+				pgm_debug ("Resolving primary interface \"%s\" with multicast group family %s.",
+					primary_interface->ir_name,
+					pgm_family_string (recv_gsr->gsr_group.ss_family));
+
 				struct interface_req ir;
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, error))
 				{
@@ -1359,28 +1423,59 @@ parse_receive_entity (
 						pgm_debug ("parse_receive_entity() failed: %s", (*error)->message);
 					return FALSE;
 				}
+				else
+				{
+					{
+						char s[INET6_ADDRSTRLEN];
+						pgm_sockaddr_ntop (&ir.ir_addr, s, sizeof(s));
+						pgm_debug ("Primary interface \"%s\" address detected as \"%s\".", primary_interface->ir_name, s);
+					}
+					primary_interface->ir_interface = ir.ir_interface;
+					memcpy (&primary_interface->ir_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
+				}
 
-				recv_gsr->gsr_interface = ir.ir_interface;
-				memcpy (&recv_gsr->gsr_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
-				scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
+				recv_gsr->gsr_interface = primary_interface->ir_interface;
+				memcpy (&recv_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&primary_interface->ir_addr));
+			}
+			else
+			{
+/* there is no primary interface, discover one with the provided address family */
+				struct sockaddr_storage addr;
+				if (!pgm_get_multicast_enabled_node_addr (recv_gsr->gsr_group.ss_family, (struct sockaddr*)&addr, sizeof(addr), error))
+				{
+					pgm_prefix_error (error,
+							_("Node primary address family cannot be determined: "));
+					pgm_free (recv_gsr);
+					pgm_free (primary_interface);
+					if (NULL != error)
+						pgm_debug ("parse_receive_entity() failed: %s", (*error)->message);
+					return FALSE;
+				}
+				else
+				{
+					{
+						char s[INET6_ADDRSTRLEN];
+						pgm_sockaddr_ntop (&addr, s, sizeof(s));
+						pgm_debug ("Node primary address detected as \"%s\".", s);
+					}
+					recv_gsr->gsr_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
+					memcpy (&recv_gsr->gsr_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
+				}
+
 			}
 		}
 
 /* copy default PGM multicast group */
-		switch (recv_gsr->gsr_group.ss_family) {
-		case AF_INET6:
-			memcpy (&((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_addr,
-				&if6_default_group_addr,
-				sizeof(if6_default_group_addr));
-			((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = scope_id;
-			break;
-
-		case AF_INET:
-			((struct sockaddr_in*)&recv_gsr->gsr_group)->sin_addr.s_addr = htonl(IF_DEFAULT_GROUP);
-			break;
-	
-		default:
+		if (!set_default_multicast_group (recv_gsr->gsr_group.ss_family, &recv_gsr->gsr_group))
+		{
 			pgm_assert_not_reached();
+		}
+		else
+		{
+			char s[INET6_ADDRSTRLEN];
+			if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&recv_gsr->gsr_group, s, sizeof (s)))
+				s[0] = 0;
+			pgm_debug ("Default to multicast group \"%s\".", s);
 		}
 
 /* ASM: source = group */
@@ -1465,6 +1560,10 @@ parse_receive_entity (
 		{
 			if (primary_interface->ir_name[0] != '\0')
 			{
+				pgm_debug ("Resolving primary interface \"%s\" with multicast group family %s.",
+					primary_interface->ir_name,
+					pgm_family_string (recv_gsr->gsr_group.ss_family));
+
 				struct interface_req ir;
 				pgm_error_t* sub_error = NULL;
 				if (!parse_interface (recv_gsr->gsr_group.ss_family, primary_interface->ir_name, &ir, &sub_error))
@@ -1487,16 +1586,49 @@ parse_receive_entity (
 						return FALSE;
 					}
 				}
+				else
+				{
+					{
+						char s[INET6_ADDRSTRLEN];
+						pgm_sockaddr_ntop (&ir.ir_addr, s, sizeof(s));
+						pgm_debug ("Primary interface \"%s\" address detected as \"%s\".", primary_interface->ir_name, s);
+					}
+					primary_interface->ir_interface = ir.ir_interface;
+					memcpy (&primary_interface->ir_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
+				}
 
 				recv_gsr->gsr_interface = ir.ir_interface;
 				memcpy (&recv_gsr->gsr_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
-				((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&ir.ir_addr);
 			}
 		}
-		else
+
+		if (AF_UNSPEC == primary_interface->ir_addr.ss_family)
 		{
-/* keep interface scope */
-			((struct sockaddr_in6*)&recv_gsr->gsr_group)->sin6_scope_id = pgm_sockaddr_scope_id ((struct sockaddr*)&primary_interface->ir_addr);
+/* there is no primary interface, discover one with the evaluated address family */
+			struct sockaddr_storage addr;
+			if (!pgm_get_multicast_enabled_node_addr (recv_gsr->gsr_group.ss_family, (struct sockaddr*)&addr, sizeof(addr), error))
+			{
+				pgm_prefix_error (error,
+						_("Node primary address family cannot be determined: "));
+				pgm_free (recv_gsr);
+				pgm_free (primary_interface);
+				if (NULL != error)
+					pgm_debug ("parse_receive_entity() failed: %s", (*error)->message);
+				return FALSE;
+			}
+			else
+			{
+				{
+					char s[INET6_ADDRSTRLEN];
+					pgm_sockaddr_ntop (&addr, s, sizeof(s));
+					pgm_debug ("Node primary address detected as \"%s\".", s);
+				}
+				primary_interface->ir_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
+				memcpy (&primary_interface->ir_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
+			}
+
+			recv_gsr->gsr_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
+			memcpy (&recv_gsr->gsr_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
 		}
 
 /* ASM: source = group */
