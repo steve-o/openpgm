@@ -1314,6 +1314,73 @@ resolve_af_from_interface (
 	}
 }
 
+/* resolve a non-unique interface decl using an address family, an empty decl 
+ * defaults to the node primary multicast-capable address.
+ */
+
+static
+bool
+resolve_interface (
+	const int		address_family,
+	struct interface_req*	interface,
+	pgm_error_t** restrict	error
+	)
+{
+	if (0 == interface->ir_name[0])
+	{
+		pgm_debug ("Interface is not specified, defaulting to node address.");
+		struct sockaddr_storage addr;
+		if (!pgm_get_multicast_enabled_node_addr (address_family, (struct sockaddr*)&addr, sizeof(addr), error))
+		{
+			pgm_prefix_error (error,
+					_("Node primary address family cannot be determined: "));
+			if (NULL != error)
+				pgm_debug ("resolve_interface() failed: %s", (*error)->message);
+		}
+		else
+		{
+			{
+				char s[INET6_ADDRSTRLEN];
+				if (0 != pgm_sockaddr_ntop (&addr, s, sizeof(s)))
+					s[0] == 0;
+				pgm_debug ("Node primary address detected as \"%s\".", s);
+			}
+			interface->ir_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
+			memcpy (&interface->ir_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
+			return TRUE;
+		}
+	}
+	else
+	{
+		pgm_debug ("Resolving interface \"%s\" with node address multicast group family %s.",
+			interface->ir_name,
+			pgm_family_string (address_family));
+		struct interface_req ir;
+		if (!parse_interface (address_family, interface->ir_name, &ir, error))
+		{
+			pgm_prefix_error (error,
+					_("Unique address cannot be determined for interface %s%s%s: "),
+					interface->ir_name ? "\"" : "", interface->ir_name ? interface->ir_name : "(null)", interface->ir_name ? "\"" : "");
+			if (NULL != error)
+				pgm_debug ("resolve_interface() failed: %s", (*error)->message);
+		}
+		else
+		{
+			{
+				char s[INET6_ADDRSTRLEN];
+				if (0 != pgm_sockaddr_ntop (&ir.ir_addr, s, sizeof(s)))
+					s[0] == 0;
+				pgm_debug ("Interface \"%s\" detected as \"%s\".", interface->ir_name ? interface->ir_name : "", s);
+			}
+			interface->ir_interface = ir.ir_interface;
+			memcpy (&interface->ir_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 /* parse a receive multicast group entity.  can contain more than one multicast group to
  * support asymmetric fan-out.
  *
