@@ -1314,6 +1314,33 @@ resolve_af_from_interface (
 	}
 }
 
+/* determine preferred address family from the primary node address, likely to be IPv6 unless disabled.
+ */
+
+static
+bool
+resolve_af_from_node (
+	int* address_family,
+	pgm_error_t** restrict	error
+	)
+{
+	struct sockaddr_storage addr;
+	if (!pgm_get_multicast_enabled_node_addr (AF_UNSPEC, (struct sockaddr*)&addr, sizeof(addr), error))
+	{
+		pgm_prefix_error (error,
+				_("Node primary node address family cannot be determined: "));
+		if (NULL != error)
+			pgm_debug ("resolve_interface() failed: %s", (*error)->message);
+		return FALSE;
+	}
+	else
+	{
+		pgm_debug ("Node primary node address family detected as \"%s\".", pgm_family_string (addr.ss_family));
+		*address_family = addr.ss_family;
+		return TRUE;
+	}
+}
+
 /* resolve a non-unique interface decl using an address family, an empty decl 
  * defaults to the node primary multicast-capable address.
  */
@@ -1333,7 +1360,7 @@ resolve_interface (
 		if (!pgm_get_multicast_enabled_node_addr (address_family, (struct sockaddr*)&addr, sizeof(addr), error))
 		{
 			pgm_prefix_error (error,
-					_("Node primary address family cannot be determined: "));
+					_("Node primary node address cannot be determined: "));
 			if (NULL != error)
 				pgm_debug ("resolve_interface() failed: %s", (*error)->message);
 		}
@@ -1343,7 +1370,7 @@ resolve_interface (
 				char s[INET6_ADDRSTRLEN];
 				if (0 != pgm_sockaddr_ntop (&addr, s, sizeof(s)))
 					s[0] == 0;
-				pgm_debug ("Node primary address detected as \"%s\".", s);
+				pgm_debug ("Node primary node address detected as \"%s\".", s);
 			}
 			interface->ir_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
 			memcpy (&interface->ir_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
