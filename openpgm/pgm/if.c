@@ -1265,6 +1265,55 @@ set_default_multicast_group (
 	return TRUE;
 }
 
+/* Given an entity parameter, attempt to resolve into a list of multicast groups.  Resolution
+ * may fail without knowing a preferred address family.
+ */
+
+static
+bool
+resolve_af_from_entity (
+	const char* restrict entity,
+	int* address_family
+	)
+{
+	struct sockaddr_storage ss;
+	int j = 0;	
+	char** tokens = pgm_strsplit (entity, ",", 10);
+	while (tokens && tokens[j])
+	{
+		if (parse_group (AF_UNSPEC, tokens[j], (struct sockaddr*)&ss, NULL /* ignore error */))
+		{
+			pgm_strfreev (tokens);
+			*address_family = ss.ss_family;
+			return TRUE;
+		}
+	}
+
+	pgm_strfreev (tokens);
+	return FALSE;
+}
+
+/* given an interface resolve the intended address family.
+ */
+
+static
+bool
+resolve_af_from_interface (
+	const struct interface_req* interface,
+	int* address_family
+	)
+{
+	if (AF_UNSPEC == interface->ir_addr.ss_family)
+	{
+		return FALSE;
+	}
+	else
+	{
+		*address_family = interface->ir_addr.ss_family;
+		return TRUE;
+	}
+}
+
 /* parse a receive multicast group entity.  can contain more than one multicast group to
  * support asymmetric fan-out.
  *
