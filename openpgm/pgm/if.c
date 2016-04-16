@@ -1287,9 +1287,77 @@ resolve_af_from_entity (
 			*address_family = ss.ss_family;
 			return TRUE;
 		}
+		++j;
 	}
 
 	pgm_strfreev (tokens);
+	return FALSE;
+}
+
+/* Resolve an entity parameter into a list of gsr entries by the specified
+ * address family and interface.
+ */
+
+static
+bool
+resolve_gsr_from_entity (
+	int			address_family,
+	const char* restrict	entity,
+	pgm_list_t**  restrict	gsr_list,	/* <struct pgm_group_source_req*> */
+	pgm_error_t** restrict	error
+	)
+{
+	struct pgm_group_source_req* gsr;
+	pgm_list_t* list = NULL;
+	int j = 0;
+	char** tokens = pgm_strsplit (entity, ",", 10);
+	while (tokens && tokens[j])
+	{
+		gsr = pgm_new0 (struct pgm_group_source_req, 1);
+
+		if (!parse_group (address_family, tokens[j], (struct sockaddr*)&gsr->gsr_group, error))
+		{
+			pgm_free (gsr);
+			while (list) {
+				pgm_free (list->data);
+				list = pgm_list_delete_link (list, list);
+			}
+			pgm_strfreev (tokens);
+			if (NULL != error)
+				pgm_debug ("resolve_gsr_from_entity() failed: %s", (*error)->message);
+			return FALSE;
+		}
+		else
+		{
+/* ASM: source = group */
+			memcpy (&gsr->gsr_source, &gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&gsr->gsr_group));
+			list = pgm_list_append (list, gsr);
+		}
+		++j;
+	}
+
+	pgm_strfreev (tokens);
+	*gsr_list = list;
+	return TRUE;
+}
+
+/* bind every multicast group to a given interface.
+ */
+
+static
+bool
+bind_gsr_to_interface (
+	pgm_list_t**  restrict  gsr_list,	/* <struct pgm_group_source_req*> */
+	const struct interface_req* interface
+	)
+{
+	while (gsr_list) {
+		struct pgm_group_source_req* gsr = *gsr_list;
+/* interface is a tuple of {index, address} in order to support modern IP stacks with IP aliasing. */
+		gsr->gsr_interface = interface->ir_addr.ss_family;
+		memcpy (&gsr->gsr_addr, &interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&interface->ir_addr));
+		*gsr_list = (*gsr_list)->next;
+	}
 	return FALSE;
 }
 
