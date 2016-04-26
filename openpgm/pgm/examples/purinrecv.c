@@ -308,23 +308,6 @@ on_console_ctrl (
 }
 #endif /* !_WIN32 */
 
-char*
-gsr_to_string (
-	const struct pgm_group_source_req* gsr
-	)
-{
-	char temp[1024], group[1024], source[1024], addr[1024];
-	if (0 != pgm_sockaddr_ntop (&gsr->gsr_group, group, sizeof (group)))
-		group[0] = 0;
-	if (0 != pgm_sockaddr_ntop (&gsr->gsr_source, source, sizeof (source)))
-		source[0] = 0;
-	if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
-		addr[0] = 0;
-	sprintf (temp, "{ .gsr_interface = %u, .gsr_group = \"%s\", .gsr_source = \"%s\", .gsr_addr = \"%s\" }",
-		gsr->gsr_interface, group, source, addr);
-	return temp;
-}
-
 static
 bool
 on_startup (void)
@@ -338,17 +321,21 @@ on_startup (void)
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
 		goto err_abort;
 	} else {
-		char recv_addrs[1024], send_addrs[1024];
+		char gsr[1024], recv_addrs[1024], send_addrs[1024];
 		recv_addrs[0] = send_addrs[0] = 0;
 		for (unsigned i = 0; i < res->ai_recv_addrs_len; i++) {
-			if (i > 0) strcat (recv_addrs, ", ");
-			strcat (recv_addrs, gsr_to_string (&res->ai_recv_addrs[i]));
+			if (i == 0) strcat (recv_addrs, "{ ");
+			else strcat (recv_addrs, ", { ");
+			strcat (recv_addrs, pgm_gsr_to_string (&res->ai_recv_addrs[i], gsr, sizeof (gsr)));
+			strcat (recv_addrs, " }");
 		}
 		for (unsigned i = 0; i < res->ai_send_addrs_len; i++) {
-			if (i > 0) strcat (send_addrs, ", ");
-			strcat (send_addrs, gsr_to_string (&res->ai_send_addrs[i]));
+			if (i == 0) strcat (send_addrs, "{ ");
+			else strcat (send_addrs, ", { ");
+			strcat (send_addrs, pgm_gsr_to_string (&res->ai_send_addrs[i], gsr, sizeof (gsr)));
+			strcat (send_addrs, " }");
 		}
-		printf ("Network parameter: { .ai_family = \"%s\", .ai_recv_addrs = [%s], .ai_send_addrs = [%s] }\n",
+		printf ("Network parameter: { ai_family = \"%s\", ai_recv_addrs = [%s], ai_send_addrs = [%s] }\n",
 			pgm_family_string (res->ai_family), recv_addrs, send_addrs);
 	}
 

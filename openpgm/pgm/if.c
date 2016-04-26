@@ -132,7 +132,8 @@ static
 char*
 interface_req_to_string (
 	struct interface_req* interface,
-	char* text
+	char* text,
+	size_t len
 	)
 {
 	char flags[1024];
@@ -140,7 +141,7 @@ interface_req_to_string (
 
 	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&interface->ir_addr, addr, sizeof (addr)))
 		addr[0] = 0;
-	sprintf (text, "if_name: \"%s\", ir_flags: \"%s\", ir_interface: %d, ir_addr: \"%s\"",
+	pgm_snprintf_s (text, len, _TRUNCATE, "if_name: \"%s\", ir_flags: \"%s\", ir_interface: %d, ir_addr: \"%s\"",
 		interface->ir_name,
 		ifa_flags_to_string (interface->ir_flags, flags),
 		interface->ir_interface,
@@ -151,7 +152,8 @@ interface_req_to_string (
 char*
 pgm_gsr_to_string (
 	const struct pgm_group_source_req* gsr,
-	char* text
+	char* text,
+	size_t len	/* capacity of text buffer */
 	)
 {
 	char group[1024], source[1024], addr[1024];
@@ -161,7 +163,7 @@ pgm_gsr_to_string (
 		source[0] = 0;
 	if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
 		addr[0] = 0;
-	sprintf (text, "gsr_interface = %u, gsr_group = \"%s\", gsr_source = \"%s\", gsr_addr = \"%s\"",
+	pgm_snprintf_s (text, len, _TRUNCATE, "gsr_interface = %u, gsr_group = \"%s\", gsr_source = \"%s\", gsr_addr = \"%s\"",
 		gsr->gsr_interface, group, source, addr);
 	return text;
 }
@@ -1604,7 +1606,7 @@ parse_receive_entity (
 		} else {
 			char s[IR_STRLEN];
 			pgm_debug ("Resolved interface as { %s }.",
-				interface_req_to_string ((struct interface_req*)(*interface_list)->data, s));
+				interface_req_to_string ((struct interface_req*)(*interface_list)->data, s, sizeof (s)));
 		}
 	}
 
@@ -1640,7 +1642,7 @@ parse_receive_entity (
 				char t[1024];
 				if (gsr_list == *recv_list) strcat (s, "{ ");
 				else strcat (s, ", { ");
-				pgm_gsr_to_string (gsr_list->data, t);
+				pgm_gsr_to_string (gsr_list->data, t, sizeof (t));
 				strcat (s, t);
 				strcat (s, " }");
 			}
@@ -1665,7 +1667,7 @@ parse_receive_entity (
 			char t[1024];
 			if (gsr_list == *recv_list) strcat (s, "{ ");
 			else strcat (s, ", { ");
-			pgm_gsr_to_string (gsr_list->data, t);
+			pgm_gsr_to_string (gsr_list->data, t, sizeof (t));
 			strcat (s, t);
 			strcat (s, " }");
 		}

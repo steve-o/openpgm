@@ -203,6 +203,7 @@ int pgm_epoll_ctl (pgm_sock_t*const, const int, const int, const int);
 #endif
 
 const char* pgm_family_string (const int) PGM_GNUC_CONST;
+char* pgm_gsr_to_string (const struct pgm_group_source_req* gsr, char* text, size_t len);
 
 PGM_END_DECLS
 
