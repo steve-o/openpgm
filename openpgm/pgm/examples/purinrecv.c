@@ -321,22 +321,8 @@ on_startup (void)
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
 		goto err_abort;
 	} else {
-		char gsr[1024], recv_addrs[1024], send_addrs[1024];
-		recv_addrs[0] = send_addrs[0] = 0;
-		for (unsigned i = 0; i < res->ai_recv_addrs_len; i++) {
-			if (i == 0) strcat (recv_addrs, "{ ");
-			else strcat (recv_addrs, ", { ");
-			strcat (recv_addrs, pgm_gsr_to_string (&res->ai_recv_addrs[i], gsr, sizeof (gsr)));
-			strcat (recv_addrs, " }");
-		}
-		for (unsigned i = 0; i < res->ai_send_addrs_len; i++) {
-			if (i == 0) strcat (send_addrs, "{ ");
-			else strcat (send_addrs, ", { ");
-			strcat (send_addrs, pgm_gsr_to_string (&res->ai_send_addrs[i], gsr, sizeof (gsr)));
-			strcat (send_addrs, " }");
-		}
-		printf ("Network parameter: { ai_family = \"%s\", ai_recv_addrs = [%s], ai_send_addrs = [%s] }\n",
-			pgm_family_string (res->ai_family), recv_addrs, send_addrs);
+		char network[1024];
+		printf ("Network parameter: { %s }\n", pgm_addrinfo_to_string (res, network, sizeof (network)));
 	}
 
 	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;

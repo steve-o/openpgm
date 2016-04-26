@@ -304,6 +304,9 @@ create_sock (void)
 	if (!pgm_getaddrinfo (network, NULL, &res, &pgm_err)) {
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
 		goto err_abort;
+	} else {
+		char network[1024];
+                printf ("Network parameter: { %s }\n", pgm_addrinfo_to_string (res, network, sizeof (network)));
 	}
 
 	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;

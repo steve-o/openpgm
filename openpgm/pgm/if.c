@@ -168,6 +168,32 @@ pgm_gsr_to_string (
 	return text;
 }
 
+char*
+pgm_addrinfo_to_string (
+	const struct pgm_addrinfo_t* addr,
+	char* text,
+	size_t len
+	)
+{
+	char gsr[1024], recv_addrs[1024], send_addrs[1024];
+	recv_addrs[0] = send_addrs[0] = 0;
+	for (unsigned i = 0; i < addr->ai_recv_addrs_len; i++) {
+		if (i == 0) strcat (recv_addrs, "{ ");
+		else strcat (recv_addrs, ", { ");
+		strcat (recv_addrs, pgm_gsr_to_string (&addr->ai_recv_addrs[i], gsr, sizeof (gsr)));
+		strcat (recv_addrs, " }");
+	}
+	for (unsigned i = 0; i < addr->ai_send_addrs_len; i++) {
+		if (i == 0) strcat (send_addrs, "{ ");
+		else strcat (send_addrs, ", { ");
+		strcat (send_addrs, pgm_gsr_to_string (&addr->ai_send_addrs[i], gsr, sizeof (gsr)));
+		strcat (send_addrs, " }");
+	}
+	pgm_snprintf_s (text, len, _TRUNCATE, "ai_family = \"%s\", ai_recv_addrs = [%s], ai_send_addrs = [%s]",
+		pgm_family_string (addr->ai_family), recv_addrs, send_addrs);
+	return text;
+}
+
 /* dump all interfaces to console.
  *
  * note that interface indexes are only in regard to the link layer and hence
