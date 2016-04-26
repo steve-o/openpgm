@@ -94,6 +94,36 @@ static inline bool is_network_char (const int, const char) PGM_GNUC_CONST;
  * internets: 224.0.1.0-238.255.255.255,  ffxe::/16
  */
 
+char*
+ifa_flags_to_string (
+	unsigned int flags,
+	char* text
+	)
+{
+	if (0 != (flags & IFF_UP))
+		strcpy (text, "UP");
+	else
+		*text = 0;
+	if (0 != (flags & IFF_LOOPBACK)) {
+		if (*text)
+			strcat (text, ",LOOPBACK");
+		else
+			strcpy (text, "LOOPBACK");
+	}
+	if (0 != (flags & IFF_BROADCAST)) {
+		if (*text)
+			strcat (text, ",BROADCAST");
+		else
+			strcpy (text, "BROADCAST");
+	}
+	if (0 != (flags & IFF_MULTICAST)) {
+		if (*text)
+			strcat (text, ",MULTICAST");
+		else
+			strcpy (text, "MULTICAST");
+	}
+	return text;
+}
 
 /* dump all interfaces to console.
  *
@@ -127,30 +157,10 @@ pgm_if_print_all (void)
 
 /* decode flags */
 		char flags[1024];
-		if (ifa->ifa_flags & IFF_UP)
-			strcpy (flags, "UP");
-		else
-			flags[0] = '\0';
-		if (ifa->ifa_flags & IFF_LOOPBACK) {
-			if (flags[0])
-				strcat (flags, ",LOOPBACK");
-			else
-				strcpy (flags, "LOOPBACK");
-		}
-		if (ifa->ifa_flags & IFF_BROADCAST) {
-			if (flags[0])
-				strcat (flags, ",BROADCAST");
-			else
-				strcpy (flags, "BROADCAST");
-		}
-		if (ifa->ifa_flags & IFF_MULTICAST) {
-			if (flags[0])
-				strcat (flags, ",MULTICAST");
-			else
-				strcpy (flags, "MULTICAST");
-		}
 		pgm_info (_("%s: index=%u flags=%u<%s>"),
-			ifa->ifa_name ? ifa->ifa_name : "(null)", idx, ifa->ifa_flags, flags);
+			ifa->ifa_name ? ifa->ifa_name : "(null)",
+			idx,
+			ifa->ifa_flags, ifa_flags_to_string (ifa->ifa_flags, flags));
 
 		char addr[INET6_ADDRSTRLEN];
 		getnameinfo (ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr),
