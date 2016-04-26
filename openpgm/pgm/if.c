@@ -56,6 +56,8 @@ struct interface_req {
 	struct sockaddr_storage ir_addr;		/* interface address */
 };
 
+#define IR_STRLEN	(IF_NAMESIZE + INET6_ADDRSTRLEN + strlen ("ir_name: \"\", ir_flags: \"\", ir_interface: , ir_addr: \"\"") + strlen ("4294967295") + strlen ("UP,LOOPBACK,BROADCAST,MULTICAST"))
+
 
 /* locals */
 
@@ -122,6 +124,24 @@ ifa_flags_to_string (
 		else
 			strcpy (text, "MULTICAST");
 	}
+	return text;
+}
+
+char*
+interface_req_to_string (
+	struct interface_req* interface,
+	char* text
+	)
+{
+	char flags[1024];
+	char addr[INET6_ADDRSTRLEN];
+
+	pgm_sockaddr_ntop ((struct sockaddr*)&interface->ir_addr, addr, sizeof (addr));
+	sprintf (text, "if_name: \"%s\", ir_flags: \"%s\", ir_interface: %d, ir_addr: \"%s\"",
+		interface->ir_name,
+		ifa_flags_to_string (interface->ir_flags, flags),
+		interface->ir_interface,
+		addr);
 	return text;
 }
 
@@ -1561,7 +1581,9 @@ parse_receive_entity (
 					_("Cannot resolve interface: "));
 			return FALSE;
 		} else {
-			pgm_debug ("Resolved interface.");
+			char s[IR_STRLEN];
+			pgm_debug ("Resolved interface as { %s }.",
+				interface_req_to_string ((struct interface_req*)(*interface_list)->data, s));
 		}
 	}
 
