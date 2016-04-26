@@ -956,11 +956,9 @@ skip_inet_network:
 
 #ifdef IF_DEBUG
 	{
-		char addr[1024];
-		if (0 != pgm_sockaddr_ntop (&ir->ir_addr, addr, sizeof (addr)))
-			addr[0] = 0;
-		pgm_debug ("parse_interface() evaluted as { .ir_name = \"%s\", .ir_flags = %u, .ir_interface = %u, .ir_addr = \"%s\" }.",
-			ir->ir_name, ir->ir_flags, ir->ir_interface, addr);
+		char s[1024];
+		pgm_debug ("parse_interface() evaluted as { %s }.",
+			interface_req_to_string (ir, s, sizeof (s)));
 	}
 #endif
 	pgm_freeifaddrs (ifap);
@@ -1596,18 +1594,18 @@ parse_receive_entity (
 /* resolve address family from given parameters. */
 	if (AF_UNSPEC == family) {
 		if (!resolve_af_from_entity (entity, &family)) {
-			pgm_warn ("Cannot resolve address family from entity parameter \"%s\".", entity ? entity : "");
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Cannot resolve address family from entity parameter \"%s\".", entity ? entity : "");
 		} else {
-			pgm_debug ("Resolved entity parameter \"%s\" as %s.",
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Resolved entity parameter \"%s\" as %s.",
 				entity ? entity : "",
 				pgm_family_string (family));
 		}
 	}
 	if (AF_UNSPEC == family) {
 		if (!resolve_af_from_interface ((*interface_list)->data, &family)) {
-			pgm_warn ("Cannot resolve address family from interface parameter.");
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Cannot resolve address family from interface parameter.");
 		} else {
-			pgm_debug ("Resolved interface parameter as %s.",
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Resolved interface parameter as %s.",
 				pgm_family_string (family));
 		}
 	}
@@ -1618,7 +1616,7 @@ parse_receive_entity (
 					_("Node primary address family cannot be determined: "));
 			return FALSE;
 		} else {
-			pgm_debug ("Resolved primary node as %s.",
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Resolved primary node as %s.",
 				pgm_family_string (family));
 		}
 	}
@@ -1631,7 +1629,7 @@ parse_receive_entity (
 			return FALSE;
 		} else {
 			char s[IR_STRLEN];
-			pgm_debug ("Resolved interface as { %s }.",
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Resolved interface as { %s }.",
 				interface_req_to_string ((struct interface_req*)(*interface_list)->data, s, sizeof (s)));
 		}
 	}
@@ -1651,7 +1649,7 @@ parse_receive_entity (
 			char s[INET6_ADDRSTRLEN];
 			if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, s, sizeof (s)))
 				s[0] = 0;
-			pgm_debug ("Setting default multicast group %s.", s);
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Setting default multicast group %s.", s);
 		}
 /* ASM: source = group */
 		memcpy (&gsr->gsr_source, &gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&gsr->gsr_group));
@@ -1672,7 +1670,7 @@ parse_receive_entity (
 				strcat (s, t);
 				strcat (s, " }");
 			}
-			pgm_debug ("Resolved entity \"%s\" to [%s].", entity, s);
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Resolved entity \"%s\" to [%s].", entity, s);
 		}
 	}
 
@@ -1738,25 +1736,17 @@ parse_send_entity (
 		*send_list = pgm_list_append (*send_list, send_gsr);
 #ifdef IF_DEBUG
 		{
-			char gsrs[1024];
-			char temp[1024], group[1024], source[1024], addr[1024];
-			pgm_list_t* list = *send_list;
-			gsrs[0] = 0;
-			while (list) {
-				const struct pgm_group_source_req* gsr = list->data;
-				if (0 != pgm_sockaddr_ntop (&gsr->gsr_group, group, sizeof (group)))
-					group[0] = 0;
-				if (0 != pgm_sockaddr_ntop (&gsr->gsr_source, source, sizeof (source)))
-					source[0] = 0;
-				if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
-					addr[0] = 0;
-				sprintf (temp, "{ .gsr_interface = %u, .gsr_group = \"%s\", .gsr_source = \"%s\", .gsr_addr = \"%s\" }",
-					gsr->gsr_interface, group, source, addr);
-				strcat (gsrs, temp);
-				list = list->next;
-				if (list) strcat (gsrs, ", ");
+			char s[1024];
+			s[0] = 0;
+			for (pgm_list_t* gsr_list = *send_list; gsr_list; gsr_list = gsr_list->next) {
+				char t[1024];
+				if (gsr_list == *send_list) strcat (s, "{ ");
+				else strcat (s, ", { ");
+				pgm_gsr_to_string (gsr_list->data, t, sizeof (t));
+				strcat (s, t);
+				strcat (s, " }");
 			}
-			pgm_debug ("parse_send_entity() evaluated as [%s].", gsrs);
+			pgm_debug ("parse_send_entity() evaluated as [%s].", s);
 		}
 #endif
 		return TRUE;
@@ -1813,25 +1803,17 @@ parse_send_entity (
 	*send_list = pgm_list_append (*send_list, send_gsr);
 #ifdef IF_DEBUG
 	{
-		char gsrs[1024];
-		char temp[1024], group[1024], source[1024], addr[1024];
-		pgm_list_t* list = *send_list;
-		gsrs[0] = 0;
-		while (list) {
-			const struct pgm_group_source_req* gsr = list->data;
-			if (0 != pgm_sockaddr_ntop (&gsr->gsr_group, group, sizeof (group)))
-				group[0] = 0;
-			if (0 != pgm_sockaddr_ntop (&gsr->gsr_source, source, sizeof (source)))
-				source[0] = 0;
-			if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
-				addr[0] = 0;
-			sprintf (temp, "{ .gsr_interface = %u, .gsr_group = \"%s\", .gsr_source = \"%s\", .gsr_addr = \"%s\" }",
-				gsr->gsr_interface, group, source, addr);
-			strcat (gsrs, temp);
-			list = list->next;
-			if (list) strcat (gsrs, ", ");
+		char s[1024];
+		s[0] = 0;
+		for (pgm_list_t* gsr_list = *send_list; gsr_list; gsr_list = gsr_list->next) {
+			char t[1024];
+			if (gsr_list == *send_list) strcat (s, "{ ");
+			else strcat (s, ", { ");
+			pgm_gsr_to_string (gsr_list->data, t, sizeof (t));
+			strcat (s, t);
+			strcat (s, " }");
 		}
-		pgm_debug ("parse_send_entity() evaluated as [%s].", gsrs);
+		pgm_debug ("parse_send_entity() evaluated as [%s].", s);
 	}
 #endif
 	return TRUE;
