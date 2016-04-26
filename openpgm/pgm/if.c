@@ -96,6 +96,7 @@ static inline bool is_network_char (const int, const char) PGM_GNUC_CONST;
  * internets: 224.0.1.0-238.255.255.255,  ffxe::/16
  */
 
+static
 char*
 ifa_flags_to_string (
 	unsigned int flags,
@@ -127,6 +128,7 @@ ifa_flags_to_string (
 	return text;
 }
 
+static
 char*
 interface_req_to_string (
 	struct interface_req* interface,
@@ -136,12 +138,31 @@ interface_req_to_string (
 	char flags[1024];
 	char addr[INET6_ADDRSTRLEN];
 
-	pgm_sockaddr_ntop ((struct sockaddr*)&interface->ir_addr, addr, sizeof (addr));
+	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&interface->ir_addr, addr, sizeof (addr)))
+		addr[0] = 0;
 	sprintf (text, "if_name: \"%s\", ir_flags: \"%s\", ir_interface: %d, ir_addr: \"%s\"",
 		interface->ir_name,
 		ifa_flags_to_string (interface->ir_flags, flags),
 		interface->ir_interface,
 		addr);
+	return text;
+}
+
+char*
+pgm_gsr_to_string (
+	const struct pgm_group_source_req* gsr,
+	char* text
+	)
+{
+	char group[1024], source[1024], addr[1024];
+	if (0 != pgm_sockaddr_ntop (&gsr->gsr_group, group, sizeof (group)))
+		group[0] = 0;
+	if (0 != pgm_sockaddr_ntop (&gsr->gsr_source, source, sizeof (source)))
+		source[0] = 0;
+	if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
+		addr[0] = 0;
+	sprintf (text, "gsr_interface = %u, gsr_group = \"%s\", gsr_source = \"%s\", gsr_addr = \"%s\"",
+		gsr->gsr_interface, group, source, addr);
 	return text;
 }
 
@@ -1613,7 +1634,17 @@ parse_receive_entity (
 					_("Cannot resolve entity: "));
 			return FALSE;
 		} else {
-			pgm_debug ("Resolved entity.");
+			char s[1024];
+			s[0] = 0;
+			for (pgm_list_t* gsr_list = *recv_list; gsr_list; gsr_list = gsr_list->next) {
+				char t[1024];
+				if (gsr_list == *recv_list) strcat (s, "{ ");
+				else strcat (s, ", { ");
+				pgm_gsr_to_string (gsr_list->data, t);
+				strcat (s, t);
+				strcat (s, " }");
+			}
+			pgm_debug ("Resolved entity \"%s\" to [%s].", entity, s);
 		}
 	}
 
@@ -1628,25 +1659,17 @@ parse_receive_entity (
 
 #ifdef IF_DEBUG
 	{
-		char gsrs[1024];
-		char temp[1024], group[1024], source[1024], addr[1024];
-		pgm_list_t* list = *recv_list;
-		gsrs[0] = 0;
-		while (list) {
-			const struct pgm_group_source_req* gsr = list->data;
-			if (0 != pgm_sockaddr_ntop (&gsr->gsr_group, group, sizeof (group)))
-				group[0] = 0;
-			if (0 != pgm_sockaddr_ntop (&gsr->gsr_source, source, sizeof (source)))
-				source[0] = 0;
-			if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
-				addr[0] = 0;
-			sprintf (temp, "{ .gsr_interface = %u, .gsr_group = \"%s\", .gsr_source = \"%s\", .gsr_addr = \"%s\" }",
-				gsr->gsr_interface, group, source, addr);
-			strcat (gsrs, temp);
-			list = list->next;
-			if (list) strcat (gsrs, ", ");
+		char s[1024];
+		s[0] = 0;
+		for (pgm_list_t* gsr_list = *recv_list; gsr_list; gsr_list = gsr_list->next) {
+			char t[1024];
+			if (gsr_list == *recv_list) strcat (s, "{ ");
+			else strcat (s, ", { ");
+			pgm_gsr_to_string (gsr_list->data, t);
+			strcat (s, t);
+			strcat (s, " }");
 		}
-		pgm_debug ("parse_receive_entity() evaluated as [%s].", gsrs);
+		pgm_debug ("parse_receive_entity() evaluated as [%s].", s);
 	}
 #endif
 	return TRUE;
