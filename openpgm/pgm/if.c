@@ -1572,6 +1572,8 @@ parse_receive_entity (
 				s[0] = 0;
 			pgm_debug ("Setting default multicast group %s.", s);
 		}
+/* ASM: source = group */
+		memcpy (&gsr->gsr_source, &gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&gsr->gsr_group));
 		*recv_list = pgm_list_append (*recv_list, gsr);
 	} else {
 		if (!resolve_gsr_from_entity (family, entity, recv_list, error)) {
