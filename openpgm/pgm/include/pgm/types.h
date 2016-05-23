@@ -27,6 +27,7 @@
 
 #ifndef _MSC_VER
 #	include <sys/param.h>
+#	include <sys/types.h>
 #endif
 #include <pgm/macros.h>
 
