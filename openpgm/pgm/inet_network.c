@@ -138,7 +138,7 @@ g_debug ("netaddr %s", inet_ntoa (netaddr));
 	return 0;
 
 default_none:
-	pgm_debug ("pgm_inet_network() failed.");
+	pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "pgm_inet_network (\"%s\") failed.", s);
 	in->s_addr = INADDR_NONE;
 	return -1;
 }
@@ -238,7 +238,7 @@ pgm_inet6_network (
 	return 0;
 
 default_none:
-	pgm_debug ("pgm_inet6_network() failed.");
+	pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "pgm_inet6_network (\"%s\") failed.", s);
 	memset (in6, 0xff, sizeof(*in6));	/* equivalent to IN6ADDR_NONE */
 	return -1;
 }
@@ -336,7 +336,7 @@ pgm_sa6_network (
 	return 0;
 
 default_none:
-	pgm_debug ("pgm_sa6_network() failed.");
+	pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "pgm_sa6_network (\"%s\") failed.", s);
 	memset (sa6, 0, sizeof(*sa6));
 	sa6->sin6_family = AF_INET6;
 	memset (&sa6->sin6_addr, 0xff, sizeof(struct in6_addr));	/* equivalent to IN6ADDR_NONE */

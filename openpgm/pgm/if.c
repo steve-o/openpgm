@@ -441,7 +441,7 @@ parse_interface (
 /* For IPv6 use an internal API that mimicks inet_network but works with sockaddr
  * instead of in6_addr, the promotion is required to save the scope identifier.
  */
-	if (AF_INET  != family && 0 == pgm_sa6_network (ifname, &sa6_addr))
+	if (AF_INET != family && 0 == pgm_sa6_network (ifname, &sa6_addr))
 	{
 		if (IN6_IS_ADDR_MULTICAST(&sa6_addr.sin6_addr)) {
 			pgm_set_error (error,
@@ -646,6 +646,7 @@ parse_interface (
 						continue;
 					addr_cnt++;
 				}
+				pgm_debug ("getaddrinfo() returned %d addresses.", addr_cnt);
 				if (addr_cnt > 1) /* copy all valid entries onto the stack */
 				{
 					unsigned i = 0;
@@ -684,6 +685,7 @@ parse_interface (
 			}
 			else
 			{
+				pgm_debug ("getaddrinfo() returned 1 address.");
 				res = result;	/* only one result */
 			}
 
@@ -814,6 +816,13 @@ parse_interface (
 					ir->ir_interface = ifindex;
 					memcpy (&ir->ir_addr, ifa->ifa_addr, pgm_sockaddr_len (ifa->ifa_addr));
 					pgm_freeifaddrs (ifap);
+#ifdef IF_DEBUG
+					{
+						char s[IR_STRLEN];
+						pgm_debug ("parse_interface (\"%s\") evaluated as { %s }.",
+							ifname, interface_req_to_string (ir, s, sizeof (s)));
+					}
+#endif
 					return TRUE;
 				}
 			}
@@ -956,9 +965,9 @@ skip_inet_network:
 
 #ifdef IF_DEBUG
 	{
-		char s[1024];
-		pgm_debug ("parse_interface() evaluted as { %s }.",
-			interface_req_to_string (ir, s, sizeof (s)));
+		char s[IR_STRLEN];
+		pgm_debug ("parse_interface (\"%s\") evaluted as { %s }.",
+			ifname, interface_req_to_string (ir, s, sizeof (s)));
 	}
 #endif
 	pgm_freeifaddrs (ifap);
@@ -1603,10 +1612,13 @@ parse_receive_entity (
 	}
 	if (AF_UNSPEC == family) {
 		if (!resolve_af_from_interface ((*interface_list)->data, &family)) {
-			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Cannot resolve address family from interface parameter.");
+			char s[IR_STRLEN];
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Cannot resolve address family from interface parameter { %s }.",
+				interface_req_to_string ((*interface_list)->data, s, sizeof (s)));
 		} else {
-			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Resolved interface parameter as %s.",
-				pgm_family_string (family));
+			char s[IR_STRLEN];
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Resolved interface parameter as { %s }.",
+				interface_req_to_string ((*interface_list)->data, s, sizeof (s)));
 		}
 	}
 /* final attempt defaulting to the primary node address. */
@@ -1649,7 +1661,7 @@ parse_receive_entity (
 			char s[INET6_ADDRSTRLEN];
 			if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, s, sizeof (s)))
 				s[0] = 0;
-			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Setting default multicast group %s.", s);
+			pgm_trace (PGM_LOG_ROLE_CONFIGURATION, "Setting default multicast group \"%s\".", s);
 		}
 /* ASM: source = group */
 		memcpy (&gsr->gsr_source, &gsr->gsr_group, pgm_sockaddr_len ((struct sockaddr*)&gsr->gsr_group));
