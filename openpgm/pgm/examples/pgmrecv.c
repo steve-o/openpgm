@@ -39,6 +39,7 @@
 #	include <sys/socket.h>
 #	include <sys/uio.h>
 #	include <sys/time.h>
+#	include <getopt.h>
 #else
 #	include "getopt.h"
 #endif
@@ -92,19 +93,18 @@ usage (
 	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
-	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
-	fprintf (stderr, "  -a <ip address> : Source unicast IP address\n");
-	fprintf (stderr, "  -s <port>       : IP port\n");
-	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
-	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
+	fprintf (stderr, "  -n, --network NETWORK    : Multicast group or unicast IP address\n");
+	fprintf (stderr, "  -s, --service PORT       : IP port\n");
+	fprintf (stderr, "  -p, --port PORT          : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -l, --enable-loop        : Enable multicast loopback and address sharing\n");
 #ifdef CONFIG_WITH_HTTP
-	fprintf (stderr, "  -H              : Enable HTTP administrative interface\n");
+	fprintf (stderr, "  -H, --enable-http        : Enable HTTP administrative interface\n");
 #endif
 #ifdef CONFIG_WITH_SNMP
-	fprintf (stderr, "  -S              : Enable SNMP interface\n");
+	fprintf (stderr, "  -S, --enable-snmp        : Enable SNMP interface\n");
 #endif
-	fprintf (stderr, "  -i              : List available interfaces\n");
-	exit (1);
+	fprintf (stderr, "  -i, --list               : List available interfaces\n");
+	exit (EXIT_SUCCESS);
 }
 
 int
@@ -139,15 +139,32 @@ main (
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
+
+	static struct option long_options[] = {
+		{ "network",        required_argument, NULL, 'n' },
+		{ "service",        required_argument, NULL, 's' },
+		{ "port",           required_argument, NULL, 'p' },
+		{ "enable-loop",    no_argument,       NULL, 'l' },
+#ifdef CONFIG_WITH_HTTP
+		{ "enable-http",    no_argument,       NULL, 'H' },
+#endif
+#ifdef CONFIG_WITH_SNMP
+		{ "enable-snmp",    no_argument,       NULL, 'S' },
+#endif
+		{ "list",           no_argument,       NULL, 'i' },
+		{ "help",           no_argument,       NULL, 'h' },
+		{ NULL, 0, NULL, 0 }
+	};
+
 	int c;
-	while ((c = getopt (argc, argv, "a:s:n:p:lih"
+	while ((c = getopt_long (argc, argv, "a:s:n:p:lih"
 #ifdef CONFIG_WITH_HTTP
 					"H"
 #endif
 #ifdef CONFIG_WITH_SNMP
 					"S"
 #endif
-					)) != -1)
+					, long_options, NULL)) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;

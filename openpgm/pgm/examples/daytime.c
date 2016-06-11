@@ -32,6 +32,7 @@
 #	include <fcntl.h>
 #	include <unistd.h>
 #	include <pthread.h>
+#	include <getopt.h>
 #else
 #	include <process.h>
 #	include <wchar.h>
@@ -94,17 +95,17 @@ usage (
 	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
-	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
-	fprintf (stderr, "  -s <port>       : IP port\n");
-	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
-	fprintf (stderr, "  -r <rate>       : Regulate to rate bytes per second\n");
-	fprintf (stderr, "  -c              : Enable PGMCC\n");
-	fprintf (stderr, "  -f <type>       : Enable FEC: proactive, ondemand, or both\n");
-	fprintf (stderr, "  -N <n>          : Reed-Solomon block size (255)\n");
-	fprintf (stderr, "  -K <k>          : Reed-Solomon group size (8)\n");
-	fprintf (stderr, "  -P <count>      : Number of pro-active parity packets (h)\n");
-	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
-	fprintf (stderr, "  -i              : List available interfaces\n");
+	fprintf (stderr, "  -n, --network NETWORK    : Multicast group or unicast IP address\n");
+	fprintf (stderr, "  -s, --service PORT       : IP port\n");
+	fprintf (stderr, "  -p, --port PORT          : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -r, --speed-limit RATE   : Regulate to RATE bytes per second\n");
+	fprintf (stderr, "  -c, --enable-pgmcc       : Enable PGMCC\n");
+	fprintf (stderr, "  -f, --enable-fec TYPE    : Enable FEC: proactive, ondemand, or both\n");
+	fprintf (stderr, "  -N N                     : Reed-Solomon block size (255)\n");
+	fprintf (stderr, "  -K K                     : Reed-Solomon group size (8)\n");
+	fprintf (stderr, "  -P <count>               : Number of pro-active parity packets (h)\n");
+	fprintf (stderr, "  -l, --enable-loop        : Enable multicast loopback and address sharing\n");
+	fprintf (stderr, "  -i, --list               : List available interfaces\n");
 	exit (EXIT_SUCCESS);
 }
 
@@ -135,8 +136,21 @@ main (
 	if (NULL == binary_name)	binary_name = argv[0];
 	else				binary_name++;
 
+	static struct option long_options[] = {
+		{ "network",        required_argument, NULL, 'n' },
+		{ "service",        required_argument, NULL, 's' },
+		{ "port",           required_argument, NULL, 'p' },
+		{ "speed-limit",    required_argument, NULL, 'r' },
+		{ "enable-pgmcc",   no_argument,       NULL, 'c' },
+		{ "enable-loop",    no_argument,       NULL, 'l' },
+		{ "enable-fec",     required_argument, NULL, 'f' },
+		{ "list",           no_argument,       NULL, 'i' },
+		{ "help",           no_argument,       NULL, 'h' },
+		{ NULL, 0, NULL, 0 }
+	};
+
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:r:cf:N:K:P:lih")) != -1)
+	while ((c = getopt_long (argc, argv, "s:n:p:r:cf:N:K:P:lih", long_options, NULL)) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;

@@ -32,6 +32,7 @@
 #	include <unistd.h>
 #	include <netinet/in.h>
 #	include <sys/socket.h>
+#	include <getopt.h>
 #else
 #	include "getopt.h"
 #endif
@@ -82,14 +83,14 @@ usage (
 	)
 {
 	std::cerr << "Usage: " << bin << " [options]" << std::endl;
-	std::cerr << "  -n <network>    : Multicast group or unicast IP address" << std::endl;
-	std::cerr << "  -s <port>       : IP port" << std::endl;
-	std::cerr << "  -p <port>       : Encapsulate PGM in UDP on IP port" << std::endl;
-	std::cerr << "  -f <type>       : Enable FEC with either proactive or ondemand parity" << std::endl;
-	std::cerr << "  -K <k>          : Configure Reed-Solomon code (n, k)" << std::endl;
-	std::cerr << "  -N <n>" << std::endl;
-	std::cerr << "  -l              : Enable multicast loopback and address sharing" << std::endl;
-	std::cerr << "  -i              : List available interfaces" << std::endl;
+	std::cerr << "  -n, --network NETWORK    : Multicast group or unicast IP address" << std::endl;
+	std::cerr << "  -s, --service PORT       : IP port" << std::endl;
+	std::cerr << "  -p, --port PORT          : Encapsulate PGM in UDP on IP port" << std::endl;
+	std::cerr << "  -f, --enable-fec TYPE    : Enable FEC with either proactive or ondemand parity" << std::endl;
+	std::cerr << "  -N N                     : Reed-Solomon block size (255)" << std::endl;
+	std::cerr << "  -K K                     : Reed-Solomon group size (8)" << std::endl;
+	std::cerr << "  -l, --enable-loop        : Enable multicast loopback and address sharing" << std::endl;
+	std::cerr << "  -i, --list               : List available interfaces" << std::endl;
 	exit (EXIT_SUCCESS);
 }
 
@@ -117,8 +118,20 @@ main (
 
 /* parse program arguments */
 	const char* binary_name = std::strrchr (argv[0], '/');
+
+	static struct option long_options[] = {
+		{ "network",        required_argument, NULL, 'n' },
+		{ "service",        required_argument, NULL, 's' },
+		{ "port",           required_argument, NULL, 'p' },
+		{ "enable-loop",    no_argument,       NULL, 'l' },
+		{ "enable-fec",     required_argument, NULL, 'f' },
+		{ "list",           no_argument,       NULL, 'i' },
+		{ "help",           no_argument,       NULL, 'h' },
+		{ NULL, 0, NULL, 0 }
+	};
+
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:f:K:N:lih")) != -1)
+	while ((c = getopt_long (argc, argv, "s:n:p:f:K:N:lih", long_options, NULL)) != -1)
 	{
 		switch (c) {
 		case 'n':	network = optarg; break;

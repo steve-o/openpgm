@@ -11,7 +11,7 @@ p = e.Clone();
 if '-DHAVE_GETOPT' in env['CCFLAGS']:
 	getopt = []
 else:
-	getopt = ['getopt.c']
+	getopt = ['getopt.c', 'getopt_long.c']
 
 if e['WITH_GLIB'] == 'true':
 	e.Prepend(LIBS = ['libpgmex']);

@@ -38,6 +38,7 @@
 #	include <netinet/in.h>
 #	include <sys/socket.h>
 #	include <sys/uio.h>
+#	include <getopt.h>
 #endif
 #include <pgm/pgm.h>
 
@@ -74,11 +75,11 @@ usage (
 	)
 {
 	fprintf (stderr, "Usage: %s [options]\n", bin);
-	fprintf (stderr, "  -n <network>    : Multicast group or unicast IP address\n");
-	fprintf (stderr, "  -s <port>       : IP port\n");
-	fprintf (stderr, "  -p <port>       : Encapsulate PGM in UDP on IP port\n");
-	fprintf (stderr, "  -l              : Enable multicast loopback and address sharing\n");
-	exit (1);
+	fprintf (stderr, "  -n, --network NETWORK    : Multicast group or unicast IP address\n");
+	fprintf (stderr, "  -s, --service PORT       : IP port\n");
+	fprintf (stderr, "  -p, --port PORT          : Encapsulate PGM in UDP on IP port\n");
+	fprintf (stderr, "  -l, --enable-loop        : Enable multicast loopback and address sharing\n");
+	exit (EXIT_SUCCESS);
 }
 
 int
@@ -102,8 +103,18 @@ main (
 
 /* parse program arguments */
 	const char* binary_name = strrchr (argv[0], '/');
+
+	static struct option long_options[] = {
+		{ "network",        required_argument, NULL, 'n' },
+		{ "service",        required_argument, NULL, 's' },
+		{ "port",           required_argument, NULL, 'p' },
+		{ "enable-loop",    no_argument,       NULL, 'l' },
+		{ "help",           no_argument,       NULL, 'h' },
+		{ NULL, 0, NULL, 0 }
+	};
+
 	int c;
-	while ((c = getopt (argc, argv, "s:n:p:lh")) != -1)
+	while ((c = getopt_long (argc, argv, "s:n:p:lh", long_options, NULL)) != -1)
 	{
 		switch (c) {
 		case 'n':	g_network = optarg; break;
