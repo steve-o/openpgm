@@ -56,7 +56,12 @@ struct interface_req {
 	struct sockaddr_storage ir_addr;		/* interface address */
 };
 
-#define IR_STRLEN	(IF_NAMESIZE + INET6_ADDRSTRLEN + strlen ("ir_name: \"\", ir_flags: \"\", ir_interface: , ir_addr: \"\"") + strlen ("4294967295") + strlen ("UP,LOOPBACK,BROADCAST,MULTICAST"))
+#ifdef _MSC_VER
+/* avoid unsupported VLAs in MSVC 2013 */
+#	define IR_STRLEN	1024
+#else
+#	define IR_STRLEN	(IF_NAMESIZE + INET6_ADDRSTRLEN + strlen ("ir_name: \"\", ir_flags: \"\", ir_interface: , ir_addr: \"\"") + strlen ("4294967295") + strlen ("UP,LOOPBACK,BROADCAST,MULTICAST"))
+#endif
 
 
 /* locals */
@@ -131,7 +136,7 @@ ifa_flags_to_string (
 static
 char*
 interface_req_to_string (
-	struct interface_req* interface,
+	struct interface_req* ir,
 	char* text,
 	size_t len
 	)
@@ -139,12 +144,12 @@ interface_req_to_string (
 	char flags[1024];
 	char addr[INET6_ADDRSTRLEN];
 
-	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&interface->ir_addr, addr, sizeof (addr)))
+	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&ir->ir_addr, addr, sizeof (addr)))
 		addr[0] = 0;
 	pgm_snprintf_s (text, len, _TRUNCATE, "if_name: \"%s\", ir_flags: \"%s\", ir_interface: %d, ir_addr: \"%s\"",
-		interface->ir_name,
-		ifa_flags_to_string (interface->ir_flags, flags),
-		interface->ir_interface,
+		ir->ir_name,
+		ifa_flags_to_string (ir->ir_flags, flags),
+		ir->ir_interface,
 		addr);
 	return text;
 }
@@ -157,11 +162,11 @@ pgm_gsr_to_string (
 	)
 {
 	char group[1024], source[1024], addr[1024];
-	if (0 != pgm_sockaddr_ntop (&gsr->gsr_group, group, sizeof (group)))
+	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, group, sizeof (group)))
 		group[0] = 0;
-	if (0 != pgm_sockaddr_ntop (&gsr->gsr_source, source, sizeof (source)))
+	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_source, source, sizeof (source)))
 		source[0] = 0;
-	if (0 != pgm_sockaddr_ntop (&gsr->gsr_addr, addr, sizeof (addr)))
+	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_addr, addr, sizeof (addr)))
 		addr[0] = 0;
 	pgm_snprintf_s (text, len, _TRUNCATE, "gsr_interface = %u, gsr_group = \"%s\", gsr_source = \"%s\", gsr_addr = \"%s\"",
 		gsr->gsr_interface, group, source, addr);
@@ -1434,14 +1439,14 @@ static
 bool
 bind_gsr_to_interface (
 	pgm_list_t*  restrict  gsr_list,	/* <struct pgm_group_source_req*> */
-	const struct interface_req* interface
+	const struct interface_req* ir
 	)
 {
 	while (gsr_list) {
 		struct pgm_group_source_req* gsr = gsr_list->data;
 /* interface is a tuple of {index, address} in order to support modern IP stacks with IP aliasing. */
-		gsr->gsr_interface = interface->ir_interface;
-		memcpy (&gsr->gsr_addr, &interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&interface->ir_addr));
+		gsr->gsr_interface = ir->ir_interface;
+		memcpy (&gsr->gsr_addr, &ir->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir->ir_addr));
 		gsr_list = gsr_list->next;
 	}
 	return TRUE;
@@ -1453,17 +1458,17 @@ bind_gsr_to_interface (
 static
 bool
 resolve_af_from_interface (
-	const struct interface_req* interface,
+	const struct interface_req* ir,
 	int* address_family
 	)
 {
-	if (AF_UNSPEC == interface->ir_addr.ss_family)
+	if (AF_UNSPEC == ir->ir_addr.ss_family)
 	{
 		return FALSE;
 	}
 	else
 	{
-		*address_family = interface->ir_addr.ss_family;
+		*address_family = ir->ir_addr.ss_family;
 		return TRUE;
 	}
 }
@@ -1503,11 +1508,11 @@ static
 bool
 resolve_interface (
 	const int		address_family,
-	struct interface_req*	interface,
+	struct interface_req*	ir,
 	pgm_error_t** restrict	error
 	)
 {
-	if (0 == interface->ir_name[0])
+	if (0 == ir->ir_name[0])
 	{
 		pgm_debug ("Interface is not specified, defaulting to node address.");
 		struct sockaddr_storage addr;
@@ -1522,26 +1527,26 @@ resolve_interface (
 		{
 			{
 				char s[INET6_ADDRSTRLEN];
-				if (0 != pgm_sockaddr_ntop (&addr, s, sizeof(s)))
-					s[0] == 0;
+				if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&addr, s, sizeof(s)))
+					s[0] = 0;
 				pgm_debug ("Node primary node address detected as \"%s\".", s);
 			}
-			interface->ir_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
-			memcpy (&interface->ir_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
+			ir->ir_interface = pgm_sockaddr_scope_id ((struct sockaddr*)&addr);
+			memcpy (&ir->ir_addr, &addr, pgm_sockaddr_len ((struct sockaddr*)&addr));
 			return TRUE;
 		}
 	}
 	else
 	{
 		pgm_debug ("Resolving interface \"%s\" with node address multicast group family %s.",
-			interface->ir_name,
+			ir->ir_name,
 			pgm_family_string (address_family));
-		struct interface_req ir;
-		if (!parse_interface (address_family, interface->ir_name, &ir, error))
+		struct interface_req resolved_interface;
+		if (!parse_interface (address_family, ir->ir_name, &resolved_interface, error))
 		{
 			pgm_prefix_error (error,
 					_("Unique address cannot be determined for interface %s%s%s: "),
-					interface->ir_name ? "\"" : "", interface->ir_name ? interface->ir_name : "(null)", interface->ir_name ? "\"" : "");
+					ir->ir_name ? "\"" : "", ir->ir_name ? ir->ir_name : "(null)", ir->ir_name ? "\"" : "");
 			if (NULL != error)
 				pgm_debug ("resolve_interface() failed: %s", (*error)->message);
 		}
@@ -1549,12 +1554,12 @@ resolve_interface (
 		{
 			{
 				char s[INET6_ADDRSTRLEN];
-				if (0 != pgm_sockaddr_ntop (&ir.ir_addr, s, sizeof(s)))
+				if (0 != pgm_sockaddr_ntop (&resolved_interface.ir_addr, s, sizeof(s)))
 					s[0] == 0;
-				pgm_debug ("Interface \"%s\" detected as \"%s\".", interface->ir_name ? interface->ir_name : "", s);
+				pgm_debug ("Interface \"%s\" detected as \"%s\".", ir->ir_name ? ir->ir_name : "", s);
 			}
-			interface->ir_interface = ir.ir_interface;
-			memcpy (&interface->ir_addr, &ir.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir.ir_addr));
+			ir->ir_interface = resolved_interface.ir_interface;
+			memcpy (&ir->ir_addr, &resolved_interface.ir_addr, pgm_sockaddr_len ((struct sockaddr*)&resolved_interface.ir_addr));
 			return TRUE;
 		}
 	}

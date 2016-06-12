@@ -177,13 +177,13 @@ set_target_properties(libpgm PROPERTIES
 	RELEASE_POSTFIX "${_pgm_COMPILER}-mt-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}"
 	DEBUG_POSTFIX "${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}")
 
-add_executable(purinsend examples/purinsend.c examples/getopt.c)
+add_executable(purinsend examples/purinsend.c examples/getopt.c examples/getopt_long.c)
 target_link_libraries(purinsend libpgm)
-add_executable(purinrecv examples/purinrecv.c examples/getopt.c)
+add_executable(purinrecv examples/purinrecv.c examples/getopt.c examples/getopt_long.c)
 target_link_libraries(purinrecv libpgm)
-add_executable(daytime examples/daytime.c examples/getopt.c)
+add_executable(daytime examples/daytime.c examples/getopt.c examples/getopt_long.c)
 target_link_libraries(daytime libpgm)
-add_executable(shortcakerecv examples/shortcakerecv.c examples/async.c examples/getopt.c)
+add_executable(shortcakerecv examples/shortcakerecv.c examples/async.c examples/getopt.c examples/getopt_long.c)
 target_link_libraries(shortcakerecv libpgm)
 
 #-----------------------------------------------------------------------------
