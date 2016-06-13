@@ -1,16 +1,16 @@
 message(STATUS "Detecting OpenPGM")
-execute_process (COMMAND ${PERL_EXECUTABLE} version.pl "%major"
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        OUTPUT_VARIABLE OPENPGM_VERSION_MAJOR)
-execute_process (COMMAND ${PERL_EXECUTABLE} version.pl "%minor"
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        OUTPUT_VARIABLE OPENPGM_VERSION_MINOR)
-execute_process (COMMAND ${PERL_EXECUTABLE} version.pl "%micro"
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        OUTPUT_VARIABLE OPENPGM_VERSION_MICRO)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/mkversion.c" _VERSION_H)
+string(REGEX REPLACE ".*const unsigned pgm_major_version = ([0-9]+);.*" "\\1" OPENPGM_VERSION_MAJOR "${_VERSION_H}")
+string(REGEX REPLACE ".*const unsigned pgm_minor_version = ([0-9]+);.*" "\\1" OPENPGM_VERSION_MINOR "${_VERSION_H}")
+string(REGEX REPLACE ".*const unsigned pgm_micro_version = ([0-9]+);.*" "\\1" OPENPGM_VERSION_MICRO "${_VERSION_H}")
+unset(_VERSION_H)
 message(STATUS "Detecting OpenPGM - ${OPENPGM_VERSION_MAJOR}.${OPENPGM_VERSION_MINOR}.${OPENPGM_VERSION_MICRO}")
 
-if(MSVC_VERSION MATCHES "1700")
+if(MSVC14)
+	set(_pgm_COMPILER "-v140")
+elseif(MSVC12)
+	set(_pgm_COMPILER "-v120")
+elseif(MSVC11)
 	set(_pgm_COMPILER "-v110")
 elseif(MSVC10)
 	set(_pgm_COMPILER "-v100")

@@ -1,6 +1,6 @@
 # CMake build script for OpenPGM on Windows
 
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.6.0)
 project (OpenPGM)
 
 #-----------------------------------------------------------------------------
@@ -172,7 +172,7 @@ set(sources
 #-----------------------------------------------------------------------------
 # output
 
-add_library(libpgm STATIC ${sources} ${CMAKE_BINARY_DIR}/NSIS.template.in)
+add_library(libpgm STATIC ${sources})
 set_target_properties(libpgm PROPERTIES
 	RELEASE_POSTFIX "${_pgm_COMPILER}-mt-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}"
 	DEBUG_POSTFIX "${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}")
@@ -206,25 +206,27 @@ set(examples
 	examples/shortcakerecv.c
 )
 
-if (CMAKE_CL_64)
-	set (nsis-template ${CMAKE_SOURCE_DIR}/cmake/NSIS.template64.in)
-else (CMAKE_CL_64)
-	set (nsis-template ${CMAKE_SOURCE_DIR}/cmake/NSIS.template32.in)
-endif (CMAKE_CL_64)
+# CPack now requires either .txt or .rtf license file.
 add_custom_command(
-	OUTPUT ${CMAKE_BINARY_DIR}/NSIS.template.in
+	OUTPUT ${CMAKE_BINARY_DIR}/LICENSE.txt
 	COMMAND ${CMAKE_COMMAND}
 	ARGS    -E
 		copy
-		${nsis-template}
-		${CMAKE_BINARY_DIR}/NSIS.template.in
-	DEPENDS ${nsis-template}
+		${CMAKE_SOURCE_DIR}/LICENSE
+		${CMAKE_BINARY_DIR}/LICENSE.txt
+	DEPENDS ${CMAKE_SOURCE_DIR}/LICENSE
 )
 set (CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
 
-install (TARGETS libpgm DESTINATION lib)
+install (
+	TARGETS libpgm purinsend purinrecv daytime shortcakerecv
+	DESTINATION lib
+)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-	install (FILES ${CMAKE_BINARY_DIR}/lib/libpgm${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}.pdb DESTINATION lib)
+	install (
+		FILES ${CMAKE_BINARY_DIR}/lib/libpgm${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}.pdb
+		DESTINATION lib
+	)
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 install (FILES ${headers} DESTINATION include/pgm)
 foreach (doc ${docs})
@@ -236,36 +238,16 @@ install (FILES ${examples} DESTINATION examples)
 
 # Only need to ship CRT if distributing executable binaries.
 # include (InstallRequiredSystemLibraries)
-if (CMAKE_CL_64)
-	set (CPACK_NSIS_DISPLAY_NAME "OpenPGM ${OPENPGM_VERSION_MAJOR}.${OPENPGM_VERSION_MINOR}.${OPENPGM_VERSION_MICRO} (x64)")
-	set (CPACK_PACKAGE_FILE_NAME "OpenPGM-${OPENPGM_VERSION_MAJOR}.${OPENPGM_VERSION_MINOR}.${OPENPGM_VERSION_MICRO}-x64")
-	set (CPACK_INSTALL_CMAKE_PROJECTS
-		"${CMAKE_SOURCE_DIR}/build/x64/v110;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug/x64/v110;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x64/v100;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug/x64/v100;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x64/v90;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug/x64/v90;OpenPGM;ALL;/"
-	)
-else (CMAKE_CL_64)
-	set (CPACK_DISPLAY_NAME "OpenPGM ${OPENPGM_VERSION_MAJOR}.${OPENPGM_VERSION_MINOR}.${OPENPGM_VERSION_MICRO}")
-	set (CPACK_PACKAGE_FILE_NAME "OpenPGM-${OPENPGM_VERSION_MAJOR}.${OPENPGM_VERSION_MINOR}.${OPENPGM_VERSION_MICRO}-x86")
-	set (CPACK_INSTALL_CMAKE_PROJECTS
-		"${CMAKE_SOURCE_DIR}/build/x86/v110;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug/x86/v110;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x86/v100;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug/x86/v100;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/build/x86/v90;OpenPGM;ALL;/"
-		"${CMAKE_SOURCE_DIR}/debug/x86/v90;OpenPGM;ALL;/"
-	)
-endif (CMAKE_CL_64)
-#set (CPACK_PACKAGE_INSTALL_DIRECTORY "OpenPGM ${CPACK_PACKAGE_VERSION}")
+set (CPACK_INSTALL_CMAKE_PROJECTS
+		"${CMAKE_SOURCE_DIR}/build/v140;OpenPGM;ALL;/"
+		"${CMAKE_SOURCE_DIR}/build/v120;OpenPGM;ALL;/"
+)
 set (CPACK_PACKAGE_VENDOR "Miru")
-set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-set (CPACK_NSIS_COMPRESSOR "/SOLID lzma")
+set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt")
 set (CPACK_PACKAGE_VERSION_MAJOR ${OPENPGM_VERSION_MAJOR})
 set (CPACK_PACKAGE_VERSION_MINOR ${OPENPGM_VERSION_MINOR})
 set (CPACK_PACKAGE_VERSION_PATCH ${OPENPGM_VERSION_MICRO})
+set (CPACK_WIX_UPGRADE_GUID "832A8F90-C7A6-4F1E-8562-2068A7C9B29C")
 include (CPack)
 
 # end of file
