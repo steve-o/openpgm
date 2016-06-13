@@ -218,10 +218,8 @@ add_custom_command(
 )
 set (CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
 
-install (
-	TARGETS libpgm purinsend purinrecv daytime shortcakerecv
-	DESTINATION lib
-)
+install (TARGETS libpgm DESTINATION lib)
+install (TARGETS purinsend purinrecv daytime shortcakerecv DESTINATION bin)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	install (
 		FILES ${CMAKE_BINARY_DIR}/lib/libpgm${_pgm_COMPILER}-mt-gd-${OPENPGM_VERSION_MAJOR}_${OPENPGM_VERSION_MINOR}_${OPENPGM_VERSION_MICRO}.pdb

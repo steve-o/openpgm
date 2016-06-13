@@ -3,8 +3,8 @@ setlocal
 
 :: Remove old build files
 echo Cleaning build area ...
-rmdir /s /q build 2> null
-md build\v120 build\v140 2> null
+rmdir /s /q build 2> nul
+md build\v120 build\v140 2> nul
 
 echo Starting build ...
 call:buildx64
