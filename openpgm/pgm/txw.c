@@ -594,7 +594,7 @@ pgm_txw_retransmit_try_peek (
 	for (uint_fast8_t i = 0; i < window->rs.k; i++)
 	{
 		const struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
-		const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
+		const uint16_t odata_tsdu_length = pgm_ntohs (odata_skb->pgm_header->pgm_tsdu_length);
 		if (!parity_length)
 		{
 			parity_length = odata_tsdu_length;
@@ -633,7 +633,7 @@ pgm_txw_retransmit_try_peek (
 		for (uint_fast8_t i = 0; i < window->rs.k; i++)
 		{
 			struct pgm_sk_buff_t* odata_skb = pgm_txw_peek (window, tg_sqn + i);
-			const uint16_t odata_tsdu_length = ntohs (odata_skb->pgm_header->pgm_tsdu_length);
+			const uint16_t odata_tsdu_length = pgm_ntohs (odata_skb->pgm_header->pgm_tsdu_length);
 
 			pgm_assert (odata_tsdu_length == odata_skb->len);
 			pgm_assert (parity_length >= odata_tsdu_length);
@@ -647,12 +647,12 @@ pgm_txw_retransmit_try_peek (
 		parity_length += 2;
 	}
 
-	skb->pgm_header->pgm_tsdu_length = htons (parity_length);
+	skb->pgm_header->pgm_tsdu_length = pgm_htons (parity_length);
 
 /* space for DATA */
 	pgm_skb_put (skb, sizeof(struct pgm_data) + parity_length);
 
-	skb->pgm_data->data_sqn	= htonl ( tg_sqn | rs_h );
+	skb->pgm_data->data_sqn	= pgm_htonl ( tg_sqn | rs_h );
 
 	data = skb->pgm_data + 1;
 
@@ -706,7 +706,7 @@ pgm_txw_retransmit_try_peek (
 		opt_len					= data;
 		opt_len->opt_type			= PGM_OPT_LENGTH;
 		opt_len->opt_length			= sizeof(struct pgm_opt_length);
-		opt_len->opt_total_length		= htons ( opt_total_length );
+		opt_len->opt_total_length		= pgm_htons ( opt_total_length );
 		opt_header			 	= (struct pgm_opt_header*)(opt_len + 1);
 		opt_header->opt_type			= PGM_OPT_FRAGMENT | PGM_OPT_END;
 		opt_header->opt_length			= sizeof(struct pgm_opt_header) + sizeof(struct pgm_opt_fragment);
@@ -735,7 +735,7 @@ pgm_txw_retransmit_try_peek (
 			parity_length);
 
 /* calculate partial checksum */
-	const uint16_t tsdu_length = ntohs (skb->pgm_header->pgm_tsdu_length);
+	const uint16_t tsdu_length = pgm_ntohs (skb->pgm_header->pgm_tsdu_length);
 	state->unfolded_checksum = pgm_csum_partial ((char*)skb->tail - tsdu_length, tsdu_length, 0);
 	return skb;
 }

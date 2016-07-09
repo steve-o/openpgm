@@ -999,8 +999,8 @@ pgm_recvfrom (
 	struct pgm_sk_buff_t* pskb = *skb;
 
 	if (from) {
-		from->sa_port = ntohs (sock->dport);
-		from->sa_addr.sport = ntohs (pskb->tsi.sport);
+		from->sa_port = pgm_ntohs (sock->dport);
+		from->sa_addr.sport = pgm_ntohs (pskb->tsi.sport);
 		memcpy (&from->sa_addr.gsi, &pskb->tsi.gsi, sizeof(pgm_gsi_t));
 	}
 

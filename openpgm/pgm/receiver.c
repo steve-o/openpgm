@@ -218,7 +218,7 @@ _pgm_is_acker_election (
 	pgm_assert (NULL != skb);
 	pgm_assert (NULL != skb->pgm_opt_pgmcc_data);
 
-	const unsigned acker_afi = ntohs (skb->pgm_opt_pgmcc_data->opt_nla_afi);
+	const unsigned acker_afi = pgm_ntohs (skb->pgm_opt_pgmcc_data->opt_nla_afi);
 	switch (acker_afi) {
 	case AFI_IP:
 		if (INADDR_ANY == skb->pgm_opt_pgmcc_data->opt_nla.s_addr)
@@ -406,8 +406,8 @@ pgm_new_peer (
 	memcpy (&peer->group_nla, dst_addr, dst_addrlen);
 	memcpy (&peer->local_nla, src_addr, src_addrlen);
 /* port at same location for sin/sin6 */
-	((struct sockaddr_in*)&peer->local_nla)->sin_port = htons (sock->udp_encap_ucast_port);
-	((struct sockaddr_in*)&peer->nla)->sin_port       = htons (sock->udp_encap_ucast_port);
+	((struct sockaddr_in*)&peer->local_nla)->sin_port = pgm_htons (sock->udp_encap_ucast_port);
+	((struct sockaddr_in*)&peer->nla)->sin_port       = pgm_htons (sock->udp_encap_ucast_port);
 
 /* lock on rx window */
 	peer->window = pgm_rxw_create (&peer->tsi,
@@ -595,7 +595,7 @@ pgm_on_spm (
 
 	spm  = (struct pgm_spm *)skb->data;
 	spm6 = (struct pgm_spm6*)skb->data;
-	const uint32_t spm_sqn = ntohl (spm->spm_sqn);
+	const uint32_t spm_sqn = pgm_ntohl (spm->spm_sqn);
 
 /* check for advancing sequence number, or first SPM */
 	if (PGM_LIKELY(pgm_uint32_gte (spm_sqn, source->spm_sqn)))
@@ -609,8 +609,8 @@ pgm_on_spm (
 /* update receive window */
 		const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl (sock);
 		const unsigned naks = pgm_rxw_update (source->window,
-						      ntohl (spm->spm_lead),
-						      ntohl (spm->spm_trail),
+						      pgm_ntohl (spm->spm_lead),
+						      pgm_ntohl (spm->spm_trail),
 						      skb->tstamp,
 						      nak_rb_expiry);
 		if (naks) {
@@ -674,7 +674,7 @@ pgm_on_spm (
 					return FALSE;
 				}
 
-				const uint32_t parity_prm_tgs = ntohl (opt_parity_prm->parity_prm_tgs);
+				const uint32_t parity_prm_tgs = pgm_ntohl (opt_parity_prm->parity_prm_tgs);
 				if (PGM_UNLIKELY(parity_prm_tgs < 2 || parity_prm_tgs > 128))
 				{
 					pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded malformed SPM."));
@@ -765,7 +765,7 @@ pgm_on_peer_nak (
 
 /* handle as NCF */
 	ncf_status = pgm_rxw_confirm (peer->window,
-				      ntohl (nak->nak_sqn),
+				      pgm_ntohl (nak->nak_sqn),
 				      skb->tstamp,
 				      skb->tstamp + sock->nak_rdata_ivl,
 				      skb->tstamp + nak_rb_ivl(sock));
@@ -809,7 +809,7 @@ pgm_on_peer_nak (
 
 		while (nak_list_len) {
 			ncf_status = pgm_rxw_confirm (peer->window,
-						      ntohl (*nak_list),
+						      pgm_ntohl (*nak_list),
 						      skb->tstamp,
 						      skb->tstamp + sock->nak_rdata_ivl,
 						      skb->tstamp + nak_rb_ivl(sock));
@@ -892,7 +892,7 @@ pgm_on_ncf (
 	const pgm_time_t ncf_rdata_ivl = skb->tstamp + sock->nak_rdata_ivl;
 	const pgm_time_t ncf_rb_ivl    = skb->tstamp + nak_rb_ivl(sock);
 	ncf_status = pgm_rxw_confirm (source->window,
-				      ntohl (ncf->nak_sqn),
+				      pgm_ntohl (ncf->nak_sqn),
 				      skb->tstamp,
 				      ncf_rdata_ivl,
 				      ncf_rb_ivl);
@@ -946,7 +946,7 @@ pgm_on_ncf (
 		while (ncf_list_len)
 		{
 			ncf_status = pgm_rxw_confirm (source->window,
-						      ntohl (*ncf_list),
+						      pgm_ntohl (*ncf_list),
 						      skb->tstamp,
 						      ncf_rdata_ivl,
 						      ncf_rb_ivl);
@@ -1079,7 +1079,7 @@ send_nak (
         header->pgm_tsdu_length = 0;
 
 /* NAK */
-	nak->nak_sqn		= htonl (sequence);
+	nak->nak_sqn		= pgm_htonl (sequence);
 
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->nla, (char*)&nak->nak_src_nla_afi);
@@ -1155,7 +1155,7 @@ send_parity_nak (
         header->pgm_tsdu_length = 0;
 
 /* NAK */
-	nak->nak_sqn		= htonl (nak_tg_sqn | (nak_pkt_cnt - 1) );
+	nak->nak_sqn		= pgm_htonl (nak_tg_sqn | (nak_pkt_cnt - 1) );
 
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->nla, (char*)&nak->nak_src_nla_afi);
@@ -1250,7 +1250,7 @@ send_nak_list (
         header->pgm_tsdu_length = 0;
 
 /* NAK */
-	nak->nak_sqn		= htonl (sqn_list->sqn[0]);
+	nak->nak_sqn		= pgm_htonl (sqn_list->sqn[0]);
 
 /* source nla */
 	pgm_sockaddr_to_nla ((struct sockaddr*)&source->nla, (char*)&nak->nak_src_nla_afi);
@@ -1266,7 +1266,7 @@ send_nak_list (
 			(struct pgm_opt_length*)(nak  + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
-	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
+	opt_len->opt_total_length = pgm_htons (	sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
 						sizeof(uint8_t) +
 						( (sqn_list->len-1) * sizeof(uint32_t) ) );
@@ -1278,7 +1278,7 @@ send_nak_list (
 	opt_nak_list->opt_reserved = 0;
 
 	for (unsigned i = 1; i < sqn_list->len; i++)
-		opt_nak_list->opt_sqn[i-1] = htonl (sqn_list->sqn[i]);
+		opt_nak_list->opt_sqn[i-1] = pgm_htonl (sqn_list->sqn[i]);
 
         header->pgm_checksum    = 0;
         header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
@@ -1351,14 +1351,14 @@ send_ack (
 	header->pgm_tsdu_length = 0;
 
 /* ACK */
-	ack->ack_rx_max		= htonl (pgm_rxw_lead (source->window));
-	ack->ack_bitmap		= htonl (source->window->bitmap);
+	ack->ack_rx_max		= pgm_htonl (pgm_rxw_lead (source->window));
+	ack->ack_bitmap		= pgm_htonl (source->window->bitmap);
 
 /* OPT_PGMCC_FEEDBACK */
 	opt_len = (struct pgm_opt_length*)(ack + 1);
 	opt_len->opt_type	= PGM_OPT_LENGTH;
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
-	opt_len->opt_total_length = htons (	sizeof(struct pgm_opt_length) +
+	opt_len->opt_total_length = pgm_htons (	sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
 						(AF_INET6 == sock->send_addr.ss_family) ?
 							sizeof(struct pgm_opt6_pgmcc_feedback) :
@@ -1373,9 +1373,9 @@ send_ack (
 	opt_pgmcc_feedback->opt_reserved = 0;
 
 	const uint32_t t = (uint32_t)(source->ack_last_tstamp + pgm_to_msecs( now - source->last_data_tstamp ));
-	opt_pgmcc_feedback->opt_tstamp = htonl (t);
+	opt_pgmcc_feedback->opt_tstamp = pgm_htonl (t);
 	pgm_sockaddr_to_nla ((struct sockaddr*)&sock->send_addr, (char*)&opt_pgmcc_feedback->opt_nla_afi);
-	opt_pgmcc_feedback->opt_loss_rate = htons ((uint16_t)source->window->data_loss);
+	opt_pgmcc_feedback->opt_loss_rate = pgm_htons ((uint16_t)source->window->data_loss);
 
 	header->pgm_checksum	= 0;
 	header->pgm_checksum	= pgm_csum_fold (pgm_csum_partial (buf, (uint16_t)tpdu_length, 0));
@@ -2160,12 +2160,12 @@ pgm_on_data (
 		(void*)sock, (void*)source, (void*)skb);
 
 	const pgm_time_t nak_rb_expiry = skb->tstamp + nak_rb_ivl (sock);
-	const uint_fast16_t tsdu_length = ntohs (skb->pgm_header->pgm_tsdu_length);
+	const uint_fast16_t tsdu_length = pgm_ntohs (skb->pgm_header->pgm_tsdu_length);
 
 	skb->pgm_data = skb->data;
 
 	const uint_fast16_t opt_total_length = (skb->pgm_header->pgm_options & PGM_OPT_PRESENT) ?
-		ntohs(*(uint16_t*)( (char*)( skb->pgm_data + 1 ) + sizeof(uint16_t))) :
+		pgm_ntohs(*(uint16_t*)( (char*)( skb->pgm_data + 1 ) + sizeof(uint16_t))) :
 		0;
 
 /* advance data pointer to payload */
@@ -2215,7 +2215,7 @@ discarded:
 	if (0 != ack_rb_expiry)
 	{
 /* save source timestamp and local timestamp for RTT calculation */
-		source->ack_last_tstamp = ntohl (skb->pgm_opt_pgmcc_data->opt_tstamp);
+		source->ack_last_tstamp = pgm_ntohl (skb->pgm_opt_pgmcc_data->opt_tstamp);
 		source->last_data_tstamp = skb->tstamp;
 		if (_pgm_is_acker (sock, source, skb))
 		{
@@ -2291,12 +2291,12 @@ pgm_on_poll (
 
 	poll4 = (struct pgm_poll *)skb->data;
 	poll6 = (struct pgm_poll6*)skb->data;
-	memcpy (&poll_rand, (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
+	memcpy (&poll_rand, (AFI_IP6 == pgm_ntohs (poll4->poll_nla_afi)) ?
 		poll6->poll6_rand :
 		poll4->poll_rand, sizeof(poll_rand));
-	const uint32_t poll_mask = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
-		ntohl (poll6->poll6_mask) :
-		ntohl (poll4->poll_mask);
+	const uint32_t poll_mask = (AFI_IP6 == pgm_ntohs (poll4->poll_nla_afi)) ?
+		pgm_ntohl (poll6->poll6_mask) :
+		pgm_ntohl (poll4->poll_mask);
 
 /* Check for probability match */
 	if (poll_mask &&
@@ -2309,8 +2309,8 @@ pgm_on_poll (
 /* scoped per path nla
  * TODO: manage list of pollers per peer
  */
-	const uint32_t poll_sqn   = ntohl (poll4->poll_sqn);
-	const uint16_t poll_round = ntohs (poll4->poll_round);
+	const uint32_t poll_sqn   = pgm_ntohl (poll4->poll_sqn);
+	const uint16_t poll_round = pgm_ntohs (poll4->poll_round);
 
 /* Check for new poll round */
 	if (poll_round &&
@@ -2323,7 +2323,7 @@ pgm_on_poll (
 	source->last_poll_sqn   = poll_sqn;
 	source->last_poll_round = poll_round;
 
-	const uint16_t poll_s_type = ntohs (poll4->poll_s_type);
+	const uint16_t poll_s_type = pgm_ntohs (poll4->poll_s_type);
 
 /* Check poll type */
 	switch (poll_s_type) {
@@ -2357,9 +2357,9 @@ on_general_poll (
 /* TODO: cancel any pending poll-response */
 
 /* defer response based on provided back-off interval */
-	const uint32_t poll_bo_ivl = (AFI_IP6 == ntohs (poll4->poll_nla_afi)) ?
-		ntohl (poll6->poll6_bo_ivl) :
-		ntohl (poll4->poll_bo_ivl);
+	const uint32_t poll_bo_ivl = (AFI_IP6 == pgm_ntohs (poll4->poll_nla_afi)) ?
+		pgm_ntohl (poll6->poll6_bo_ivl) :
+		pgm_ntohl (poll4->poll_bo_ivl);
 	source->polr_expiry = skb->tstamp + pgm_rand_int_range (&sock->rand_, 0, poll_bo_ivl);
 	pgm_nla_to_sockaddr (&poll4->poll_nla_afi, (struct sockaddr*)&source->poll_nla);
 /* TODO: schedule poll-response */

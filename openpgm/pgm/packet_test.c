@@ -85,7 +85,7 @@ pgm_print_packet (
 		return FALSE;
 	}
 
-	size_t packet_length = ntohs(ip->ip_len);	/* total packet length */
+	size_t packet_length = pgm_ntohs(ip->ip_len);	/* total packet length */
 
 /* ip_len can equal packet_length - ip_header_length in FreeBSD/NetBSD
  * Stevens/Fenner/Rudolph, Unix Network Programming Vol.1, p.739 
@@ -107,7 +107,7 @@ pgm_print_packet (
 		return FALSE;
 	}
 
-	const uint16_t offset = ntohs(ip->ip_off);
+	const uint16_t offset = pgm_ntohs(ip->ip_off);
 
 /* 3 bits routing priority, 4 bits type of service: delay, throughput, reliability, cost */
 	printf ("(tos 0x%x", (int)ip->ip_tos);
@@ -129,7 +129,7 @@ pgm_print_packet (
 #define IP_OFFMASK	0x1fff
 
 	printf (", id %u, offset %u, flags [%s%s]",
-		ntohs(ip->ip_id),
+		pgm_ntohs(ip->ip_id),
 		(offset & 0x1fff) * 8,
 		((offset & IP_DF) ? "DF" : ""),
 		((offset & IP_MF) ? "+" : ""));
@@ -146,7 +146,7 @@ pgm_print_packet (
  */
 	const uint16_t ip_sum = pgm_inet_checksum(data, (uint16_t)packet_length, 0);
 	if (ip_sum != 0) {
-		const uint16_t encoded_ip_sum = ntohs(ip->ip_sum);
+		const uint16_t encoded_ip_sum = pgm_ntohs(ip->ip_sum);
 		printf (", bad cksum! %i", encoded_ip_sum);
 	}
 
@@ -206,7 +206,7 @@ pgm_print_packet (
 			((pgm_header->pgm_options & (0x1 << 1)) ? "true" : "false"),
 
 		pgm_header->pgm_gsi[0], pgm_header->pgm_gsi[1], pgm_header->pgm_gsi[2], pgm_header->pgm_gsi[3], pgm_header->pgm_gsi[4], pgm_header->pgm_gsi[5],
-		ntohs(pgm_header->pgm_tsdu_length));
+		pgm_ntohs(pgm_header->pgm_tsdu_length));
 
 	if (pgm_header->pgm_checksum)
 	{
@@ -293,12 +293,12 @@ pgm_print_spm (
 
 	const struct pgm_spm * spm  = (const struct pgm_spm *)data;
 	const struct pgm_spm6* spm6 = (const struct pgm_spm6*)data;
-	const uint16_t spm_nla_afi = ntohs (spm->spm_nla_afi);
+	const uint16_t spm_nla_afi = pgm_ntohs (spm->spm_nla_afi);
 
 	printf ("sqn %" PRIu32 " trail %" PRIu32 "lu lead %" PRIu32 "lu nla-afi %u ",
-		ntohl(spm->spm_sqn),
-		ntohl(spm->spm_trail),
-		ntohl(spm->spm_lead),
+		pgm_ntohl(spm->spm_sqn),
+		pgm_ntohl(spm->spm_trail),
+		pgm_ntohl(spm->spm_lead),
 		spm_nla_afi);	/* address family indicator */
 
 	char s[INET6_ADDRSTRLEN];
@@ -389,12 +389,12 @@ pgm_print_poll (
 
 	const struct pgm_poll * poll4 = (const struct pgm_poll *)data;
 	const struct pgm_poll6* poll6 = (const struct pgm_poll6*)data;
-	const uint16_t poll_nla_afi = ntohs (poll4->poll_nla_afi);
+	const uint16_t poll_nla_afi = pgm_ntohs (poll4->poll_nla_afi);
 
 	printf ("sqn %" PRIu32 " round %u sub-type %u nla-afi %u ",
-		ntohl(poll4->poll_sqn),
-		ntohs(poll4->poll_round),
-		ntohs(poll4->poll_s_type),
+		pgm_ntohl(poll4->poll_sqn),
+		pgm_ntohs(poll4->poll_round),
+		pgm_ntohs(poll4->poll_s_type),
 		poll_nla_afi);	/* address family indicator */
 
 	char s[INET6_ADDRSTRLEN];
@@ -499,8 +499,8 @@ pgm_print_polr (
 	const struct pgm_polr* polr = (const struct pgm_polr*)data;
 
 	printf("sqn %" PRIu32 " round %u",
-		ntohl(polr->polr_sqn),
-		ntohs(polr->polr_round));
+		pgm_ntohl(polr->polr_sqn),
+		pgm_ntohs(polr->polr_round));
 
 	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_polr);
 	size_t pgm_opt_len = len - sizeof(struct pgm_polr);
@@ -554,8 +554,8 @@ pgm_print_odata (
 	const struct pgm_data* odata = (const struct pgm_data*)data;
 
 	printf ("sqn %" PRIu32 " trail %" PRIu32 " [",
-		ntohl(odata->data_sqn),
-		ntohl(odata->data_trail));
+		pgm_ntohl(odata->data_sqn),
+		pgm_ntohl(odata->data_trail));
 
 /* option extensions */
 	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_data);
@@ -570,7 +570,7 @@ pgm_print_odata (
 	}
 
 /* data */
-	const char* end = payload + ntohs (header->pgm_tsdu_length);
+	const char* end = payload + pgm_ntohs (header->pgm_tsdu_length);
 	while (payload < end) {
 		if (isprint (*payload))
 			putchar (*payload);
@@ -609,8 +609,8 @@ pgm_print_rdata (
 	const struct pgm_data* rdata = (const struct pgm_data*)data;
 
 	printf ("sqn %" PRIu32 " trail %" PRIu32 " [",
-		ntohl (rdata->data_sqn),
-		ntohl (rdata->data_trail));
+		pgm_ntohl (rdata->data_sqn),
+		pgm_ntohl (rdata->data_trail));
 
 /* option extensions */
 	const void* pgm_opt = (const uint8_t*)data + sizeof(struct pgm_data);
@@ -625,7 +625,7 @@ pgm_print_rdata (
 	}
 
 /* data */
-	const char* end = payload + ntohs (header->pgm_tsdu_length);
+	const char* end = payload + pgm_ntohs (header->pgm_tsdu_length);
 	while (payload < end) {
 		if (isprint (*payload))
 			putchar (*payload);
@@ -686,10 +686,10 @@ pgm_print_nak (
 
 	const struct pgm_nak * nak  = (const struct pgm_nak *)data;
 	const struct pgm_nak6* nak6 = (const struct pgm_nak6*)data;
-	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
+	const uint16_t nak_src_nla_afi = pgm_ntohs (nak->nak_src_nla_afi);
 
 	printf ("sqn %" PRIu32 " src ", 
-		ntohl(nak->nak_sqn));
+		pgm_ntohl(nak->nak_sqn));
 
 	char s[INET6_ADDRSTRLEN];
 	const void* pgm_opt;
@@ -698,7 +698,7 @@ pgm_print_nak (
 /* source nla */
 	switch (nak_src_nla_afi) {
 	case AFI_IP: {
-		const uint16_t nak_grp_nla_afi = ntohs (nak->nak_grp_nla_afi);
+		const uint16_t nak_grp_nla_afi = pgm_ntohs (nak->nak_grp_nla_afi);
 		if (nak_src_nla_afi != nak_grp_nla_afi) {
 			puts ("different source & group afi very wibbly wobbly :(");
 			return FALSE;
@@ -720,7 +720,7 @@ pgm_print_nak (
 			return FALSE;
 		}
 
-		const uint16_t nak_grp_nla_afi = ntohs (nak6->nak6_grp_nla_afi);
+		const uint16_t nak_grp_nla_afi = pgm_ntohs (nak6->nak6_grp_nla_afi);
 		if (nak_src_nla_afi != nak_grp_nla_afi) {
 			puts ("different source & group afi very wibbly wobbly :(");
 			return FALSE;
@@ -880,7 +880,7 @@ pgm_print_ack (
 	bitmap[32] = '\0';
 
 	printf ("rx_max %" PRIu32 " bitmap [%s] ",
-		ntohl(ack->ack_rx_max), bitmap);
+		pgm_ntohl(ack->ack_rx_max), bitmap);
 
 /* option extensions */
 	if (header->pgm_options & PGM_OPT_PRESENT &&
@@ -922,7 +922,7 @@ pgm_print_options (
 		return -1;
 	}
 
-	uint16_t opt_total_length = ntohs (opt_len->opt_total_length);
+	uint16_t opt_total_length = pgm_ntohs (opt_len->opt_total_length);
 	printf (" total len %u ", opt_total_length);
 	if (opt_total_length < (sizeof(struct pgm_opt_length) + sizeof(struct pgm_opt_header)) ||
 	    opt_total_length > len)
@@ -1084,7 +1084,7 @@ pgm_udpport_string (
 	struct servent* se = getservbyport (port, "udp");
 	if (se == NULL) {
 		char buf[sizeof("00000")];
-		pgm_snprintf_s (buf, sizeof (buf), sizeof (buf), "%u", ntohs (port));
+		pgm_snprintf_s (buf, sizeof (buf), sizeof (buf), "%u", pgm_ntohs (port));
 		service_string = pgm_strdup(buf);
 	} else {
 		service_string = pgm_strdup(se->s_name);

@@ -816,7 +816,7 @@ _pgm_getadaptersaddresses (
  */
 
 #define IN6_IS_ADDR_TEREDO(addr) \
-	(((const uint32_t *)(addr))[0] == ntohl (0x20010000))
+	(((const uint32_t *)(addr))[0] == pgm_ntohl (0x20010000))
 
 			if (AF_INET6 == unicast->Address.lpSockaddr->sa_family &&
 /* TunnelType only applies to one interface on the adapter and no
@@ -899,7 +899,7 @@ _pgm_getadaptersaddresses (
 					adapter->OperStatus != IfOperStatusUp)
 				{
 /* RFC3927: link-local IPv4 always has 16-bit CIDR */
-					if (IN_LINKLOCAL( ntohl (((struct sockaddr_in*)(unicast->Address.lpSockaddr))->sin_addr.s_addr)))
+					if (IN_LINKLOCAL( pgm_ntohl (((struct sockaddr_in*)(unicast->Address.lpSockaddr))->sin_addr.s_addr)))
 					{
 						pgm_trace (PGM_LOG_ROLE_NETWORK,_("Assuming 16-bit prefix length for link-local IPv4 adapter %s."),
 							adapter->AdapterName);
@@ -923,7 +923,7 @@ _pgm_getadaptersaddresses (
 				}
 /* Assume unicast address for first prefix of operational adapter */
 				if (AF_INET == lpSockaddr->sa_family)
-					pgm_assert (!IN_MULTICAST( ntohl (((struct sockaddr_in*)(lpSockaddr))->sin_addr.s_addr)));
+					pgm_assert (!IN_MULTICAST( pgm_ntohl (((struct sockaddr_in*)(lpSockaddr))->sin_addr.s_addr)));
 				if (AF_INET6 == lpSockaddr->sa_family)
 					pgm_assert (!IN6_IS_ADDR_MULTICAST( &((struct sockaddr_in6*)(lpSockaddr))->sin6_addr));
 /* Assume subnet or host IP address for XP backward compatibility */
@@ -952,7 +952,7 @@ _pgm_getadaptersaddresses (
 				}
 #else
 /* NB: left-shift of full bit-width is undefined in C standard. */
-				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = htonl( 0xffffffffU << ( 32 - prefixLength ) );
+				((struct sockaddr_in*)ift->_ifa.ifa_netmask)->sin_addr.s_addr = pgm_htonl( 0xffffffffU << ( 32 - prefixLength ) );
 #endif
 				break;
 

@@ -273,7 +273,7 @@ pgm_if_print_all (void)
 			struct sockaddr_in sin;
 			memset (&sin, 0, sizeof (sin));
 			sin.sin_family = AF_INET;
-			sin.sin_addr.s_addr = htonl (IF_DEFAULT_GROUP);
+			sin.sin_addr.s_addr = pgm_htonl (IF_DEFAULT_GROUP);
 			memcpy (&ifaddr, &sin, sizeof (sin));
 		} else if (AF_INET6 == addr->sa_family) {
 			struct sockaddr_in6 sin6;
@@ -304,9 +304,9 @@ is_in_net (
 	pgm_assert (NULL != netmask);
 
 #ifdef IF_DEBUG
-	const struct in_addr taddr    = { .s_addr = htonl (addr->s_addr) };
-	const struct in_addr tnetaddr = { .s_addr = htonl (netaddr->s_addr) };
-	const struct in_addr tnetmask = { .s_addr = htonl (netmask->s_addr) };
+	const struct in_addr taddr    = { .s_addr = pgm_htonl (addr->s_addr) };
+	const struct in_addr tnetaddr = { .s_addr = pgm_htonl (netaddr->s_addr) };
+	const struct in_addr tnetmask = { .s_addr = pgm_htonl (netmask->s_addr) };
 	char saddr[INET_ADDRSTRLEN], snetaddr[INET_ADDRSTRLEN], snetmask[INET_ADDRSTRLEN];
 	pgm_debug ("is_in_net (addr:%s netaddr:%s netmask:%s)",
 		 pgm_inet_ntop (AF_INET, &taddr,    saddr,    sizeof(saddr)),
@@ -420,7 +420,7 @@ parse_interface (
 	if (AF_INET6 != family && 0 == pgm_inet_network (ifname, &in_addr))
 	{
 #ifdef IF_DEBUG
-		struct in_addr t = { .s_addr = htonl (in_addr.s_addr) };
+		struct in_addr t = { .s_addr = pgm_htonl (in_addr.s_addr) };
 		pgm_debug ("IPv4 network address: %s", inet_ntoa (t));
 #endif
 		if (IN_MULTICAST(in_addr.s_addr)) {
@@ -437,7 +437,7 @@ parse_interface (
 		struct sockaddr_in s4;
 		memset (&s4, 0, sizeof(s4));
 		s4.sin_family = AF_INET;
-		s4.sin_addr.s_addr = htonl (in_addr.s_addr);
+		s4.sin_addr.s_addr = pgm_htonl (in_addr.s_addr);
 		memcpy (addr, &s4, sizeof(s4));
 
 		check_inet_network = TRUE;
@@ -478,7 +478,7 @@ parse_interface (
 		switch (eai) {
 		case 0:
 			if (AF_INET == res->ai_family &&
-			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
+			    IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_IF,
@@ -646,7 +646,7 @@ parse_interface (
 				addr_cnt = 0;
 				for (res = result; NULL != res; res = res->ai_next)
 				{
-					if ((AF_INET == res->ai_family && IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
+					if ((AF_INET == res->ai_family && IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
 					    (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
 						continue;
 					addr_cnt++;
@@ -658,7 +658,7 @@ parse_interface (
 					addr = pgm_newa (struct sockaddr_storage, addr_cnt);
 					for (res = result; NULL != res; res = res->ai_next)
 					{
-						if ((AF_INET == res->ai_family && IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
+						if ((AF_INET == res->ai_family && IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
 						    (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
 							continue;
 						memcpy (&addr[i++], res->ai_addr, pgm_sockaddr_len (res->ai_addr));
@@ -672,7 +672,7 @@ parse_interface (
 				{
 					for (res = result; NULL != res; res = res->ai_next)
 					{
-						if ((AF_INET == res->ai_family && IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
+						if ((AF_INET == res->ai_family && IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr))) ||
 						    (AF_INET6 == res->ai_family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
 							continue;
 						break;
@@ -695,7 +695,7 @@ parse_interface (
 			}
 
 			if (AF_INET == res->ai_family &&
-			    IN_MULTICAST(ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
+			    IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)(res->ai_addr))->sin_addr.s_addr)))
 			{
 				pgm_set_error (error,
 					     PGM_ERROR_DOMAIN_IF,
@@ -837,8 +837,8 @@ parse_interface (
 		if (check_inet_network &&
 		    AF_INET == ifa->ifa_addr->sa_family)
 		{
-			const struct in_addr ifaddr  = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
-			const struct in_addr netmask = { .s_addr = ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
+			const struct in_addr ifaddr  = { .s_addr = pgm_ntohl (((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr) };
+			const struct in_addr netmask = { .s_addr = pgm_ntohl (((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr) };
 			struct in_addr lna;
 
 /* local network address must be null, otherwise should match an address is previous check */
@@ -1049,7 +1049,7 @@ parse_group (
 /* IPv4 address */
 	if (AF_INET6 != family &&
 	    pgm_inet_pton (AF_INET, group, &((struct sockaddr_in*)addr)->sin_addr) &&
-	    IN_MULTICAST(ntohl (((struct sockaddr_in*)addr)->sin_addr.s_addr)))
+	    IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)addr)->sin_addr.s_addr)))
 	{
 		addr->sa_family = AF_INET;
 #ifdef IF_DEBUG
@@ -1101,7 +1101,7 @@ parse_group (
 			memcpy (&sa, &ne->n_net, sizeof (sa));
 			if (IN_MULTICAST(sa.sin_addr.s_addr)) {
 				addr->sa_family = ne->n_net.ss_family;
-				((struct sockaddr_in*)addr)->sin_addr.s_addr = htonl (sa.sin_addr.s_addr);
+				((struct sockaddr_in*)addr)->sin_addr.s_addr = pgm_htonl (sa.sin_addr.s_addr);
 #ifdef IF_DEBUG
 				{
 					char multicast_group[1024];
@@ -1205,7 +1205,7 @@ parse_group (
  */
 	for (res = result; NULL != res; res = res->ai_next)
 	{
-		if ((AF_INET6 != family && IN_MULTICAST(ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
+		if ((AF_INET6 != family && IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
 		    (AF_INET  != family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
 		{
 /* return first multicast result */
@@ -1343,7 +1343,7 @@ set_default_multicast_group (
 	case AF_INET: {
 		struct sockaddr_in s4;
 		memset (&s4, 0, sizeof (s4));
-		s4.sin_addr.s_addr = htonl (IF_DEFAULT_GROUP);
+		s4.sin_addr.s_addr = pgm_htonl (IF_DEFAULT_GROUP);
 		memcpy (sa, &s4, sizeof (s4));
 		break;
 	}

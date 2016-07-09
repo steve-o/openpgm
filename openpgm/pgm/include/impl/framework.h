@@ -42,7 +42,9 @@
 #include <pgm/tsi.h>
 #include <pgm/types.h>
 
+#include <impl/byteorder.h>
 #include <impl/checksum.h>
+#include <impl/endian.h>
 #include <impl/errno.h>
 #include <impl/fixed.h>
 #include <impl/galois.h>

@@ -277,7 +277,7 @@ pgmSourceTable_get_next_data_point(
 	idx = idx->next_variable;
 
 /* pgmSourceSourcePort */
-	const unsigned sport = ntohs (sock->tsi.sport);
+	const unsigned sport = pgm_ntohs (sock->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 
 	*my_data_context = sock;
@@ -381,7 +381,7 @@ pgmSourceTable_handler (
 
 			case COLUMN_PGMSOURCEDESTPORT:
 				{
-					const unsigned dport = ntohs (sock->dport);
+					const unsigned dport = pgm_ntohs (sock->dport);
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&dport, sizeof(dport) );
 				}
@@ -555,7 +555,7 @@ pgmSourceConfigTable_get_next_data_point(
 	idx = idx->next_variable;
 
 /* pgmSourceSourcePort */
-	const unsigned sport = ntohs (sock->tsi.sport);
+	const unsigned sport = pgm_ntohs (sock->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 
 	*my_data_context = sock;
@@ -918,7 +918,7 @@ pgmSourcePerformanceTable_get_next_data_point (
 	idx = idx->next_variable;
 
 /* pgmSourceSourcePort */
-	const unsigned sport = ntohs (sock->tsi.sport);
+	const unsigned sport = pgm_ntohs (sock->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 
 	*my_data_context = sock;
@@ -1491,7 +1491,7 @@ pgmReceiverTable_get_next_data_point (
 	idx = idx->next_variable;
 
 /* pgmReceiverSourcePort */
-	const unsigned sport = ntohs (peer->tsi.sport);
+	const unsigned sport = pgm_ntohs (peer->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 	idx = idx->next_variable;
 
@@ -1616,7 +1616,7 @@ pgmReceiverTable_handler (
 /* by definition same as sock */
 			case COLUMN_PGMRECEIVERDESTPORT:
 				{
-					const unsigned dport = ntohs (sock->dport);
+					const unsigned dport = pgm_ntohs (sock->dport);
 					snmp_set_var_typed_value (var, ASN_UNSIGNED,
 								  (const u_char*)&dport, sizeof(dport) );
 				}
@@ -1852,7 +1852,7 @@ pgmReceiverConfigTable_get_next_data_point(
 	idx = idx->next_variable;
 
 /* pgmReceiverSourcePort */
-	const unsigned sport = ntohs (peer->tsi.sport);
+	const unsigned sport = pgm_ntohs (peer->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 	idx = idx->next_variable;
 
@@ -2242,7 +2242,7 @@ pgmReceiverPerformanceTable_get_next_data_point (
 	idx = idx->next_variable;
 
 /* pgmReceiverSourcePort */
-	const unsigned sport = ntohs (peer->tsi.sport);
+	const unsigned sport = pgm_ntohs (peer->tsi.sport);
 	snmp_set_var_typed_value (idx, ASN_UNSIGNED, (const u_char*)&sport, sizeof(sport));
 	idx = idx->next_variable;
 

@@ -282,7 +282,7 @@ pgm_sockaddr_is_addr_multicast (
 	case AF_INET: {
 		struct sockaddr_in s4;
 		memcpy (&s4, sa, sizeof(s4));
-		retval = IN_MULTICAST(ntohl( s4.sin_addr.s_addr ));
+		retval = IN_MULTICAST(pgm_ntohl( s4.sin_addr.s_addr ));
 		break;
 	}
 
@@ -528,10 +528,10 @@ pgm_sockaddr_router_alert (
 /* manually set the IP option */
 #	ifndef _WIN32
 	const uint32_t ipopt_ra = ((uint32_t)PGM_IPOPT_RA << 24) | (0x04 << 16);
-	const uint32_t router_alert = htonl (ipopt_ra);
+	const uint32_t router_alert = pgm_htonl (ipopt_ra);
 #	else
 	const DWORD ipopt_ra = ((DWORD)PGM_IPOPT_RA << 24) | (0x04 << 16);
-	const DWORD router_alert = htonl (ipopt_ra);
+	const DWORD router_alert = pgm_htonl (ipopt_ra);
 #	endif
 	const int optlen = v ? sizeof (router_alert) : 0;
 #endif
@@ -1365,7 +1365,7 @@ pgm_nla_to_sockaddr (
 	int retval = 0;
 
 	memcpy (&nla_family, nla, sizeof(nla_family));
-	sa->sa_family = ntohs (nla_family);
+	sa->sa_family = pgm_ntohs (nla_family);
 	switch (sa->sa_family) {
 	case AFI_IP:
 		sa->sa_family = AF_INET;
@@ -1398,12 +1398,12 @@ pgm_sockaddr_to_nla (
 	*(uint16_t*)((char*)nla + sizeof(uint16_t)) = 0;	/* reserved 16bit space */
 	switch (sa->sa_family) {
 	case AF_INET:
-		*(uint16_t*)nla = htons (AFI_IP);
+		*(uint16_t*)nla = pgm_htons (AFI_IP);
 		((struct in_addr*)((char*)nla + sizeof(uint32_t)))->s_addr = ((const struct sockaddr_in*)sa)->sin_addr.s_addr;
 		break;
 
 	case AF_INET6:
-		*(uint16_t*)nla = htons (AFI_IP6);
+		*(uint16_t*)nla = pgm_htons (AFI_IP6);
 		memcpy ((struct in6_addr*)((char*)nla + sizeof(uint32_t)), &((const struct sockaddr_in6*)sa)->sin6_addr, sizeof(struct in6_addr));
 		break;
 

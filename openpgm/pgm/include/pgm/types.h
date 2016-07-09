@@ -90,7 +90,8 @@
 #	define pgm_bool_t	bool
 #endif
 
-#if !defined( PGM_RESTRICT_DEFINED ) && (!defined( restrict ) || (defined( __STDC_VERSION__ ) && __STDC_VERSION__ < 199901L))
+/* TBD: Older versions of Clang are reported to not include support for restrict */
+#if !defined( PGM_RESTRICT_DEFINED ) && (!defined( restrict ) || (defined( __STDC_VERSION__ ) && __STDC_VERSION__ < 199901L)) && !(defined( __clang__ ) && defined( __cplusplus ))
 /* C89 ANSI standard */
 #	define restrict
 #	define PGM_RESTRICT_DEFINED

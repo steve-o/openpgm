@@ -156,7 +156,7 @@ pgm_parse_raw (
 	}
 
 #ifndef HAVE_HOST_ORDER_IP_LEN
-	size_t packet_length = ntohs (ip->ip_len);	/* total packet length */
+	size_t packet_length = pgm_ntohs (ip->ip_len);	/* total packet length */
 #else
 	size_t packet_length = ip->ip_len;		/* total packet length */
 #endif
@@ -185,7 +185,7 @@ pgm_parse_raw (
 #ifdef PGM_CHECK_IN_CKSUM
 	const uint16_t sum = in_cksum (data, packet_length, 0);
 	if (PGM_UNLIKELY(0 != sum)) {
-		const uint16_t ip_sum = ntohs (ip->ip_sum);
+		const uint16_t ip_sum = pgm_ntohs (ip->ip_sum);
 		pgm_set_error (error,
 			     PGM_ERROR_DOMAIN_PACKET,
 			     PGM_ERROR_CKSUM,
@@ -197,7 +197,7 @@ pgm_parse_raw (
 
 /* fragmentation offset, bit 0: 0, bit 1: do-not-fragment, bit 2: more-fragments */
 #ifndef HAVE_HOST_ORDER_IP_OFF
-	const uint16_t offset = ntohs (ip->ip_off);
+	const uint16_t offset = pgm_ntohs (ip->ip_off);
 #else
 	const uint16_t offset = ip->ip_off;
 #endif
@@ -340,7 +340,7 @@ pgm_verify_spm (
 	pgm_assert (NULL != skb);
 
 	const struct pgm_spm* spm = (const struct pgm_spm*)skb->data;
-	switch (ntohs (spm->spm_nla_afi)) {
+	switch (pgm_ntohs (spm->spm_nla_afi)) {
 /* truncated packet */
 	case AFI_IP6:
 		if (PGM_UNLIKELY(skb->len < sizeof(struct pgm_spm6)))
@@ -395,7 +395,7 @@ pgm_verify_poll (
 	pgm_assert (NULL != skb);
 
 	const struct pgm_poll* poll4 = (const struct pgm_poll*)skb->data;
-	switch (ntohs (poll4->poll_nla_afi)) {
+	switch (pgm_ntohs (poll4->poll_nla_afi)) {
 /* truncated packet */
 	case AFI_IP6:
 		if (PGM_UNLIKELY(skb->len < sizeof(struct pgm_poll6)))
@@ -500,17 +500,17 @@ pgm_verify_nak (
 		return FALSE;
 
 	const struct pgm_nak* nak = (struct pgm_nak*)skb->data;
-	const uint16_t nak_src_nla_afi = ntohs (nak->nak_src_nla_afi);
+	const uint16_t nak_src_nla_afi = pgm_ntohs (nak->nak_src_nla_afi);
 	uint16_t nak_grp_nla_afi = 0;
 
 /* check source NLA: unicast address of the ODATA sender */
 	switch (nak_src_nla_afi) {
 	case AFI_IP:
-		nak_grp_nla_afi = ntohs (nak->nak_grp_nla_afi);
+		nak_grp_nla_afi = pgm_ntohs (nak->nak_grp_nla_afi);
 		break;
 
 	case AFI_IP6:
-		nak_grp_nla_afi = ntohs (((const struct pgm_nak6*)nak)->nak6_grp_nla_afi);
+		nak_grp_nla_afi = pgm_ntohs (((const struct pgm_nak6*)nak)->nak6_grp_nla_afi);
 		break;
 
 	default:

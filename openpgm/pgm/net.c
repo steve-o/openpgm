@@ -77,7 +77,7 @@ pgm_sendto_hops (
 		(const void*)buf,
 		len,
 		saddr,
-		ntohs (((const struct sockaddr_in*)to)->sin_port),
+		pgm_ntohs (((const struct sockaddr_in*)to)->sin_port),
 		(int)tolen);
 #endif
 

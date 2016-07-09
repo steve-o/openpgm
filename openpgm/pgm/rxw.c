@@ -321,14 +321,14 @@ pgm_rxw_add (
 	pgm_debug ("add (window:%p skb:%p nak_rb_expiry:%" PGM_TIME_FORMAT ")",
 		(const void*)window, (const void*)skb, nak_rb_expiry);
 
-	skb->sequence = ntohl (skb->pgm_data->data_sqn);
+	skb->sequence = pgm_ntohl (skb->pgm_data->data_sqn);
 
 /* protocol sanity check: tsdu size */
-	if (PGM_UNLIKELY(skb->len != ntohs (skb->pgm_header->pgm_tsdu_length)))
+	if (PGM_UNLIKELY(skb->len != pgm_ntohs (skb->pgm_header->pgm_tsdu_length)))
 		return PGM_RXW_MALFORMED;
 
 /* protocol sanity check: valid trail pointer wrt. sequence */
-	if (PGM_UNLIKELY(skb->sequence - ntohl (skb->pgm_data->data_trail) >= ((UINT32_MAX/2)-1)))
+	if (PGM_UNLIKELY(skb->sequence - pgm_ntohl (skb->pgm_data->data_trail) >= ((UINT32_MAX/2)-1)))
 		return PGM_RXW_BOUNDS;
 
 /* verify fragment header for original data, parity packets include a
@@ -338,19 +338,19 @@ pgm_rxw_add (
 	    skb->pgm_opt_fragment)
 	{
 /* protocol sanity check: single fragment APDU */
-		if (PGM_UNLIKELY(ntohl (skb->of_apdu_len) == skb->len))
+		if (PGM_UNLIKELY(pgm_ntohl (skb->of_apdu_len) == skb->len))
 			skb->pgm_opt_fragment = NULL;
 
 /* protocol sanity check: minimum APDU length */
-		if (PGM_UNLIKELY(ntohl (skb->of_apdu_len) < skb->len))
+		if (PGM_UNLIKELY(pgm_ntohl (skb->of_apdu_len) < skb->len))
 			return PGM_RXW_MALFORMED;
 
 /* protocol sanity check: sequential ordering */
-		if (PGM_UNLIKELY(pgm_uint32_gt (ntohl (skb->of_apdu_first_sqn), skb->sequence)))
+		if (PGM_UNLIKELY(pgm_uint32_gt (pgm_ntohl (skb->of_apdu_first_sqn), skb->sequence)))
 			return PGM_RXW_MALFORMED;
 
 /* protocol sanity check: maximum APDU length */
-		if (PGM_UNLIKELY(ntohl (skb->of_apdu_len) > PGM_MAX_APDU))
+		if (PGM_UNLIKELY(pgm_ntohl (skb->of_apdu_len) > PGM_MAX_APDU))
 			return PGM_RXW_MALFORMED;
 	}
 
@@ -358,7 +358,7 @@ pgm_rxw_add (
 	if (PGM_UNLIKELY(!window->is_defined))
 		_pgm_rxw_define (window, skb->sequence - 1);	/* previous_lead needed for append to occur */
 	else
-		_pgm_rxw_update_trail (window, ntohl (skb->pgm_data->data_trail));
+		_pgm_rxw_update_trail (window, pgm_ntohl (skb->pgm_data->data_trail));
 
 /* bounds checking for parity data occurs at the transmission group sequence number */
 	if (skb->pgm_header->pgm_options & PGM_OPT_PARITY)
@@ -790,7 +790,7 @@ _pgm_rxw_is_apdu_lost (
 	if (!skb->pgm_opt_fragment)
 		return FALSE;
 
-	const uint32_t apdu_first_sqn = ntohl (skb->of_apdu_first_sqn);
+	const uint32_t apdu_first_sqn = pgm_ntohl (skb->of_apdu_first_sqn);
 
 /* by definition, first fragment indicates APDU is available */
 	if (apdu_first_sqn == skb->sequence)
@@ -1358,7 +1358,7 @@ _pgm_rxw_incoming_read (
 		skb = _pgm_rxw_peek (window, window->commit_lead);
 		pgm_assert (NULL != skb);
 		if (_pgm_rxw_is_apdu_complete (window,
-					      skb->pgm_opt_fragment ? ntohl (skb->of_apdu_first_sqn) : skb->sequence))
+					      skb->pgm_opt_fragment ? pgm_ntohl (skb->of_apdu_first_sqn) : skb->sequence))
 		{
 			bytes_read += _pgm_rxw_incoming_read_apdu (window, pmsg);
 			data_read  ++;
@@ -1432,7 +1432,7 @@ _pgm_rxw_reconstruct (
 
 	const bool is_var_pktlen = skb->pgm_header->pgm_options & PGM_OPT_VAR_PKTLEN;
 	const bool is_op_encoded = skb->pgm_header->pgm_options & PGM_OPT_PRESENT;
-	const uint16_t parity_length = ntohs (skb->pgm_header->pgm_tsdu_length);
+	const uint16_t parity_length = pgm_ntohs (skb->pgm_header->pgm_tsdu_length);
 
 	for (uint32_t i = tg_sqn, j = 0; i != (tg_sqn + window->rs.k); i++, j++)
 	{
@@ -1577,7 +1577,7 @@ _pgm_rxw_is_apdu_complete (
 		return FALSE;
 	}
 
-	const size_t apdu_size = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
+	const size_t apdu_size = skb->pgm_opt_fragment ? pgm_ntohl (skb->of_apdu_len) : skb->len;
 	const uint32_t  tg_sqn = _pgm_rxw_tg_sqn (window, first_sequence);
 
 	pgm_assert_cmpuint (apdu_size, >=, skb->len);
@@ -1631,13 +1631,13 @@ _pgm_rxw_is_apdu_complete (
 				return TRUE;
 
 /* protocol sanity check: matching first sequence reference */
-			if (PGM_UNLIKELY(ntohl (skb->of_apdu_first_sqn) != first_sequence)) {
+			if (PGM_UNLIKELY(pgm_ntohl (skb->of_apdu_first_sqn) != first_sequence)) {
 				pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
 
 /* protocol sanity check: matching apdu length */
-			if (PGM_UNLIKELY(ntohl (skb->of_apdu_len) != apdu_size)) {
+			if (PGM_UNLIKELY(pgm_ntohl (skb->of_apdu_len) != apdu_size)) {
 				pgm_rxw_lost (window, first_sequence);
 				return FALSE;
 			}
@@ -1687,7 +1687,7 @@ _pgm_rxw_incoming_read_apdu (
 	skb = _pgm_rxw_peek (window, window->commit_lead);
 	pgm_assert (NULL != skb);
 
-	const size_t apdu_len = skb->pgm_opt_fragment ? ntohl (skb->of_apdu_len) : skb->len;
+	const size_t apdu_len = skb->pgm_opt_fragment ? pgm_ntohl (skb->of_apdu_len) : skb->len;
 	pgm_assert_cmpuint (apdu_len, >=, skb->len);
 
 	do {
@@ -2174,7 +2174,7 @@ pgm_rxw_dump (
 			window->tsi->gsi.identifier[3],
 			window->tsi->gsi.identifier[4],
 			window->tsi->gsi.identifier[5],
-			ntohs (window->tsi->sport),
+			pgm_ntohs (window->tsi->sport),
 		(void*)window->nak_backoff_queue.head,
 			(void*)window->nak_backoff_queue.tail,
 			window->nak_backoff_queue.length,

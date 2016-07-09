@@ -95,7 +95,7 @@ pgm_skb_is_valid (
 			pgm_return_val_if_fail ((const char*)skb->pgm_opt_fragment + sizeof(struct pgm_opt_fragment) < (const char*)skb->tail, FALSE);
 /* of_apdu_first_sqn can be any value */
 /* of_frag_offset */
-			pgm_return_val_if_fail (ntohl (skb->of_frag_offset) < ntohl (skb->of_apdu_len), FALSE);
+			pgm_return_val_if_fail (pgm_ntohl (skb->of_frag_offset) < pgm_ntohl (skb->of_apdu_len), FALSE);
 /* of_apdu_len can be any value */
 		}
 		pgm_return_val_if_fail (PGM_ODATA == skb->pgm_header->pgm_type || PGM_RDATA == skb->pgm_header->pgm_type, FALSE);

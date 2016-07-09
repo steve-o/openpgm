@@ -301,7 +301,7 @@ pgm_http_init (
 	memset (&http_addr, 0, sizeof(http_addr));
 	http_addr.sin_family = AF_INET;
 	http_addr.sin_addr.s_addr = INADDR_ANY;
-	http_addr.sin_port = htons (http_port);
+	http_addr.sin_port = pgm_htons (http_port);
 	if (0 != bind (http_sock, (struct sockaddr*)&http_addr, sizeof(http_addr))) {
 		const int save_errno = pgm_get_last_sock_error();
 		char errbuf[1024];
@@ -1029,8 +1029,8 @@ transports_callback (
 				     NI_NUMERICHOST);
 			char gsi[ PGM_GSISTRLEN ];
 			pgm_gsi_print_r (&sock->tsi.gsi, gsi, sizeof(gsi));
-			const in_port_t sport = ntohs (sock->tsi.sport);
-			const in_port_t dport = ntohs (sock->dport);
+			const in_port_t sport = pgm_ntohs (sock->tsi.sport);
+			const in_port_t dport = pgm_ntohs (sock->dport);
 			pgm_string_append_printf (response,	"<tr>"
 									"<td>%s</td>"
 									"<td>%u</td>"
@@ -1089,7 +1089,7 @@ default_callback (
 				(unsigned char*)&tsi.gsi.identifier[4],
 				(unsigned char*)&tsi.gsi.identifier[5],
 				&tsi.sport);
-	tsi.sport = htons (tsi.sport);
+	tsi.sport = pgm_htons (tsi.sport);
 	if (count == 7)
 	{
 		const int retval = http_tsi_response (connection, &tsi);
@@ -1150,7 +1150,7 @@ http_tsi_response (
 	char title[ sizeof("Transport .00000") + PGM_GSISTRLEN ];
 	sprintf (title, "Transport %s.%hu",
 		 gsi,
-		 ntohs (sock->tsi.sport));
+		 pgm_ntohs (sock->tsi.sport));
 
 	char source_address[INET6_ADDRSTRLEN];
 	getnameinfo ((struct sockaddr*)&sock->send_gsr.gsr_source, pgm_sockaddr_len ((struct sockaddr*)&sock->send_gsr.gsr_source),
@@ -1164,8 +1164,8 @@ http_tsi_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	const in_port_t dport = ntohs (sock->dport);
-	const in_port_t sport = ntohs (sock->tsi.sport);
+	const in_port_t dport = pgm_ntohs (sock->dport);
+	const in_port_t sport = pgm_ntohs (sock->tsi.sport);
 
 	const pgm_time_t ihb_min = sock->spm_heartbeat_len ? sock->spm_heartbeat_interval[ 1 ] : 0;
 	const pgm_time_t ihb_max = sock->spm_heartbeat_len ? sock->spm_heartbeat_interval[ sock->spm_heartbeat_len - 1 ] : 0;
@@ -1377,8 +1377,8 @@ http_each_receiver (
 	char gsi[ PGM_GSISTRLEN + sizeof(".00000") ];
 	pgm_gsi_print_r (&peer->tsi.gsi, gsi, sizeof(gsi));
 
-	const uint16_t sport = ntohs (peer->tsi.sport);
-	const uint16_t dport = ntohs (sock->dport);	/* by definition must be the same */
+	const uint16_t sport = pgm_ntohs (peer->tsi.sport);
+	const uint16_t dport = pgm_ntohs (sock->dport);	/* by definition must be the same */
 	pgm_string_append_printf (response,	"<tr>"
 							"<td>%s</td>"
 							"<td>%u</td>"
@@ -1465,7 +1465,7 @@ http_receiver_response (
 	char title[ sizeof("Peer .00000") + PGM_GSISTRLEN ];
 	sprintf (title, "Peer %s.%u",
 		 gsi,
-		 ntohs (peer->tsi.sport));
+		 pgm_ntohs (peer->tsi.sport));
 
 	char group_address[INET6_ADDRSTRLEN];
 	getnameinfo ((const struct sockaddr*)&peer->group_nla, pgm_sockaddr_len ((const struct sockaddr*)&peer->group_nla),
@@ -1485,8 +1485,8 @@ http_receiver_response (
 		     NULL, 0,
 		     NI_NUMERICHOST);
 
-	const in_port_t sport = ntohs (peer->tsi.sport);
-	const in_port_t dport = ntohs (sock->dport);	/* by definition must be the same */
+	const in_port_t sport = pgm_ntohs (peer->tsi.sport);
+	const in_port_t dport = pgm_ntohs (sock->dport);	/* by definition must be the same */
 	const pgm_rxw_t* window = peer->window;
 	const uint32_t outstanding_naks = window->nak_backoff_queue.length +
 					  window->wait_ncf_queue.length +

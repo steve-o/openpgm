@@ -27,28 +27,6 @@
 #include <glib.h>
 #include <check.h>
 
-#if defined( BYTE_ORDER )
-#	define PGM_BYTE_ORDER		BYTE_ORDER
-#	define PGM_BIG_ENDIAN		BIG_ENDIAN
-#	define PGM_LITTLE_ENDIAN	LITTLE_ENDIAN
-#elif defined( __BYTE_ORDER )
-#	define PGM_BYTE_ORDER		__BYTE_ORDER
-#	define PGM_BIG_ENDIAN		__BIG_ENDIAN
-#	define PGM_LITTLE_ENDIAN	__LITTLE_ENDIAN
-#elif defined( __sun )
-#	define PGM_LITTLE_ENDIAN	1234
-#	define PGM_BIG_ENDIAN		4321
-#	if defined( _BIT_FIELDS_LTOH )
-#		define PGM_BYTE_ORDER		PGM_LITTLE_ENDIAN
-#	elif defined( _BIT_FIELDS_HTOL )
-#		define PGM_BYTE_ORDER		PGM_BIG_ENDIAN
-#	else
-#		error "Unknown bit field order for Sun Solaris."
-#	endif
-#else
-#	error "BYTE_ORDER not supported."
-#endif
-
 #ifdef _WIN32
 #	define PGM_CHECK_NOFORK		1
 #endif

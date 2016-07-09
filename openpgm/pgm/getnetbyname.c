@@ -151,7 +151,7 @@ again:
 		struct sockaddr_in sa;
 		memset (&sa, 0, sizeof (sa));
 		sa.sin_family = AF_INET;
-		sa.sin_addr.s_addr = ntohl (sin.s_addr);
+		sa.sin_addr.s_addr = pgm_ntohl (sin.s_addr);
 		memcpy (&net.n_net, &sa, sizeof (sa));
 	} else if (0 != pgm_sa6_network (cp, (struct sockaddr_in6*)&net.n_net)) {
 /* cannot resolve address, fail instead of returning junk address */
@@ -254,7 +254,7 @@ found:
 	memset (&sa, 0, sizeof (sa));
 	sa.sin_family = ne->n_addrtype;
 	addr = pgm_inet_makeaddr (ne->n_net, 0);
-	sa.sin_addr.s_addr = ntohl (addr.s_addr);
+	sa.sin_addr.s_addr = pgm_ntohl (addr.s_addr);
 	memcpy (&net.n_net, &sa, sizeof (sa));
 	endnetent();
 	return &net;
