@@ -68,6 +68,7 @@ set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "${CMAKE_MODULE_LINKER_FLAGS_RELEASE} /LTC
 # source files
 
 set(c99-sources
+	cpu.c
         thread.c
         mem.c
         string.c

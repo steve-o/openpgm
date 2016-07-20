@@ -6,6 +6,7 @@ import os;
 Import('env')
 
 src = Split("""
+		cpu.c
 		thread.c
 		mem.c
 		string.c

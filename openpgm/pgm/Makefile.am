@@ -7,6 +7,7 @@ noinst_LTLIBRARIES = libpgm_noinst.la
 EXTRA_DIST = galois_generator.pl version_generator.py
 
 libpgm_noinst_la_SOURCES = \
+	cpu.c \
 	thread.c \
 	mem.c \
 	string.c \

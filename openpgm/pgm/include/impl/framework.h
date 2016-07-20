@@ -44,6 +44,7 @@
 
 #include <impl/byteorder.h>
 #include <impl/checksum.h>
+#include <impl/cpu.h>
 #include <impl/endian.h>
 #include <impl/errno.h>
 #include <impl/fixed.h>
