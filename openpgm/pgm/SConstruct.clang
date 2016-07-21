@@ -77,18 +77,14 @@ env = Environment(
 				'-Wno-inline',
 				'-Wno-unused-function',
 #			'-pedantic',
+# Native arch
+			'-march=native',
 # C99
 			'-std=gnu99',
 			'-D_XOPEN_SOURCE=600',
 			'-D_BSD_SOURCE',
 # re-entrant libc
 			'-D_REENTRANT',
-# optimium checksum implementation
-#			'-DUSE_8BIT_CHECKSUM',
-			'-DUSE_16BIT_CHECKSUM',
-#			'-DUSE_32BIT_CHECKSUM',
-#			'-DUSE_64BIT_CHECKSUM',
-#			'-DUSE_VECTOR_CHECKSUM',
 # optimum galois field multiplication
 			'-DUSE_GALOIS_MUL_LUT',
 # Autoconf config.h

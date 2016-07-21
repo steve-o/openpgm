@@ -105,6 +105,8 @@ env = Environment(
 				'-Wno-inline',
 				'-Wno-unused-function',
 			'-pedantic',
+# Native arch
+			'-march=native',
 # C99
 			'-std=gnu99',
 # re-entrant libc
@@ -121,12 +123,6 @@ env = Environment(
 #			'-DCONFIG_HAVE_GNUC_VARARGS',
 # stack memory api header
 #			'-DCONFIG_HAVE_ALLOCA_H',
-# optimium checksum implementation
-#			'-DCONFIG_8BIT_CHECKSUM',
-			'-DCONFIG_16BIT_CHECKSUM',
-#			'-DCONFIG_32BIT_CHECKSUM',
-#			'-DCONFIG_64BIT_CHECKSUM',
-#			'-DCONFIG_VECTOR_CHECKSUM',
 # useful /proc system
 #			'-DCONFIG_HAVE_PROC',
 # example: crash handling

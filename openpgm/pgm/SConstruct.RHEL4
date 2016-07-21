@@ -92,6 +92,8 @@ env = Environment(ENV = os.environ,
 				'-Wnested-externs',
 				'-Winline',
 			'-pedantic',
+# Native arch
+			'-march=native',
 # C99
 			'-std=gnu99',
 			'-D_XOPEN_SOURCE=600',
@@ -110,12 +112,6 @@ env = Environment(ENV = os.environ,
 #			'-DHAVE_GNUC_VARARGS',
 # stack memory api header
 			'-DHAVE_ALLOCA_H',
-# optimium checksum implementation
-#			'-DUSE_8BIT_CHECKSUM',
-			'-DUSE_16BIT_CHECKSUM',
-#			'-DUSE_32BIT_CHECKSUM',
-#			'-DUSE_64BIT_CHECKSUM',
-#			'-DUSE_VECTOR_CHECKSUM',
 # useful /proc system
 			'-DHAVE_PROC_CPUINFO',
 # example: crash handling

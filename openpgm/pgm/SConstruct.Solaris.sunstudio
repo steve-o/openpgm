@@ -104,12 +104,6 @@ env = Environment(
 			'-D__EXTENSIONS__',
 # re-entrant libc
 			'-D_REENTRANT',
-# optimium checksum implementation
-#			'-DUSE_8BIT_CHECKSUM',
-			'-DUSE_16BIT_CHECKSUM',
-#			'-DUSE_32BIT_CHECKSUM',
-#			'-DUSE_64BIT_CHECKSUM',
-#			'-DUSE_VECTOR_CHECKSUM',
 # optimum galois field multiplication
 			'-DUSE_GALOIS_MUL_LUT',
 # POSIX spinlocks

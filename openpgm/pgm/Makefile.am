@@ -93,7 +93,6 @@ galois_tables.c: galois_generator.pl
 
 libpgm_noinst_la_CFLAGS = \
 	-I$(top_srcdir)/include \
-	-DUSE_16BIT_CHECKSUM \
 	-DUSE_GALOIS_MUL_LUT \
 	-DGETTEXT_PACKAGE='"pgm"'
 

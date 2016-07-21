@@ -54,7 +54,10 @@ static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 #if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
-static uint16_t do_csum_simd (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+static uint16_t do_csum_sse2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+#endif
+#if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
+static uint16_t do_csum_sse42 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 #ifdef __AVX2__
 static uint16_t do_csum_avx (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
@@ -815,7 +818,7 @@ do_csumcpy_vector (
  */
 static
 uint16_t
-do_csum_simd (
+do_csum_sse2 (
 	const void*	addr,
 	uint16_t	len,
 	uint32_t	csum
@@ -850,19 +853,10 @@ do_csum_simd (
 	while (count16--) {
 		__m128i tmp = _mm_load_si128((const __m128i*)buf);			// load 128-bit blob
 
-/* marginal gain with zero constant over _mm_setzero_si128(), however there is no _mm_cvtepu16_epi32
- * that operates on the high 64-bits of tmp.  Note that adding SSE calls will only make performance
- * worse, i.e. the following is slower:
- *
- * __m128i hi = _mm_cvtepu16_epi32 (_mm_srli_si128 (tmp, 8));
+/* marginal gain with zero constant over _mm_setzero_si128().
  */
-//#ifdef __SSE4_2__
-//		__m128i lo = _mm_cvtepu16_epi32 (tmp);		/* lower bits only */
-//		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
-//#else
 		__m128i lo = _mm_unpacklo_epi16 (tmp, zero);
 		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
-//#endif
 
 		sum = _mm_add_epi32 (sum, lo);
 		sum = _mm_add_epi32 (sum, hi);
@@ -896,7 +890,7 @@ do_csum_simd (
 
 static
 uint16_t
-do_csumcpy_simd (
+do_csumcpy_sse2 (
 	const void* restrict srcaddr,
 	void* restrict	     dstaddr,
 	uint16_t	     len,
@@ -968,6 +962,84 @@ do_csumcpy_simd (
 /* trailing odd byte */
 	if (len & 1) {
 		((uint8_t*restrict)&remainder)[0] = *dstbuf = *srcbuf;
+	}
+	acc += remainder;
+	acc  = (acc >> 32) + (acc & 0xffffffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return (uint16_t)acc;
+}
+#endif
+
+#if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
+static
+uint16_t
+do_csum_sse42 (
+	const void*	addr,
+	uint16_t	len,
+	uint32_t	csum
+	)
+{
+	uint_fast64_t acc = csum;		/* fixed size for asm */
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;			/* fixed size for endian swap */
+	uint_fast16_t count2;
+	uint_fast16_t count16;
+	bool is_odd;
+
+	if (PGM_UNLIKELY(len == 0))
+		return (uint16_t)acc;
+/* align first byte */
+	is_odd = ((uintptr_t)buf & 1);
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*)&remainder)[1] = *buf++;
+		len--;
+	}
+/* drain upto 14-bytes to align on 128-bit strides */
+	count2 = (0x10 - ((uintptr_t)buf & 0xf)) >> 1;
+	while (len > 1 && count2--) {
+		acc += ((const uint16_t*)buf)[ 0 ];
+		buf += 2;
+		len -= 2;
+	}
+/* 128-bit, 16-byte stride */
+	count16 = len >> 4;
+	const __m128i zero = _mm_setzero_si128();
+	__m128i sum = zero;
+	while (count16--) {
+		__m128i tmp = _mm_load_si128((const __m128i*)buf);			// load 128-bit blob
+
+/* marginal gain with zero constant over _mm_setzero_si128(), however there is no _mm_cvtepu16_epi32
+ * that operates on the high 64-bits of tmp.  Note that adding SSE calls will only make performance
+ * worse, i.e. the following is slower:
+ *
+ * __m128i hi = _mm_cvtepu16_epi32 (_mm_srli_si128 (tmp, 8));
+ */
+		__m128i lo = _mm_cvtepu16_epi32 (tmp);	      /* lower bits only */
+		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
+
+		sum = _mm_add_epi32 (sum, lo);
+		sum = _mm_add_epi32 (sum, hi);
+		buf += 16;
+	}
+
+// add all 32-bit components together
+	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 8));
+	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 4));
+	acc += _mm_cvtsi128_si32 (sum);
+	len %= 16;
+/* final 15 bytes */
+	count2 = len >> 1;
+	while (count2--) {
+		acc += ((const uint16_t*)buf)[ 0 ];
+		buf += 2;
+	}
+/* trailing odd byte */
+	if (len & 1) {
+		((uint8_t*)&remainder)[0] = *buf;
 	}
 	acc += remainder;
 	acc  = (acc >> 32) + (acc & 0xffffffff);
@@ -1173,11 +1245,19 @@ pgm_checksum_init (const pgm_cpu_t* cpu)
 		return;
 	}
 #endif
+#if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
+	if (cpu->has_sse42) {
+		pgm_minor (_("Using SSE4.2 instructions for checksum."));
+		do_csum = do_csum_sse42;
+		do_csumcpy = do_csumcpy_sse2;
+		return;
+	}
+#endif
 #if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
 	if (cpu->has_sse2) {
 		pgm_minor (_("Using SSE2 instructions for checksum."));
-		do_csum = do_csum_simd;
-		do_csumcpy = do_csumcpy_simd;
+		do_csum = do_csum_sse2;
+		do_csumcpy = do_csumcpy_sse2;
 		return;
 	}
 #endif
