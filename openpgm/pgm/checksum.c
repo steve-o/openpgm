@@ -46,7 +46,6 @@
 
 /* locals */
 
-static inline uint16_t do_csum (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_8bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_16bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_32bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
@@ -54,12 +53,15 @@ static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #if defined(__amd64) || defined(__x86_64__)
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
-#ifdef __SSE2__
+#if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_simd (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 #ifdef __AVX2__
 static uint16_t do_csum_avx (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
+
+static uint16_t (*do_csum) (const void*, uint16_t, uint32_t) = NULL;
+static uint32_t (*do_csumcpy) (const void* restrict src, void* restrict dst, uint16_t len, uint32_t csum) = NULL;
 
 
 /* Endian independent checksum routine.
@@ -588,7 +590,7 @@ do_csumcpy_64bit (
 }
 
 #if defined(__amd64) || defined(__x86_64__)
-/* SIMD instructions unique to AMD/Intel 64-bit, so always little endian.
+/* SIMD instructions unique to AMD/Intel 64-bit, so always little endian.  Any compiler but MSVC 64-bit.
  *
  * TODO: TLB priming and prefetch with cache line size (128 bytes).
  * TODO: 8-byte software versus 16-byte hardware prefetch.
@@ -808,7 +810,9 @@ do_csumcpy_vector (
 }
 #endif
 
-#ifdef __SSE2__
+#if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
+/* The __SSEn__ macros are not defined under MSVC.
+ */
 static
 uint16_t
 do_csum_simd (
@@ -834,7 +838,7 @@ do_csum_simd (
 	}
 /* drain upto 14-bytes to align on 128-bit strides */
 	count2 = (0x10 - ((uintptr_t)buf & 0xf)) >> 1;
-	while (count2--) {
+	while (len > 1 && count2--) {
 		acc += ((const uint16_t*)buf)[ 0 ];
 		buf += 2;
 		len -= 2;
@@ -852,13 +856,13 @@ do_csum_simd (
  *
  * __m128i hi = _mm_cvtepu16_epi32 (_mm_srli_si128 (tmp, 8));
  */
-#ifdef __SSE4_2__
-		__m128i lo = _mm_cvtepu16_epi32 (tmp);		/* lower bits only */
-		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
-#else
+//#ifdef __SSE4_2__
+//		__m128i lo = _mm_cvtepu16_epi32 (tmp);		/* lower bits only */
+//		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
+//#else
 		__m128i lo = _mm_unpacklo_epi16 (tmp, zero);
 		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
-#endif
+//#endif
 
 		sum = _mm_add_epi32 (sum, lo);
 		sum = _mm_add_epi32 (sum, hi);
@@ -928,7 +932,7 @@ do_csumcpy_simd (
 	}
 /* drain upto 14-bytes to align on 128-bit strides */
 	count2 = (0x10 - ((uintptr_t)srcbuf & 0xf)) >> 1;
-	while (count2--) {
+	while (len > 1 && count2--) {
 		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
 		srcbuf = &srcbuf[ 2 ];
 		dstbuf = &dstbuf[ 2 ];
@@ -1002,7 +1006,7 @@ do_csum_avx (
 	}
 /* drain upto 31-bytes to align on 256-bit strides */
 	count2 = (0x20 - ((uintptr_t)buf & 0x1f)) >> 1;
-	while (count2--) {
+	while (len > 1 && count2--) {
 		acc += ((const uint16_t*)buf)[ 0 ];
 		buf += 2;
 		len -= 2;
@@ -1085,7 +1089,7 @@ do_csumcpy_avx (
 	}
 /* drain upto 31-bytes to align on 256-bit strides */
 	count2 = (0x20 - ((uintptr_t)srcbuf & 0x1f)) >> 1;
-	while (count2--) {
+	while (len > 1 && count2--) {
 		acc += ((uint16_t*restrict)dstbuf)[ 0 ] = ((const uint16_t*restrict)srcbuf)[ 0 ];
 		srcbuf = &srcbuf[ 2 ];
 		dstbuf = &dstbuf[ 2 ];
@@ -1144,30 +1148,48 @@ do_csumcpy_avx (
  *	_mm512_extract_epi32()
  */
 
-static inline
+static
 uint16_t
-do_csum (
-	const void*	addr,
-	uint16_t	len,
-	uint32_t	csum
+do_csum_memcpy (
+	const void* restrict srcaddr,
+	void* restrict	     dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
 	)
 {
-#if   defined( USE_8BIT_CHECKSUM )
-	return do_csum_8bit (addr, len, csum);
-#elif defined( USE_16BIT_CHECKSUM )
-	return do_csum_16bit (addr, len, csum);
-#elif defined( USE_32BIT_CHECKSUM )
-	return do_csum_32bit (addr, len, csum);
-#elif defined( USE_64BIT_CHECKSUM )
-	return do_csum_64bit (addr, len, csum);
-#elif defined( USE_VECTOR_CHECKSUM )
-	return do_csum_vector (addr, len, csum);
-#elif defined( USE_SIMD_CHECKSUM )
-	return do_csum_simd (addr, len, csum);
-#elif defined( USE_AVX_CHECKSUM )
-	return do_csum_avx (addr, len, csum);
+	memcpy (dstaddr, srcaddr, len);
+	return pgm_csum_partial (dstaddr, len, csum);
+}
+
+PGM_GNUC_INTERNAL
+void
+pgm_checksum_init (const pgm_cpu_t* cpu)
+{
+#ifdef __AVX2__
+	if (cpu->has_avx2) {
+		pgm_minor (_("Using AVX2 instructions for checksum."));
+		do_csum = do_csum_avx;
+		do_csumcpy = do_csumcpy_avx;
+		return;
+	}
+#endif
+#if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
+	if (cpu->has_sse2) {
+		pgm_minor (_("Using SSE2 instructions for checksum."));
+		do_csum = do_csum_simd;
+		do_csumcpy = do_csumcpy_simd;
+		return;
+	}
+#endif
+
+/* defaults to 16-bit checksum and memcpy for SPARC. */
+	do_csum = do_csum_16bit;
+
+#if defined( __sparc__ ) || defined( __sparc ) || defined( __sparcv9 )
+/* SPARC will not handle destination & source addresses with different alignment */
+	do_csumcpy = do_csum_memcpy;
 #else
-#	error "checksum routine undefined"
+	do_csumcpy = do_csumcpy_16bit;
 #endif
 }
 
@@ -1225,30 +1247,7 @@ pgm_compat_csum_partial_copy (
 	pgm_assert (NULL != src);
 	pgm_assert (NULL != dst);
 
-#if defined( __sparc__ ) || defined( __sparc ) || defined( __sparcv9 )
-/* SPARC will not handle destination & source addresses with different alignment */
-	memcpy (dst, src, len);
-	return pgm_csum_partial (dst, len, csum);
-#else
-#	if   defined( USE_8BIT_CHECKSUM )
-	return do_csumcpy_8bit (src, dst, len, csum);
-#	elif defined( USE_16BIT_CHECKSUM )
-	return do_csumcpy_16bit (src, dst, len, csum);
-#	elif defined( USE_32BIT_CHECKSUM )
-	return do_csumcpy_32bit (src, dst, len, csum);
-#	elif defined( USE_64BIT_CHECKSUM )
-	return do_csumcpy_64bit (src, dst, len, csum);
-#	elif defined( USE_VECTOR_CHECKSUM )
-	return do_csumcpy_vector (src, dst, len, csum);
-#	elif defined( USE_SIMD_CHECKSUM )
-	return do_csumcpy_simd (src, dst, len, csum);
-#	elif defined( USE_AVX_CHECKSUM )
-	return do_csumcpy_avx (src, dst, len, csum);
-#	else
-	memcpy (dst, src, len);
-	return pgm_csum_partial (dst, len, csum);
-#	endif
-#endif
+	return do_csumcpy (src, dst, len, csum);
 }
 
 /* Fold 32 bit checksum accumulator into 16 bit final value.

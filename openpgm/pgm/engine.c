@@ -65,6 +65,8 @@ unsigned		pgm_loss_rate PGM_GNUC_READ_MOSTLY = 0;
 static bool		pgm_is_supported = FALSE;
 static volatile uint32_t pgm_ref_count	 = 0;
 
+static pgm_cpu_t	pgm_cpu;
+
 #ifdef _WIN32
 #	ifndef WSAID_WSARECVMSG
 /* http://cvs.winehq.org/cvsweb/wine/include/mswsock.h */
@@ -87,6 +89,9 @@ pgm_init (
 {
 	if (pgm_atomic_exchange_and_add32 (&pgm_ref_count, 1) > 0)
 		return TRUE;
+
+/* capture run-time platform information */
+	pgm_cpuid (&pgm_cpu);
 
 /* initialise dependent modules */
 	pgm_messages_init();
@@ -198,6 +203,9 @@ pgm_init (
 
 /* create global sock list lock */
 	pgm_rwlock_init (&pgm_sock_list_lock);
+
+/* set preferred checksum algorithm */
+	pgm_checksum_init (&pgm_cpu);
 
 	pgm_is_supported = TRUE;
 	return TRUE;

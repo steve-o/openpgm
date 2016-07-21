@@ -66,8 +66,10 @@ pgm_cpuid (pgm_cpu_t* cpu)
 	memset (cpu, 0, sizeof (pgm_cpu_t));
 
 	int cpu_info[4] = {-1};
-	__cpuid (cpu_info, 0);
-	int num_ids = cpu_info[0];
+// Calling __cpuid with 0x0 as the function_id argument
+// gets the number of the highest valid function ID.
+	__cpuid (cpu_info, 0x0);
+	const int num_ids = cpu_info[0];
 	if (num_ids == 0) {
 // no valid ids
 		return;
