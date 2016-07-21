@@ -36,13 +36,13 @@
 #ifndef _MSC_VER
 static
 void
-__cpuid (int cpu_info[4], int info_type) {
+__cpuidex (int cpu_info[4], int function_id, int subfunction_id) {
   __asm__ volatile (
     "mov %%ebx, %%edi\n"
     "cpuid\n"
     "xchg %%edi, %%ebx\n"
     : "=a"(cpu_info[0]), "=D"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
-    : "a"(info_type)
+    : "a"(function_id), "c"(subfunction_id)
   );
 }
 
@@ -68,16 +68,16 @@ pgm_cpuid (pgm_cpu_t* cpu)
 	int cpu_info[4] = {-1};
 // Calling __cpuid with 0x0 as the function_id argument
 // gets the number of the highest valid function ID.
-	__cpuid (cpu_info, 0x0);
+	__cpuidex (cpu_info, 0x0, 0x0);
 	const int num_ids = cpu_info[0];
 	if (num_ids == 0) {
 // no valid ids
 		return;
 	}
 	int cpu_info7[4] = {0};
-	__cpuid (cpu_info, 1);
+	__cpuidex (cpu_info, 0x1, 0x0);
 	if (num_ids >= 7) {
-		__cpuid (cpu_info7, 7);
+		__cpuidex (cpu_info7, 0x7, 0x0);
 	}
 
 	cpu->has_mmx =   (cpu_info[3] & 0x00800000) != 0;

@@ -54,6 +54,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	)
 endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
+# Enables the use of Intel Advanced Vector Extensions 2 instructions.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+
 # Parallel make.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 

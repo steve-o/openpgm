@@ -39,7 +39,9 @@
 #endif
 #include <impl/framework.h>
 
-#ifdef __SSE2__
+#ifdef _MSC_VER
+#	include <intrin.h>
+#else
 #	include <x86intrin.h>
 #endif
 
@@ -59,8 +61,8 @@ static uint16_t do_csum_sse2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_sse42 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
-#ifdef __AVX2__
-static uint16_t do_csum_avx (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+#if defined(__AVX2__) || defined(_M_AMD64) || defined(_M_X64)
+static uint16_t do_csum_avx2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 
 static uint16_t (*do_csum) (const void*, uint16_t, uint32_t) = NULL;
@@ -1052,10 +1054,10 @@ do_csum_sse42 (
 }
 #endif
 
-#ifdef __AVX2__
+#if defined(__AVX2__) || defined(_M_AMD64) || defined(_M_X64)
 static
 uint16_t
-do_csum_avx (
+do_csum_avx2 (
 	const void*	addr,
 	uint16_t	len,
 	uint32_t	csum
@@ -1101,7 +1103,15 @@ do_csum_avx (
 // add all 32-bit components together
 	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 8));
 	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 4));
+#ifndef _MSC_VER
 	acc += _mm256_extract_epi32 (sum, 0) + _mm256_extract_epi32 (sum, 4);
+#else
+	{
+		__m128i __Y1 = _mm256_extractf128_si256 (sum, 0 >> 2);
+		__m128i __Y2 = _mm256_extractf128_si256 (sum, 4 >> 2);
+		acc += _mm_extract_epi32 (__Y1, 0 % 4) + _mm_extract_epi32 (__Y2, 4 % 4);
+	}
+#endif
 	len %= 32;
 /* final 31 bytes */
 	count2 = len >> 1;
@@ -1125,7 +1135,7 @@ do_csum_avx (
 
 static
 uint16_t
-do_csumcpy_avx (
+do_csumcpy_avx2 (
 	const void* restrict srcaddr,
 	void* restrict	     dstaddr,
 	uint16_t	     len,
@@ -1185,7 +1195,15 @@ do_csumcpy_avx (
 // add all 32-bit components together
 	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 8));
 	sum = _mm256_add_epi32 (sum, _mm256_srli_si256 (sum, 4));
+#ifndef _MSC_VER
 	acc += _mm256_extract_epi32 (sum, 0) + _mm256_extract_epi32 (sum, 4);
+#else
+	{
+		__m128i __Y1 = _mm256_extractf128_si256 (sum, 0 >> 2);
+		__m128i __Y2 = _mm256_extractf128_si256 (sum, 4 >> 2);
+		acc += _mm_extract_epi32 (__Y1, 0 % 4) + _mm_extract_epi32 (__Y2, 4 % 4);
+	}
+#endif
 	len %= 32;
 /* final 15 bytes */
 	count2 = len >> 1;
@@ -1237,11 +1255,11 @@ PGM_GNUC_INTERNAL
 void
 pgm_checksum_init (const pgm_cpu_t* cpu)
 {
-#ifdef __AVX2__
+#if defined(__AVX2__) || defined(_M_AMD64) || defined(_M_X64)
 	if (cpu->has_avx2) {
 		pgm_minor (_("Using AVX2 instructions for checksum."));
-		do_csum = do_csum_avx;
-		do_csumcpy = do_csumcpy_avx;
+		do_csum = do_csum_avx2;
+		do_csumcpy = do_csumcpy_avx2;
 		return;
 	}
 #endif
