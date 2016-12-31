@@ -573,7 +573,7 @@ END_TEST
 #endif
 
 #ifdef __SSE2__
-START_TEST (test_simd)
+START_TEST (test_sse2)
 {
 	const unsigned iterations = 1000;
 	char* source = alloca (perf_testsize);
@@ -588,21 +588,21 @@ START_TEST (test_simd)
 
 	start = pgm_time_update_now();
 	for (unsigned i = iterations; i; i--) {
-		csum = ~do_csum_simd (source, perf_testsize, 0);
+		csum = ~do_csum_sse2 (source, perf_testsize, 0);
 /* function calculates answer in host order */
 		csum = g_htons (csum);
 		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
 	}
 
 	check = pgm_time_update_now();
-	g_message ("simd/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+	g_message ("sse2/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
 		perf_testsize,
 		(guint64)(check - start),
 		(guint64)((check - start) / iterations));
 }
 END_TEST
 
-START_TEST (test_simd_memcpy)
+START_TEST (test_sse2_memcpy)
 {
 	const unsigned iterations = 1000;
 	char* source = alloca (perf_testsize);
@@ -619,21 +619,21 @@ START_TEST (test_simd_memcpy)
 	start = pgm_time_update_now();
 	for (unsigned i = iterations; i; i--) {
 		memcpy (target, source, perf_testsize);
-		csum = ~do_csum_simd (target, perf_testsize, 0);
+		csum = ~do_csum_sse2 (target, perf_testsize, 0);
 /* function calculates answer in host order */
 		csum = g_htons (csum);
 		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
 	}
 
 	check = pgm_time_update_now();
-	g_message ("simd/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+	g_message ("sse2/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
 		perf_testsize,
 		(guint64)(check - start),
 		(guint64)((check - start) / iterations));
 }
 END_TEST
 
-START_TEST (test_simd_csumcpy)
+START_TEST (test_sse2_csumcpy)
 {
 	const unsigned iterations = 1000;
 	char* source = alloca (perf_testsize);
@@ -649,14 +649,14 @@ START_TEST (test_simd_csumcpy)
 
 	start = pgm_time_update_now();
 	for (unsigned i = iterations; i; i--) {
-		csum = ~do_csumcpy_simd (source, target, perf_testsize, 0);
+		csum = ~do_csumcpy_sse2 (source, target, perf_testsize, 0);
 /* function calculates answer in host order */
 		csum = g_htons (csum);
 		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
 	}
 
 	check = pgm_time_update_now();
-	g_message ("simd/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+	g_message ("sse2/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
 		perf_testsize,
 		(guint64)(check - start),
 		(guint64)((check - start) / iterations));
@@ -665,7 +665,7 @@ END_TEST
 #endif
 
 #ifdef __AVX2__
-START_TEST (test_avx)
+START_TEST (test_avx2)
 {
 	const unsigned iterations = 1000;
 	char* source = alloca (perf_testsize);
@@ -680,21 +680,21 @@ START_TEST (test_avx)
 
 	start = pgm_time_update_now();
 	for (unsigned i = iterations; i; i--) {
-		csum = ~do_csum_avx (source, perf_testsize, 0);
+		csum = ~do_csum_avx2 (source, perf_testsize, 0);
 /* function calculates answer in host order */
 		csum = g_htons (csum);
 		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
 	}
 
 	check = pgm_time_update_now();
-	g_message ("avx/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+	g_message ("avx2/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
 		perf_testsize,
 		(guint64)(check - start),
 		(guint64)((check - start) / iterations));
 }
 END_TEST
 
-START_TEST (test_avx_memcpy)
+START_TEST (test_avx2_memcpy)
 {
 	const unsigned iterations = 1000;
 	char* source = alloca (perf_testsize);
@@ -711,21 +711,21 @@ START_TEST (test_avx_memcpy)
 	start = pgm_time_update_now();
 	for (unsigned i = iterations; i; i--) {
 		memcpy (target, source, perf_testsize);
-		csum = ~do_csum_avx (target, perf_testsize, 0);
+		csum = ~do_csum_avx2 (target, perf_testsize, 0);
 /* function calculates answer in host order */
 		csum = g_htons (csum);
 		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
 	}
 
 	check = pgm_time_update_now();
-	g_message ("avx/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+	g_message ("avx2/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
 		perf_testsize,
 		(guint64)(check - start),
 		(guint64)((check - start) / iterations));
 }
 END_TEST
 
-START_TEST (test_avx_csumcpy)
+START_TEST (test_avx2_csumcpy)
 {
 	const unsigned iterations = 1000;
 	char* source = alloca (perf_testsize);
@@ -741,14 +741,14 @@ START_TEST (test_avx_csumcpy)
 
 	start = pgm_time_update_now();
 	for (unsigned i = iterations; i; i--) {
-		csum = ~do_csumcpy_avx (source, target, perf_testsize, 0);
+		csum = ~do_csumcpy_avx2 (source, target, perf_testsize, 0);
 /* function calculates answer in host order */
 		csum = g_htons (csum);
 		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
 	}
 
 	check = pgm_time_update_now();
-	g_message ("avx/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+	g_message ("avx2/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
 		perf_testsize,
 		(guint64)(check - start),
 		(guint64)((check - start) / iterations));
@@ -776,10 +776,10 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_100b, test_vector);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_100b, test_simd);
+	tcase_add_test (tc_100b, test_sse2);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_100b, test_avx);
+	tcase_add_test (tc_100b, test_avx2);
 #endif
 
 	TCase* tc_200b = tcase_create ("200b");
@@ -794,10 +794,10 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_200b, test_vector);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_200b, test_simd);
+	tcase_add_test (tc_200b, test_sse2);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_200b, test_avx);
+	tcase_add_test (tc_200b, test_avx2);
 #endif
 
 	TCase* tc_1500b = tcase_create ("1500b");
@@ -812,10 +812,10 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_1500b, test_vector);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_1500b, test_simd);
+	tcase_add_test (tc_1500b, test_sse2);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_1500b, test_avx);
+	tcase_add_test (tc_1500b, test_avx2);
 #endif
 
 	TCase* tc_9kb = tcase_create ("9KB");
@@ -830,10 +830,10 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_9kb, test_vector);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_9kb, test_simd);
+	tcase_add_test (tc_9kb, test_sse2);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_9kb, test_avx);
+	tcase_add_test (tc_9kb, test_avx2);
 #endif
 
 	TCase* tc_64kb = tcase_create ("64KB");
@@ -848,10 +848,10 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_64kb, test_vector);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_64kb, test_simd);
+	tcase_add_test (tc_64kb, test_sse2);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_64kb, test_avx);
+	tcase_add_test (tc_64kb, test_avx2);
 #endif
 
 	return s;
@@ -877,10 +877,10 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_100b, test_vector_memcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_100b, test_simd_memcpy);
+	tcase_add_test (tc_100b, test_sse2_memcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_100b, test_avx_memcpy);
+	tcase_add_test (tc_100b, test_avx2_memcpy);
 #endif
 
 	TCase* tc_200b = tcase_create ("200b");
@@ -895,10 +895,10 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_200b, test_vector_memcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_200b, test_simd_memcpy);
+	tcase_add_test (tc_200b, test_sse2_memcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_200b, test_avx_memcpy);
+	tcase_add_test (tc_200b, test_avx2_memcpy);
 #endif
 
 	TCase* tc_1500b = tcase_create ("1500b");
@@ -913,10 +913,10 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_1500b, test_vector_memcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_1500b, test_simd_memcpy);
+	tcase_add_test (tc_1500b, test_sse2_memcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_1500b, test_avx_memcpy);
+	tcase_add_test (tc_1500b, test_avx2_memcpy);
 #endif
 
 	TCase* tc_9kb = tcase_create ("9KB");
@@ -931,10 +931,10 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_9kb, test_vector_memcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_9kb, test_simd_memcpy);
+	tcase_add_test (tc_9kb, test_sse2_memcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_9kb, test_avx_memcpy);
+	tcase_add_test (tc_9kb, test_avx2_memcpy);
 #endif
 
 	TCase* tc_64kb = tcase_create ("64KB");
@@ -949,10 +949,10 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_64kb, test_vector_memcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_64kb, test_simd_memcpy);
+	tcase_add_test (tc_64kb, test_sse2_memcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_64kb, test_avx_memcpy);
+	tcase_add_test (tc_64kb, test_avx2_memcpy);
 #endif
 
 	return s;
@@ -978,10 +978,10 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_100b, test_vector_csumcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_100b, test_simd_csumcpy);
+	tcase_add_test (tc_100b, test_sse2_csumcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_100b, test_avx_csumcpy);
+	tcase_add_test (tc_100b, test_avx2_csumcpy);
 #endif
 
 	TCase* tc_200b = tcase_create ("200b");
@@ -996,10 +996,10 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_200b, test_vector_csumcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_200b, test_simd_csumcpy);
+	tcase_add_test (tc_200b, test_sse2_csumcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_200b, test_avx_csumcpy);
+	tcase_add_test (tc_200b, test_avx2_csumcpy);
 #endif
 
 	TCase* tc_1500b = tcase_create ("1500b");
@@ -1014,10 +1014,10 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_1500b, test_vector_csumcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_1500b, test_simd_csumcpy);
+	tcase_add_test (tc_1500b, test_sse2_csumcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_1500b, test_avx_csumcpy);
+	tcase_add_test (tc_1500b, test_avx2_csumcpy);
 #endif
 
 	TCase* tc_9kb = tcase_create ("9KB");
@@ -1032,10 +1032,10 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_9kb, test_vector_csumcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_9kb, test_simd_csumcpy);
+	tcase_add_test (tc_9kb, test_sse2_csumcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_9kb, test_avx_csumcpy);
+	tcase_add_test (tc_9kb, test_avx2_csumcpy);
 #endif
 
 	TCase* tc_64kb = tcase_create ("64KB");
@@ -1050,10 +1050,10 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_64kb, test_vector_csumcpy);
 #endif
 #ifdef __SSE2__
-	tcase_add_test (tc_64kb, test_simd_csumcpy);
+	tcase_add_test (tc_64kb, test_sse2_csumcpy);
 #endif
 #ifdef __AVX2__
-	tcase_add_test (tc_64kb, test_avx_csumcpy);
+	tcase_add_test (tc_64kb, test_avx2_csumcpy);
 #endif
 
 	return s;

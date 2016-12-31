@@ -2745,23 +2745,6 @@ out:
 }
 #endif /* HAVE_EPOLL_CTL */
 
-const char*
-pgm_family_string (
-	const int	family
-	)
-{
-	const char* c;
-
-	switch (family) {
-	case AF_UNSPEC:		c = "AF_UNSPEC"; break;
-	case AF_INET:		c = "AF_INET"; break;
-	case AF_INET6:		c = "AF_INET6"; break;
-	default: c = "(unknown)"; break;
-	}
-
-	return c;
-}
-
 static
 const char*
 pgm_sock_type_string (

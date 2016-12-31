@@ -190,6 +190,7 @@ if env['WITH_CHECK'] == 'true':
 		] + tlog);
 # collate
 	tframework = [	te.Object('checksum.c'),
+			te.Object('cpu.c'),
 			te.Object('error.c'),
 			te.Object('galois_tables.c'),
 			te.Object('getifaddrs.c'),
