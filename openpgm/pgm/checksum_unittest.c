@@ -56,6 +56,14 @@ pgm_get_nprocs (void)
 	return 1;
 }
 
+static
+void
+mock_setup (void)
+{
+	do_csum = do_csum_16bit;
+	do_csumcpy = do_csum_memcpy;
+}
+
 /* target:
  *	uint16_t
  *	pgm_inet_checksum (
@@ -242,6 +250,7 @@ make_test_suite (void)
 
 	TCase* tc_inet = tcase_create ("inet");
 	suite_add_tcase (s, tc_inet);
+	tcase_add_checked_fixture (tc_inet, mock_setup, NULL);
 	tcase_add_test (tc_inet, test_inet_pass_001);
 	tcase_add_test (tc_inet, test_inet_pass_002);
 #ifndef PGM_CHECK_NOFORK
@@ -254,10 +263,12 @@ make_test_suite (void)
 
 	TCase* tc_block_add = tcase_create ("block-add");
 	suite_add_tcase (s, tc_block_add);
+	tcase_add_checked_fixture (tc_block_add, mock_setup, NULL);
 	tcase_add_test (tc_block_add, test_block_add_pass_001);
 
 	TCase* tc_partial = tcase_create ("partial");
 	suite_add_tcase (s, tc_partial);
+	tcase_add_checked_fixture (tc_partial, mock_setup, NULL);
 	tcase_add_test (tc_partial, test_partial_pass_001);
 #ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_partial, test_partial_fail_001, SIGABRT);
@@ -265,6 +276,7 @@ make_test_suite (void)
 
 	TCase* tc_partial_copy = tcase_create ("partial-copy");
 	suite_add_tcase (s, tc_partial_copy);
+	tcase_add_checked_fixture (tc_partial_copy, mock_setup, NULL);
 	tcase_add_test (tc_partial_copy, test_partial_copy_pass_001);
 #ifndef PGM_CHECK_NOFORK
 	tcase_add_test_raise_signal (tc_partial_copy, test_partial_copy_fail_001, SIGABRT);
