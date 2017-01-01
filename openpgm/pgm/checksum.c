@@ -65,24 +65,27 @@ static uint16_t do_csum_mmx (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_sse2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
-/* SSE3 - Adds unalighed load instruction LDDQU (_mm_lddqu_si128). */
+/* SSE3 - Adds unalighed load instruction LDDQU (_mm_lddqu_si128), but no store. */
 #if defined(__SSE3__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_sse3 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
-/* SSSE3 */
-/* SSE4 */
-#if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
-static uint16_t do_csum_sse42 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+/* SSSE3 - Introduces more packed integer operations. */
+/* SSE4.1 - Adds packed zero extension to wider types. */
+#if defined(__SSE4_1__) || defined(_M_AMD64) || defined(_M_X64)
+static uint16_t do_csum_sse41 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
-/* SSE5 */
-/* AVX */
+/* SSE4.2 - Adds STTN and CRC32 operations. */
+/* POPCNT & LZNCT */
+/* SSE4a - Streaming store and combined mask-shift operation. */
+/* AVX - New three operand instructions. */
+/* AVX2 - Expands existing instructions to 256-bit operands. */
 #if defined(__AVX2__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_avx2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
-/* F16C */
-/* XOP */
-/* FMA */
-/* AVX-512 */
+/* F16C (SSE5) - Floating point conversion. */
+/* XOP - Extended operations. including integer FMA. horizontal arithmetic. */
+/* FMA - Fused multiply-add. */
+/* AVX-512 - Adds 512-bit operands. */
 
 static uint16_t (*do_csum) (const void*, uint16_t, uint32_t) = NULL;
 static uint32_t (*do_csumcpy) (const void* restrict src, void* restrict dst, uint16_t len, uint32_t csum) = NULL;
@@ -1207,10 +1210,10 @@ do_csum_sse3 (
 }
 #endif
 
-#if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
+#if defined(__SSE4_1__) || defined(_M_AMD64) || defined(_M_X64)
 static
 uint16_t
-do_csum_sse42 (
+do_csum_sse41 (
 	const void*	addr,
 	uint16_t	len,
 	uint32_t	csum
@@ -1231,19 +1234,12 @@ do_csum_sse42 (
 		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
-/* drain upto 14-bytes to align on 128-bit strides */
-	count2 = (0x10 - ((uintptr_t)buf & 0xf)) >> 1;
-	while (len > 1 && count2--) {
-		acc += ((const uint16_t*)buf)[ 0 ];
-		buf += 2;
-		len -= 2;
-	}
 /* 128-bit, 16-byte stride */
 	count16 = len >> 4;
 	const __m128i zero = _mm_setzero_si128();
 	__m128i sum = zero;
 	while (count16--) {
-		__m128i tmp = _mm_load_si128((const __m128i*)buf);			// load 128-bit blob
+		__m128i tmp = _mm_lddqu_si128((const __m128i*)buf);			// load 128-bit blob
 
 /* marginal gain with zero constant over _mm_setzero_si128(), however there is no _mm_cvtepu16_epi32
  * that operates on the high 64-bits of tmp.  Note that adding SSE calls will only make performance
@@ -1309,19 +1305,12 @@ do_csum_avx2 (
 		((uint8_t*)&remainder)[1] = *buf++;
 		len--;
 	}
-/* drain upto 31-bytes to align on 256-bit strides */
-	count2 = (0x20 - ((uintptr_t)buf & 0x1f)) >> 1;
-	while (len > 1 && count2--) {
-		acc += ((const uint16_t*)buf)[ 0 ];
-		buf += 2;
-		len -= 2;
-	}
 /* 256-bit, 32-byte stride */
 	count32 = len >> 5;
 	const __m256i zero = _mm256_setzero_si256();
 	__m256i sum = zero;
 	while (count32--) {
-		__m256i tmp = _mm256_load_si256((const __m256i*)buf);			// load 256-bit blob
+		__m256i tmp = _mm256_lddqu_si256((const __m256i*)buf);			// load 256-bit blob
 
 		__m256i lo = _mm256_unpacklo_epi16 (tmp, zero);
 		__m256i hi = _mm256_unpackhi_epi16 (tmp, zero);
@@ -1494,10 +1483,10 @@ pgm_checksum_init (const pgm_cpu_t* cpu)
 		return;
 	}
 #endif
-#if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
-	if (cpu->has_sse42) {
-		pgm_minor (_("Using SSE4.2 instructions for checksum."));
-		do_csum = do_csum_sse42;
+#if defined(__SSE4_1_) || defined(_M_AMD64) || defined(_M_X64)
+	if (cpu->has_sse41) {
+		pgm_minor (_("Using SSE4.1 instructions for checksum."));
+		do_csum = do_csum_sse41;
 		do_csumcpy = do_csumcpy_sse2;
 		return;
 	}
