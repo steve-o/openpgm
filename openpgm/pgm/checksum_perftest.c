@@ -572,6 +572,98 @@ START_TEST (test_vector_csumcpy)
 END_TEST
 #endif
 
+#ifdef __MMX__
+START_TEST (test_mmx)
+{
+	const unsigned iterations = 1000;
+	char* source = alloca (perf_testsize);
+	for (unsigned i = 0, j = 0; i < perf_testsize; i++) {
+		j = j * 1103515245 + 12345;
+		source[i] = j;
+	}
+	const guint16 answer = perf_answer;		/* network order */
+
+	guint16 csum;
+	pgm_time_t start, check;
+
+	start = pgm_time_update_now();
+	for (unsigned i = iterations; i; i--) {
+		csum = ~do_csum_mmx (source, perf_testsize, 0);
+/* function calculates answer in host order */
+		csum = g_htons (csum);
+		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
+	}
+
+	check = pgm_time_update_now();
+	g_message ("mmx/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+		perf_testsize,
+		(guint64)(check - start),
+		(guint64)((check - start) / iterations));
+}
+END_TEST
+
+START_TEST (test_mmx_memcpy)
+{
+	const unsigned iterations = 1000;
+	char* source = alloca (perf_testsize);
+	char* target = alloca (perf_testsize);
+	for (unsigned i = 0, j = 0; i < perf_testsize; i++) {
+		j = j * 1103515245 + 12345;
+		source[i] = j;
+	}
+	const guint16 answer = perf_answer;		/* network order */
+
+	guint16 csum;
+	pgm_time_t start, check;
+
+	start = pgm_time_update_now();
+	for (unsigned i = iterations; i; i--) {
+		memcpy (target, source, perf_testsize);
+		csum = ~do_csum_mmx (target, perf_testsize, 0);
+/* function calculates answer in host order */
+		csum = g_htons (csum);
+		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
+	}
+
+	check = pgm_time_update_now();
+	g_message ("mmx/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+		perf_testsize,
+		(guint64)(check - start),
+		(guint64)((check - start) / iterations));
+}
+END_TEST
+
+START_TEST (test_mmx_csumcpy)
+{
+	const unsigned iterations = 1000;
+	char* source = alloca (perf_testsize);
+	char* target = alloca (perf_testsize);
+	for (unsigned i = 0, j = 0; i < perf_testsize; i++) {
+		j = j * 1103515245 + 12345;
+		source[i] = j;
+	}
+	const guint16 answer = perf_answer;		/* network order */
+
+	guint16 csum;
+	pgm_time_t start, check;
+
+	start = pgm_time_update_now();
+	for (unsigned i = iterations; i; i--) {
+		csum = ~do_csumcpy_mmx (source, target, perf_testsize, 0);
+/* function calculates answer in host order */
+		csum = g_htons (csum);
+		fail_unless (answer == csum, "checksum mismatch 0x%04x (0x%04x)", csum, answer);
+	}
+
+	check = pgm_time_update_now();
+	g_message ("mmx/%u: elapsed time %" PGM_TIME_FORMAT " us, unit time %" PGM_TIME_FORMAT " us",
+		perf_testsize,
+		(guint64)(check - start),
+		(guint64)((check - start) / iterations));
+}
+END_TEST
+#endif
+
 #ifdef __SSE2__
 START_TEST (test_sse2)
 {
@@ -775,6 +867,9 @@ make_csum_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_100b, test_vector);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_100b, test_mmx);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_100b, test_sse2);
 #endif
@@ -792,6 +887,9 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_200b, test_64bit);
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_200b, test_vector);
+#endif
+#ifdef __MMX__
+	tcase_add_test (tc_200b, test_mmx);
 #endif
 #ifdef __SSE2__
 	tcase_add_test (tc_200b, test_sse2);
@@ -811,6 +909,9 @@ make_csum_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_1500b, test_vector);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_1500b, test_mmx);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_1500b, test_sse2);
 #endif
@@ -829,6 +930,9 @@ make_csum_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_9kb, test_vector);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_9kb, test_mmx);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_9kb, test_sse2);
 #endif
@@ -846,6 +950,9 @@ make_csum_performance_suite (void)
 	tcase_add_test (tc_64kb, test_64bit);
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_64kb, test_vector);
+#endif
+#ifdef __MMX__
+	tcase_add_test (tc_64kb, test_mmx);
 #endif
 #ifdef __SSE2__
 	tcase_add_test (tc_64kb, test_sse2);
@@ -876,6 +983,9 @@ make_csum_memcpy_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_100b, test_vector_memcpy);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_100b, test_mmx);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_100b, test_sse2_memcpy);
 #endif
@@ -893,6 +1003,9 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_200b, test_64bit_memcpy);
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_200b, test_vector_memcpy);
+#endif
+#ifdef __MMX__
+	tcase_add_test (tc_200b, test_mmx);
 #endif
 #ifdef __SSE2__
 	tcase_add_test (tc_200b, test_sse2_memcpy);
@@ -912,6 +1025,9 @@ make_csum_memcpy_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_1500b, test_vector_memcpy);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_1500b, test_mmx);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_1500b, test_sse2_memcpy);
 #endif
@@ -930,6 +1046,9 @@ make_csum_memcpy_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_9kb, test_vector_memcpy);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_9kb, test_mmx);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_9kb, test_sse2_memcpy);
 #endif
@@ -947,6 +1066,9 @@ make_csum_memcpy_performance_suite (void)
 	tcase_add_test (tc_64kb, test_64bit_memcpy);
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_64kb, test_vector_memcpy);
+#endif
+#ifdef __MMX__
+	tcase_add_test (tc_64kb, test_mmx);
 #endif
 #ifdef __SSE2__
 	tcase_add_test (tc_64kb, test_sse2_memcpy);
@@ -977,6 +1099,9 @@ make_csumcpy_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_100b, test_vector_csumcpy);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_100b, test_mmx_csumcpy);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_100b, test_sse2_csumcpy);
 #endif
@@ -994,6 +1119,9 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_200b, test_64bit_csumcpy);
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_200b, test_vector_csumcpy);
+#endif
+#ifdef __MMX__
+	tcase_add_test (tc_200b, test_mmx_csumcpy);
 #endif
 #ifdef __SSE2__
 	tcase_add_test (tc_200b, test_sse2_csumcpy);
@@ -1013,6 +1141,9 @@ make_csumcpy_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_1500b, test_vector_csumcpy);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_1500b, test_mmx_csumcpy);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_1500b, test_sse2_csumcpy);
 #endif
@@ -1031,6 +1162,9 @@ make_csumcpy_performance_suite (void)
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_9kb, test_vector_csumcpy);
 #endif
+#ifdef __MMX__
+	tcase_add_test (tc_9kb, test_mmx_csumcpy);
+#endif
 #ifdef __SSE2__
 	tcase_add_test (tc_9kb, test_sse2_csumcpy);
 #endif
@@ -1048,6 +1182,9 @@ make_csumcpy_performance_suite (void)
 	tcase_add_test (tc_64kb, test_64bit_csumcpy);
 #if defined(__amd64) || defined(__x86_64__) || defined(_WIN64)
 	tcase_add_test (tc_64kb, test_vector_csumcpy);
+#endif
+#ifdef __MMX__
+	tcase_add_test (tc_64kb, test_mmx_csumcpy);
 #endif
 #ifdef __SSE2__
 	tcase_add_test (tc_64kb, test_sse2_csumcpy);

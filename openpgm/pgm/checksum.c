@@ -55,19 +55,38 @@ static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #if defined(__amd64) || defined(__x86_64__)
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
+/* MMX - First generation SIMD instructions, MMX registers are shared with x87 FPU. */
+#if defined(__MMX__) || defined(_M_AMD64) || defined(_M_X64)
+static uint16_t do_csum_mmx (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
+#endif
+/* 3DNow! - AMD's twist on MMX, abandoned except for PREFETCH & PREFETCHW */
+/* SSE - Adds 8-16 dedicated registers whereby MMX shared with FPU */
 #if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_sse2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
+/* SSE3 */
+/* SSSE3 */
+/* SSE4 */
 #if defined(__SSE4_2__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_sse42 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
+/* SSE5 */
+/* AVX */
 #if defined(__AVX2__) || defined(_M_AMD64) || defined(_M_X64)
 static uint16_t do_csum_avx2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
+/* F16C */
+/* XOP */
+/* FMA */
+/* AVX-512 */
 
 static uint16_t (*do_csum) (const void*, uint16_t, uint32_t) = NULL;
 static uint32_t (*do_csumcpy) (const void* restrict src, void* restrict dst, uint16_t len, uint32_t csum) = NULL;
 
+/* Explicitly protecting against alignment issues, so hush compiler. */
+#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || defined(__clang__)
+#	pragma GCC diagnostic ignored "-Wcast-align"
+#endif
 
 /* Endian independent checksum routine.
  *
@@ -815,6 +834,145 @@ do_csumcpy_vector (
 }
 #endif
 
+#if defined(__MMX__) || defined(_M_AMD64) || defined(_M_X64)
+static
+uint16_t
+do_csum_mmx (
+	const void*	addr,
+	uint16_t	len,
+	uint32_t	csum
+	)
+{
+	uint_fast32_t acc = csum;
+	const uint8_t* buf = (const uint8_t*)addr;
+	uint16_t remainder = 0;
+	uint_fast16_t count8;
+	bool is_odd;
+
+/* empty buffer */
+	if (PGM_UNLIKELY(len == 0))
+		return (uint16_t)acc;
+	is_odd = ((uintptr_t)buf & 1);
+/* align first byte */
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*)&remainder)[1] = *buf++;
+		len--;
+	}
+/* 8-byte unrolls */
+	count8 = len >> 3;
+	const __m64 zero = _mm_setzero_si64();
+	__m64 sum = zero;
+	while (count8--) {
+#if 1
+		__m64 tmp = _mm_set_pi64x(*(const int64_t*)buf);
+#else
+		__m64 tmp = _mm_set_pi32(((const int*)buf)[1], ((const int*)buf)[0]);	// load 64-bit as 2×32-bit
+#endif
+
+		__m64 lo = _mm_unpacklo_pi16 (tmp, zero); // interleave 2×16-bit
+		__m64 hi = _mm_unpackhi_pi16 (tmp, zero);
+
+		sum = _mm_add_pi32 (sum, lo); // add 2×32-bit
+		sum = _mm_add_pi32 (sum, hi);
+		buf += 8;
+	}
+
+// add all 32-bit components together
+	sum = _mm_add_pi32 (sum, _mm_srli_si64 (sum, 32));
+	acc += _mm_cvtsi64_si32 (sum);
+	len %= 8;
+/* final 7 bytes */
+	while (len >= sizeof (uint16_t)) {
+		const uint_fast16_t word16 = *(const uint16_t*)buf;
+		acc += word16;
+		len -= 2; buf += 2;
+	}
+/* trailing odd byte */
+	if (len > 0) {
+		((uint8_t*)&remainder)[0] = *buf;
+	}
+	acc += remainder;
+/* fold accumulator down to 16-bits */
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return (uint16_t)acc;
+}
+
+static
+uint16_t
+do_csumcpy_mmx (
+	const void* restrict srcaddr,
+	void* restrict	     dstaddr,
+	uint16_t	     len,
+	uint32_t	     csum
+	)
+{
+	uint_fast32_t acc = csum;
+	const uint8_t*restrict src = (const uint8_t*restrict)srcaddr;
+	uint8_t*restrict dst = (uint8_t*restrict)dstaddr;
+	uint16_t remainder = 0;
+	uint_fast16_t count8;
+	bool is_odd;
+
+/* empty buffer */
+	if (PGM_UNLIKELY(len == 0))
+		return (uint16_t)acc;
+	is_odd = ((uintptr_t)src & 1);
+/* align first byte */
+	if (PGM_UNLIKELY(is_odd)) {
+		((uint8_t*restrict)&remainder)[1] = *dst++ = *src++;
+		len--;
+	}
+/* 8-byte unrolls, anything larger than 16-byte or less than 8 loses performance */
+	count8 = len >> 3;
+	__m64 sum = _mm_setzero_si64();
+	while (count8--) {
+#if 1
+		__m64 tmp = _mm_set_pi64x(*(const int64_t*)src);
+#else
+		__m64 tmp = _mm_set_pi32(((const int*)src)[1], ((const int*)src)[0]);	// load 64-bit as 2×32-bit
+#endif
+		__m64 lo = _mm_unpacklo_pi16 (tmp, _mm_setzero_si64());
+		__m64 hi = _mm_unpackhi_pi16 (tmp, _mm_setzero_si64());
+
+		sum = _mm_add_pi32 (sum, lo);
+		sum = _mm_add_pi32 (sum, hi);
+#if 1
+		*(int64_t*)dst = _mm_cvtm64_si64 (tmp);
+#else		
+		((int*)dst)[1] = _mm_cvtsi64_si32 (tmp);
+		((int*)dst)[0] = _mm_cvtsi64_si32 (_mm_srli_si64 (tmp, 32));
+#endif
+		src = &src[ 8 ];
+		dst = &dst[ 8 ];
+	}
+
+// add all 32-bit components together
+	sum = _mm_add_pi32 (sum, _mm_srli_si64 (sum, 32));
+	acc += _mm_cvtsi64_si32 (sum);	
+	len %= 8;
+/* final 7 bytes */
+	while (len >= sizeof (uint16_t)) {
+		const uint_fast16_t word16 = *(uint16_t*restrict)dst = *(const uint16_t*restrict)src;
+		acc += word16;
+		len -= 2; src += 2; dst += 2;
+	}
+/* trailing odd byte */
+	if (len > 0) {
+		((uint8_t*restrict)&remainder)[0] = *dst = *src;
+	}
+	acc += remainder;
+/* fold accumulator down to 16-bits */
+	acc  = (acc >> 16) + (acc & 0xffff);
+	acc += (acc >> 16);
+	if (PGM_UNLIKELY(is_odd))
+		acc = ((acc & 0xff) << 8) | ((acc & 0xff00) >> 8);
+	return (uint16_t)acc;
+}
+#endif
+
 #if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
 /* The __SSEn__ macros are not defined under MSVC.
  */
@@ -857,16 +1015,16 @@ do_csum_sse2 (
 
 /* marginal gain with zero constant over _mm_setzero_si128().
  */
-		__m128i lo = _mm_unpacklo_epi16 (tmp, zero);
+		__m128i lo = _mm_unpacklo_epi16 (tmp, zero); // interleave 4×16-bit
 		__m128i hi = _mm_unpackhi_epi16 (tmp, zero);
 
-		sum = _mm_add_epi32 (sum, lo);
+		sum = _mm_add_epi32 (sum, lo); // add 4×32-bit
 		sum = _mm_add_epi32 (sum, hi);
 		buf += 16;
 	}
 
 // add all 32-bit components together
-	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 8));
+	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 8)); // shift right 8 bytes
 	sum = _mm_add_epi32 (sum, _mm_srli_si128 (sum, 4));
 	acc += _mm_cvtsi128_si32 (sum);
 	len %= 16;
@@ -1276,6 +1434,14 @@ pgm_checksum_init (const pgm_cpu_t* cpu)
 		pgm_minor (_("Using SSE2 instructions for checksum."));
 		do_csum = do_csum_sse2;
 		do_csumcpy = do_csumcpy_sse2;
+		return;
+	}
+#endif
+#if defined(__MMX__) || defined(_M_AMD64) || defined(_M_X64)
+	if (cpu->has_mmx) {
+		pgm_minor (_("Using MMX instructions for checksum."));
+		do_csum = do_csum_mmx;
+		do_csumcpy = do_csumcpy_mmx;
 		return;
 	}
 #endif
