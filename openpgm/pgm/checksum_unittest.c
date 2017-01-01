@@ -62,6 +62,8 @@ mock_setup (void)
 {
 	do_csum = do_csum_16bit;
 	do_csumcpy = do_csum_memcpy;
+	do_csum = do_csum_sse3;
+	do_csumcpy = do_csumcpy_sse2;
 }
 
 /* target:
