@@ -322,6 +322,13 @@ pgm_on_nak (
 		
 /* NAK_SRC_NLA contains our sock unicast NLA */
 	pgm_nla_to_sockaddr (&nak->nak_src_nla_afi, (struct sockaddr*)&nak_src_nla);
+
+/* copy scope id from socket */
+	if (AF_INET6 == sock->family)
+	{
+		((struct sockaddr_in6*)&nak_src_nla)->sin6_scope_id = ((struct sockaddr_in6*)&sock->send_addr)->sin6_scope_id;
+	}
+
 	if (PGM_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nak_src_nla, (struct sockaddr*)&sock->send_addr) != 0))
 	{
 		char saddr[INET6_ADDRSTRLEN];
@@ -333,6 +340,13 @@ pgm_on_nak (
 
 /* NAK_GRP_NLA containers our sock multicast group */ 
 	pgm_nla_to_sockaddr ((AF_INET6 == nak_src_nla.ss_family) ? &nak6->nak6_grp_nla_afi : &nak->nak_grp_nla_afi, (struct sockaddr*)&nak_grp_nla);
+
+/* copy scope id from multicast socket */
+	if (AF_INET6 == sock->family)
+	{
+		((struct sockaddr_in6*)&nak_grp_nla)->sin6_scope_id = ((struct sockaddr_in6*)&sock->send_gsr.gsr_group)->sin6_scope_id;
+	}
+
 	if (PGM_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&nak_grp_nla, (struct sockaddr*)&sock->send_gsr.gsr_group) != 0))
 	{
 		char sgroup[INET6_ADDRSTRLEN];
