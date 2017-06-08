@@ -883,6 +883,13 @@ pgm_on_ncf (
 
 /* NCF_GRP_NLA contains our sock multicast group */ 
 	pgm_nla_to_sockaddr ((AF_INET6 == ncf_src_nla.ss_family) ? &ncf6->nak6_grp_nla_afi : &ncf->nak_grp_nla_afi, (struct sockaddr*)&ncf_grp_nla);
+
+/* copy scope id from multicast socket */
+	if (AF_INET6 == sock->family)
+	{
+		((struct sockaddr_in6*)&ncf_grp_nla)->sin6_scope_id = ((struct sockaddr_in6*)&sock->send_gsr.gsr_group)->sin6_scope_id;
+	}
+
 	if (PGM_UNLIKELY(pgm_sockaddr_cmp ((struct sockaddr*)&ncf_grp_nla, (struct sockaddr*)&sock->send_gsr.gsr_group) != 0))
 	{
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Discarded NCF on multicast group mismatch."));
