@@ -870,7 +870,7 @@ do_csum_mmx (
 	const __m64 zero = _mm_setzero_si64();
 	__m64 sum = zero;
 	while (count8--) {
-#if 1
+#if 0
 		__m64 tmp = _mm_set_pi64x(*(const int64_t*)buf);
 #else
 		__m64 tmp = _mm_set_pi32(((const int*)buf)[1], ((const int*)buf)[0]);	// load 64-bit as 2×32-bit
@@ -936,7 +936,7 @@ do_csumcpy_mmx (
 	count8 = len >> 3;
 	__m64 sum = _mm_setzero_si64();
 	while (count8--) {
-#if 1
+#if 0
 		__m64 tmp = _mm_set_pi64x(*(const int64_t*)src);
 #else
 		__m64 tmp = _mm_set_pi32(((const int*)src)[1], ((const int*)src)[0]);	// load 64-bit as 2×32-bit
