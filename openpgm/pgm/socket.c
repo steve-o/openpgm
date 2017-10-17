@@ -2208,7 +2208,7 @@ pgm_bind3 (
 	}
 #else
 	if (recv_req->ir_address.ss_family != AF_UNSPEC)
-		memcpy(&recv_addr, &recv_req->ir_address, pgm_sockaddr_len (recv_req->ir_address));
+		memcpy(&recv_addr, &recv_req->ir_address, pgm_sockaddr_len (&recv_req->ir_address));
 	else if (!pgm_if_indextoaddr (recv_req->ir_interface,
 			         sock->family,
 				 recv_req->ir_scope_id,
