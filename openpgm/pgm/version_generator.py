@@ -4,7 +4,7 @@ import os
 import platform
 import time
 
-timestamp = time.gmtime(int(os.environ.get('SOURCE_DATE_EPOCH', time.time()))
+timestamp = time.gmtime(int(os.environ.get('SOURCE_DATE_EPOCH', time.time())))
 build_date = time.strftime ("%Y-%m-%d", timestamp)
 build_time = time.strftime ("%H:%M:%S", timestamp)
 build_rev = ''.join (list (filter (str.isdigit, "$Revision$")))

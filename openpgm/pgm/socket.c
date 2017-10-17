@@ -478,8 +478,12 @@ pgm_socket (
  */
 		pgm_trace (PGM_LOG_ROLE_NETWORK,_("Set socket sharing."));
 		const int v = 1;
-#ifndef SO_REUSEPORT
-		if (SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
+                const int ip_mcast_all = 0; // turn off
+#if !defined(SO_REUSEPORT) || defined(DISABLE_REUSEPORT)
+                if (SOCKET_ERROR == setsockopt (new_sock->recv_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
+#if defined(DISABLE_IP_MULTICAST_ALL)
+                    SOCKET_ERROR == setsockopt (new_sock->recv_sock, IPPROTO_IP, IP_MULTICAST_ALL, (const char*)&ip_mcast_all, sizeof(ip_mcast_all)) ||        
+#endif
 		    SOCKET_ERROR == setsockopt (new_sock->send_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)) ||
 		    SOCKET_ERROR == setsockopt (new_sock->send_with_router_alert_sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&v, sizeof(v)))
 		{
