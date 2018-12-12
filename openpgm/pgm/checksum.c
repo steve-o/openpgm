@@ -56,7 +56,7 @@ static uint16_t do_csum_64bit (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 static uint16_t do_csum_vector (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 /* MMX - First generation SIMD instructions, MMX registers are shared with x87 FPU. */
-#if defined(__MMX__) || defined(_M_AMD64) || defined(_M_X64)
+#if defined(__MMX__)
 static uint16_t do_csum_mmx (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 #endif
 /* 3DNow! - AMD's twist on MMX, abandoned except for PREFETCH & PREFETCHW. */
@@ -88,7 +88,7 @@ static uint16_t do_csum_avx2 (const void*, uint16_t, uint32_t) PGM_GNUC_PURE;
 /* AVX-512 - Adds 512-bit operands. */
 
 static uint16_t (*do_csum) (const void*, uint16_t, uint32_t) = NULL;
-static uint32_t (*do_csumcpy) (const void* restrict src, void* restrict dst, uint16_t len, uint32_t csum) = NULL;
+static uint16_t (*do_csumcpy) (const void* restrict src, void* restrict dst, uint16_t len, uint32_t csum) = NULL;
 
 /* Explicitly protecting against alignment issues, so hush compiler. */
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6) || defined(__clang__)
@@ -841,7 +841,7 @@ do_csumcpy_vector (
 }
 #endif
 
-#if defined(__MMX__) || defined(_M_AMD64) || defined(_M_X64)
+#if defined(__MMX__)
 static
 uint16_t
 do_csum_mmx (
@@ -1507,7 +1507,7 @@ pgm_checksum_init (const pgm_cpu_t* cpu)
 		return;
 	}
 #endif
-#if defined(__MMX__) || defined(_M_AMD64) || defined(_M_X64)
+#if defined(__MMX__)
 	if (cpu->has_mmx) {
 		pgm_minor (_("Using MMX instructions for checksum."));
 		do_csum = do_csum_mmx;
