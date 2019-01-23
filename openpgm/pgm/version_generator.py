@@ -8,6 +8,11 @@ timestamp = time.gmtime(int(os.environ.get('SOURCE_DATE_EPOCH', time.time())))
 build_date = time.strftime ("%Y-%m-%d", timestamp)
 build_time = time.strftime ("%H:%M:%S", timestamp)
 build_rev = ''.join (list (filter (str.isdigit, "$Revision$")))
+build_system = platform.system()
+build_machine = platform.machine()
+if 'SOURCE_DATE_EPOCH' in os.environ:
+        build_system = 'BuildSystem'
+        build_machine = 'BuildMachine'
 
 print ("""
 /* vim:ts=8:sts=8:sw=4:noai:noexpandtab
@@ -51,7 +56,7 @@ const char* pgm_build_revision = "{4}";
 
 
 /* eof */
-""".format (build_date, build_time, platform.system(), platform.machine(), build_rev))
+""".format (build_date, build_time, build_system, build_machine, build_rev))
 
 # end of file
 
