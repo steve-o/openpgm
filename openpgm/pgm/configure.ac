@@ -312,14 +312,19 @@ uint32_t add32_with_carry (uint32_t a, uint32_t b) {
 	;;
 esac
 # ticket spinlock friendly: unaligned pointers & atomic ops (excl. Sun Pro)
-AC_MSG_CHECKING([for unaligned pointers])
-AC_RUN_IFELSE(
-	[AC_LANG_PROGRAM([[char* nezumi = "mouse";]],
-		[[short x = *(short*)(nezumi + 2)]])],
-	[AC_MSG_RESULT([yes])
-		pgm_unaligned_pointers=yes],
-	[AC_MSG_RESULT([no])
-		pgm_unaligned_pointers=no])
+AC_CACHE_CHECK([if unaligned access fails], [ac_cv_lbl_unaligned_fail],
+	[AC_RUN_IFELSE(
+		[AC_LANG_PROGRAM([[char* nezumi = "mouse";]],
+			[[short x = *(short*)(nezumi + 2)]])],
+		[ac_cv_lbl_unaligned_fail=no],
+		[ac_cv_lbl_unaligned_fail=yes],
+		[ac_cv_lbl_unaligned_fail=yes])
+	])
+if test "$ac_cv_lbl_unaligned_fail" = yes; then
+	pgm_unaligned_pointers=no
+else
+	pgm_unaligned_pointers=yes
+fi
 AC_MSG_CHECKING([for intrinsic atomic ops])
 # AC_PREPROC_IFELSE not always portable
 AC_COMPILE_IFELSE(
