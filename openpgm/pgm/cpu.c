@@ -59,6 +59,7 @@ _xgetbv(uint32_t xcr) {
 #endif
 
 
+#if defined(__i386__) || defined(__x86_64__)
 PGM_GNUC_INTERNAL
 void
 pgm_cpuid (pgm_cpu_t* cpu)
@@ -93,5 +94,13 @@ pgm_cpuid (pgm_cpu_t* cpu)
 			(_xgetbv(0) & 6) == 6 /* XSAVE enabled by kernel */;
 	cpu->has_avx2 = cpu->has_avx && (cpu_info7[1] & 0x00000020) != 0;
 }
+#else
+PGM_GNUC_INTERNAL
+void
+pgm_cpuid (pgm_cpu_t* cpu)
+{
+	memset(cpu, 0, sizeof(pgm_cpu_t));
+}
+#endif
 
 /* eof */
