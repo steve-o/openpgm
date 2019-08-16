@@ -187,7 +187,7 @@ darwin* | aix*)
 	AC_MSG_RESULT([no])
 	;;
 *)
-AC_COMPILE_IFELSE(
+AC_LINK_IFELSE(
 	[AC_LANG_PROGRAM(,[[unsigned long lo, hi;
 __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));]])],
 :1
