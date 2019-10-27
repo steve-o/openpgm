@@ -202,15 +202,15 @@ if env['WITH_SNMP'] == 'true':
 conf = Configure(env, custom_tests = tests);
 
 if env['WITH_SNMP'] == 'true' and not conf.CheckSNMP():
-	print 'Net-SNMP libraries not compatible.';
+	print ('Net-SNMP libraries not compatible.');
 	Exit(1);
 
 if env['WITH_CHECK'] == 'true' and conf.CheckCheck():
-	print 'Enabling Check unit tests.';
+	print ('Enabling Check unit tests.');
 	conf.env['CHECK'] = 'true';
 	env['CHECK_FLAGS'] = env.ParseFlags('!pkg-config --cflags --libs check');
 else:
-	print 'Disabling Check unit tests.';
+	print ('Disabling Check unit tests.');
 	conf.env['CHECK'] = 'false';
 
 env = conf.Finish();

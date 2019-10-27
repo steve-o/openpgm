@@ -113,7 +113,7 @@ def CheckMember (context, member, header):
 int
 main ()
 {
-	offsetof (""" + string.replace (member, '.', ', ') + """);
+	offsetof (""" + member.replace('.', ', ') + """);
 	return 0;
 }
 	"""
