@@ -112,7 +112,7 @@ release = env.Clone(BUILD = 'release')
 release.Append(CCFLAGS = '-O2')
 
 debug = env.Clone(BUILD = 'debug')
-debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-gdb')
+debug.Append(CCFLAGS = ['-DPGM_DEBUG','-ggdb'], LINKFLAGS = '-ggdb')
 
 profile = env.Clone(BUILD = 'profile')
 profile.Append(CCFLAGS = ['-O2','-pg'], LINKFLAGS = '-pg')
@@ -232,7 +232,7 @@ env.Append(BUILDERS = {'StaticSharedLibrary': pic_lib});
 #-----------------------------------------------------------------------------
 
 ref_node = 'ref/' + env['BUILD'] + '-' + platform.system() + '-' + platform.machine() + '/';
-BuildDir(ref_node, '.', duplicate=0)
+VariantDir(ref_node, '.', duplicate=0)
 
 env.Append(CPPPATH = [
 # $(top_builddir)/include

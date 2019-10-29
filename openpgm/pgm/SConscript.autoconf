@@ -288,6 +288,7 @@ def AutoConf (env):
 	settings['HAVE_CLOCK_GETTIME'] = conf.CheckFunc ('clock_gettime');
 	settings['HAVE_FTIME'] = conf.CheckFunc ('ftime');
 	settings['HAVE_GETTIMEOFDAY'] = conf.CheckFunc ('gettimeofday');
+	settings['HAVE_TIMESPEC_GET'] = conf.CheckFunc ('timespec_get');
 	# Custom checks
 	settings['HAVE_PTHREAD_SPINLOCK'] = conf.CheckPthreadSpinlock();
 	settings['HAVE_GETPROTOBYNAME_R'] = conf.CheckFunc ('getprotobyname_r');
