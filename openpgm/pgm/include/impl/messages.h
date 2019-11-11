@@ -185,14 +185,14 @@ static inline void pgm_fatal (const char* format, ...) {
 #define pgm_warn_if_reached() \
 	do { \
 		pgm_warn ("file %s: line %d (%s): code should not be reached", \
-				__FILE__, __LINE__, __PRETTY_FUNCTION__); \
+				__FILE__, __LINE__, __func__); \
 	} while (0)
 #define pgm_warn_if_fail(expr) \
 	do { \
 		if (PGM_LIKELY (expr)); \
 		else \
 			pgm_warn ("file %s: line %d (%s): runtime check failed: (%s)", \
-				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
+				__FILE__, __LINE__, __func__, #expr); \
 	} while (0)
 
 
@@ -210,14 +210,14 @@ static inline void pgm_fatal (const char* format, ...) {
 		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_fatal ("file %s: line %d (%s): assertion failed: (%s)", \
-				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
+				__FILE__, __LINE__, __func__, #expr); \
 			abort (); \
 		} \
 	} while (0)
 #	define pgm_assert_not_reached() \
 	do { \
 		pgm_fatal ("file %s: line %d (%s): should not be reached", \
-			__FILE__, __LINE__, __PRETTY_FUNCTION__); \
+			__FILE__, __LINE__, __func__); \
 		abort (); \
 	} while (0)
 #	define pgm_assert_cmpint(n1, cmp, n2) \
@@ -226,7 +226,7 @@ static inline void pgm_fatal (const char* format, ...) {
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%" PRIi64 " %s %" PRIi64 ")", \
-				__FILE__, __LINE__, __PRETTY_FUNCTION__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
+				__FILE__, __LINE__, __func__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
 	} while (0)
@@ -236,7 +236,7 @@ static inline void pgm_fatal (const char* format, ...) {
 		if (PGM_LIKELY(_n1 cmp _n2)); \
 		else { \
 			pgm_fatal ("file %s: line %d (%s): assertion failed (%s): (%" PRIu64 " %s %" PRIu64 ")", \
-				__FILE__, __LINE__, __PRETTY_FUNCTION__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
+				__FILE__, __LINE__, __func__, #n1 " " #cmp " " #n2, _n1, #cmp, _n2); \
 			abort (); \
 		} \
 	} while (0)
@@ -295,7 +295,7 @@ static inline void pgm_fatal (const char* format, ...) {
 		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
-				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
+				__FILE__, __LINE__, __func__, #expr); \
 			return; \
 		} \
 	} while (0)
@@ -304,20 +304,20 @@ static inline void pgm_fatal (const char* format, ...) {
 		if (PGM_LIKELY(expr)); \
 		else { \
 			pgm_warn ("file %s: line %d (%s): assertion `%s' failed", \
-				__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr); \
+				__FILE__, __LINE__, __func__, #expr); \
 			return (val); \
 		} \
 	} while (0)
 #	define pgm_return_if_reached() \
 	do { \
 		pgm_warn ("file %s: line %d (%s): should not be reached", \
-			__FILE__, __LINE__, __PRETTY_FUNCTION__); \
+			__FILE__, __LINE__, __func__); \
 		return; \
 	} while (0)
 #	define pgm_return_val_if_reached(val) \
 	do { \
 		pgm_warn ("file %s: line %d (%s): should not be reached", \
-			__FILE__, __LINE__, __PRETTY_FUNCTION__); \
+			__FILE__, __LINE__, __func__); \
 		return (val); \
 	} while (0)
 

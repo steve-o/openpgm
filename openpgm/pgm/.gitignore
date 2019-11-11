@@ -3,3 +3,6 @@ build/
 config.log
 ref/
 scons.signatures-*.dblite
+autom4te.cache/
+/configure
+/include/config.h
