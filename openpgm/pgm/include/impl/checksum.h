@@ -30,9 +30,11 @@
 #define __PGM_IMPL_CHECKSUM_H__
 
 #include <pgm/types.h>
+#include <impl/cpu.h>
 
 PGM_BEGIN_DECLS
 
+PGM_GNUC_INTERNAL void pgm_checksum_init (const pgm_cpu_t* cpu);
 uint16_t pgm_inet_checksum (const void*, uint16_t, uint16_t);
 uint16_t pgm_csum_fold (uint32_t) PGM_GNUC_CONST;
 uint32_t pgm_csum_block_add (uint32_t, uint32_t, const uint16_t) PGM_GNUC_CONST;

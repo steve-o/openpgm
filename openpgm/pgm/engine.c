@@ -37,6 +37,7 @@
 
 #ifndef _WIN32
 #	include <netdb.h>
+#	include <grp.h>
 #endif
 #include <impl/i18n.h>
 #include <impl/framework.h>

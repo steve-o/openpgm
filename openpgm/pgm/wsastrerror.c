@@ -27,19 +27,21 @@
 
 /* compatibility stubs */
 
-char *
+const char*
 pgm_wsastrerror (
 	const int	wsa_errnum
 	)
 {
+	(void)wsa_errnum;
 	return _("Unknown.");
 }
 
-char*
+const char*
 pgm_adapter_strerror (
 	const int	adapter_errnum
 	)
 {
+	(void)adapter_errnum;
 	return _("Unknown.");
 }
 
@@ -50,6 +52,7 @@ pgm_win_strerror (
 	const int	win_errnum
 	)
 {
+	(void)win_errnum;
 	pgm_strncpy_s (buf, buflen, _("Unknown."), _TRUNCATE);
 	return buf;
 }
@@ -57,7 +60,7 @@ pgm_win_strerror (
 #else
 #	include <ws2tcpip.h>
 
-char*
+const char*
 pgm_wsastrerror (
 	const int	wsa_errnum
 	)
@@ -352,7 +355,7 @@ pgm_wsastrerror (
 	}
 }
 
-char*
+const char*
 pgm_adapter_strerror (
 	const int	adapter_errnum
 	)

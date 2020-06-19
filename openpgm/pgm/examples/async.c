@@ -189,6 +189,7 @@ receiver_routine (
 				pgm_getsockopt (async->sock, IPPROTO_PGM, PGM_TIME_REMAIN, &tv, &optlen);
 			}
 			goto block;
+			/* fallthrough */
 		case PGM_IO_STATUS_RATE_LIMITED:
 			{
 				socklen_t optlen = sizeof (tv);

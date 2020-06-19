@@ -567,7 +567,7 @@ receiver_thread (
 				socklen_t optlen = sizeof (tv);
 				pgm_getsockopt (rx_sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
 			}
-/* fall through */
+			/* fallthrough */
 		case PGM_IO_STATUS_WOULD_BLOCK:
 block:
 #ifdef CONFIG_HAVE_EPOLL

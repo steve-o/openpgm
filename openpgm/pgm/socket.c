@@ -2269,7 +2269,7 @@ pgm_bind3 (
 	memset (&send_addr, 0, sizeof(send_addr));
 
 	if (send_req->ir_address.ss_family != AF_UNSPEC)
-		memcpy(&send_addr, &send_req->ir_address, pgm_sockaddr_len ((struct sockaddr *)&send_req->ir_address));
+		memcpy(&send_addr, &send_req->ir_address, pgm_sockaddr_len ((const struct sockaddr *)&send_req->ir_address));
 	else if (!pgm_if_indextoaddr (send_req->ir_interface,
 				 sock->family,
 				 send_req->ir_scope_id,

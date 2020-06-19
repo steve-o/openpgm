@@ -1274,7 +1274,7 @@ again:
 					break;
 				}
 			}
-/* fall through */
+			/* fallthrough */
 		case PGM_IO_STATUS_WOULD_BLOCK:
 //g_message ("would block");
 block:

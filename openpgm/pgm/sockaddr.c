@@ -208,7 +208,7 @@ pgm_in_len2mask (
 	uint8_t* p;
 
 	p = (uint8_t*)mask;
-	memset (mask, sizeof (*mask), 0);
+	memset (mask, 0, sizeof (*mask));
 	for (i = 0; i < prefixlen / 8; i++)
 		p[i] = 0xff;
 	if (prefixlen % 8)

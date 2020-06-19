@@ -31,8 +31,9 @@
 
 PGM_BEGIN_DECLS
 
-char* pgm_wsastrerror (const int);
-char* pgm_adapter_strerror (const int);
+const char* pgm_wsastrerror (const int);
+const char* pgm_adapter_strerror (const int);
+/* non-const, result must be freed. */
 char* pgm_win_strerror (char*, size_t, const int);
 
 PGM_END_DECLS

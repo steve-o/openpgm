@@ -61,7 +61,7 @@ e.Append(CCFLAGS = '-DGETTEXT_PACKAGE=\'"pgm"\'');
 e.Command ('galois_tables.c', 'galois_generator.pl', "perl $SOURCE > $TARGET");
 
 # Version stamping
-e.Command ('version.c', 'version_generator.py', "python $SOURCE > $TARGET");
+e.Command ('version.c', 'version_generator.py', "python3 $SOURCE > $TARGET");
 e.Depends ('version.c', src);
 src += ['version.c'];
 

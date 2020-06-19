@@ -372,7 +372,7 @@ pgm_rxw_add (
 		}
 
 		const struct pgm_sk_buff_t* const first_skb = _pgm_rxw_peek (window, _pgm_rxw_tg_sqn (window, skb->sequence));
-		const pgm_rxw_state_t* const first_state = (pgm_rxw_state_t*)&first_skb->cb;
+		const pgm_rxw_state_t* const first_state = (const pgm_rxw_state_t*)&first_skb->cb;
 
 		if (_pgm_rxw_tg_sqn (window, skb->sequence) == _pgm_rxw_tg_sqn (window, window->lead)) {
 			window->has_event = 1;
@@ -801,7 +801,7 @@ _pgm_rxw_is_apdu_lost (
 	if (NULL == first_skb)
 		return TRUE;
 
-	const pgm_rxw_state_t* first_state = (pgm_rxw_state_t*)&first_skb->cb;
+	const pgm_rxw_state_t* first_state = (const pgm_rxw_state_t*)&first_skb->cb;
 	if (PGM_PKT_STATE_LOST_DATA == first_state->pkt_state)
 		return TRUE;
 
@@ -1255,7 +1255,8 @@ pgm_rxw_readv (
 		} else {
 			pgm_trace (PGM_LOG_ROLE_RX_WINDOW,_("Locking trail at commit window"));
 		}
-/* fall through */
+		/* fallthrough */
+
 	case PGM_PKT_STATE_BACK_OFF:
 	case PGM_PKT_STATE_WAIT_NCF:
 	case PGM_PKT_STATE_WAIT_DATA:
@@ -1453,6 +1454,8 @@ _pgm_rxw_reconstruct (
 			tg_opts[ window->rs.k + rs_h ] = (pgm_gf8_t*)skb->pgm_opt_fragment;
 			offsets[ j ] = window->rs.k + rs_h;
 			++rs_h;
+			/* fallthrough */
+
 /* fall through and alloc new skb for reconstructed data */
 		case PGM_PKT_STATE_BACK_OFF:
 		case PGM_PKT_STATE_WAIT_NCF:
@@ -2053,8 +2056,8 @@ _pgm_rxw_recovery_update (
 	case PGM_PKT_STATE_BACK_OFF:
 	case PGM_PKT_STATE_WAIT_NCF:
 		pgm_rxw_state (window, skb, PGM_PKT_STATE_WAIT_DATA);
+		/* fallthrough */
 
-/* fall through */
 	case PGM_PKT_STATE_WAIT_DATA:
 		state->timer_expiry = nak_rdata_expiry;
 		return PGM_RXW_UPDATED;

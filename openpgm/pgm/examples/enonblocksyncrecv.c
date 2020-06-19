@@ -187,7 +187,7 @@ main (
 				socklen_t optlen = sizeof (tv);
 				pgm_getsockopt (g_sock, IPPROTO_PGM, PGM_RATE_REMAIN, &tv, &optlen);
 			}
-/* fall through */
+			/* fallthrough */
 		case PGM_IO_STATUS_WOULD_BLOCK:
 /* poll for next event */
 block:

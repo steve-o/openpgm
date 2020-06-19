@@ -1367,9 +1367,9 @@ send_ack (
 	opt_len->opt_length	= sizeof(struct pgm_opt_length);
 	opt_len->opt_total_length = pgm_htons (	sizeof(struct pgm_opt_length) +
 						sizeof(struct pgm_opt_header) +
-						(AF_INET6 == sock->send_addr.ss_family) ?
+						( (AF_INET6 == sock->send_addr.ss_family) ?
 							sizeof(struct pgm_opt6_pgmcc_feedback) :
-							sizeof(struct pgm_opt_pgmcc_feedback) );
+							sizeof(struct pgm_opt_pgmcc_feedback) ) );
 	opt_header = (struct pgm_opt_header*)(opt_len + 1);
 	opt_header->opt_type	= PGM_OPT_PGMCC_FEEDBACK | PGM_OPT_END;
 	opt_header->opt_length	= sizeof(struct pgm_opt_header) +

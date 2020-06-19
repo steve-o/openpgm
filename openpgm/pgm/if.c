@@ -34,6 +34,7 @@
 #ifdef _AIX
 #       define IP_MULTICAST
 #endif
+#	include <arpa/inet.h>
 #	include <sys/types.h>
 #	include <sys/socket.h>
 #	include <netdb.h>		/* _GNU_SOURCE for EAI_NODATA */
@@ -162,11 +163,11 @@ pgm_gsr_to_string (
 	)
 {
 	char group[1024], source[1024], addr[1024];
-	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_group, group, sizeof (group)))
+	if (0 != pgm_sockaddr_ntop ((const struct sockaddr*)&gsr->gsr_group, group, sizeof (group)))
 		group[0] = 0;
-	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_source, source, sizeof (source)))
+	if (0 != pgm_sockaddr_ntop ((const struct sockaddr*)&gsr->gsr_source, source, sizeof (source)))
 		source[0] = 0;
-	if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&gsr->gsr_addr, addr, sizeof (addr)))
+	if (0 != pgm_sockaddr_ntop ((const struct sockaddr*)&gsr->gsr_addr, addr, sizeof (addr)))
 		addr[0] = 0;
 	pgm_snprintf_s (text, len, _TRUNCATE, "gsr_interface = %u, gsr_group = \"%s\", gsr_source = \"%s\", gsr_addr = \"%s\"",
 		gsr->gsr_interface, group, source, addr);
@@ -1205,7 +1206,7 @@ parse_group (
  */
 	for (res = result; NULL != res; res = res->ai_next)
 	{
-		if ((AF_INET6 != family && IN_MULTICAST(pgm_ntohl (((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
+		if ((AF_INET6 != family && IN_MULTICAST(pgm_ntohl (((const struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr))) ||
 		    (AF_INET  != family && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6*)res->ai_addr)->sin6_addr)))
 		{
 /* return first multicast result */
@@ -1446,7 +1447,7 @@ bind_gsr_to_interface (
 		struct pgm_group_source_req* gsr = gsr_list->data;
 /* interface is a tuple of {index, address} in order to support modern IP stacks with IP aliasing. */
 		gsr->gsr_interface = ir->ir_interface;
-		memcpy (&gsr->gsr_addr, &ir->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&ir->ir_addr));
+		memcpy (&gsr->gsr_addr, &ir->ir_addr, pgm_sockaddr_len ((const struct sockaddr*)&ir->ir_addr));
 		gsr_list = gsr_list->next;
 	}
 	return TRUE;
@@ -1554,8 +1555,8 @@ resolve_interface (
 		{
 			{
 				char s[INET6_ADDRSTRLEN];
-				if (0 != pgm_sockaddr_ntop (&resolved_interface.ir_addr, s, sizeof(s)))
-					s[0] == 0;
+				if (0 != pgm_sockaddr_ntop ((struct sockaddr*)&resolved_interface.ir_addr, s, sizeof(s)))
+					s[0] = 0;
 				pgm_debug ("Interface \"%s\" detected as \"%s\".", ir->ir_name ? ir->ir_name : "", s);
 			}
 			ir->ir_interface = resolved_interface.ir_interface;
@@ -1654,7 +1655,7 @@ parse_receive_entity (
 	if (NULL == entity) {
 		struct pgm_group_source_req* gsr = pgm_new0 (struct pgm_group_source_req, 1);
 		gsr->gsr_interface = ((struct interface_req*)(*interface_list)->data)->ir_interface;
-		if (!set_default_multicast_group (family, &gsr->gsr_group)) {
+		if (!set_default_multicast_group (family, (struct sockaddr*)&gsr->gsr_group)) {
 			pgm_set_error (error,
 					PGM_ERROR_DOMAIN_IF,
 					PGM_ERROR_INVAL,
@@ -1772,7 +1773,7 @@ parse_send_entity (
 /* default send object */
 	send_gsr = pgm_new0 (struct pgm_group_source_req, 1);
 	send_gsr->gsr_interface = primary_interface->ir_interface;
-	memcpy (&send_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((struct sockaddr*)&primary_interface->ir_addr));
+	memcpy (&send_gsr->gsr_addr, &primary_interface->ir_addr, pgm_sockaddr_len ((const struct sockaddr*)&primary_interface->ir_addr));
 	if (!parse_group (family, entity, (struct sockaddr*)&send_gsr->gsr_group, error))
 	{
 		pgm_prefix_error (error,
@@ -2005,6 +2006,7 @@ network_parse (
 				}
 				pgm_clear_error (&sub_error);
 				ec++;
+				/* fallthrough */
 
 			case ENTITY_RECEIVE:
 				if (!parse_receive_entity (family, entity, &source_list, recv_list, error))
@@ -2065,6 +2067,7 @@ network_parse (
 				goto free_lists;
 			}
 			ec++;
+			/* fallthrough */
 
 		case ENTITY_RECEIVE:
 			if (!parse_receive_entity (family, b, &source_list, recv_list, error))

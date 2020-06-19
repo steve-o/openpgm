@@ -168,6 +168,7 @@ main (
 			case 'b':
 			case 'B':
 				proactive_packets = 1;
+				/* fallthrough */
 			case 'o':
 			case 'O':
 				use_ondemand_parity = TRUE;
@@ -319,8 +320,8 @@ create_sock (void)
 		fprintf (stderr, "Parsing network parameter: %s\n", pgm_err->message);
 		goto err_abort;
 	} else {
-		char network[1024];
-                printf ("Network parameter: { %s }\n", pgm_addrinfo_to_string (res, network, sizeof (network)));
+		char s[1024];
+                printf ("Network parameter: { %s }\n", pgm_addrinfo_to_string (res, s, sizeof (s)));
 	}
 
 	sa_family = res->ai_send_addrs[0].gsr_group.ss_family;

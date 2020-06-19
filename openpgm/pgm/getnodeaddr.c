@@ -122,7 +122,7 @@ pgm_getnodeaddr (
 			t->ai_addrlen	= ai->ai_addrlen;
 			t->ai_addr	= (struct sockaddr*)p;
 			p += ai->ai_addrlen;
-			t->ai_next	= (NULL == ai->ai_next) ? NULL : p;
+			t->ai_next	= (NULL == ai->ai_next) ? NULL : (struct addrinfo*)p;
 		}
 		freeaddrinfo (result);
 		*res = na;

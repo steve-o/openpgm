@@ -307,7 +307,7 @@ pgm_txw_add (
 	pgm_assert ((char*)skb->data > (char*)skb->head);
 	pgm_assert ((sizeof(struct pgm_header) + sizeof(struct pgm_data)) <= (size_t)((char*)skb->data - (char*)skb->head));
 
-	pgm_debug ("add (window:%p skb:%p)", (const char*)window, (const char*)skb);
+	pgm_debug ("add (window:%p skb:%p)", (const void*)window, (const void*)skb);
 
 	if (pgm_txw_is_full (window))
 	{
