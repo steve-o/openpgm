@@ -48,7 +48,7 @@ pgm_gsi_create_from_data (
 {
 	pgm_return_val_if_fail (NULL != gsi, FALSE);
 	pgm_return_val_if_fail (NULL != data, FALSE);
-	pgm_return_val_if_fail (length > 1, FALSE);
+	pgm_return_val_if_fail (length > 0, FALSE);
 
 	struct pgm_md5_t ctx;
 	char resblock[16];

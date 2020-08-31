@@ -88,9 +88,9 @@ env = Environment(
 		],
 	LIBS = [
 		],
-	PROTOBUF_CCFLAGS = '-I/miru/projects/protobuf/protobuf-2.3.0/gcc64/include',
-	PROTOBUF_LIBS = '/miru/projects/protobuf/protobuf-2.3.0/gcc64/lib/libprotobuf.a',
-	PROTOBUF_PROTOC = '/miru/projects/protobuf/protobuf-2.3.0/gcc64/bin/protoc'
+	PROTOBUF_CCFLAGS = '-I/home/steve-o/protobuf/include',
+	PROTOBUF_LIBS = '/home/steve-o/protobuf/lib/libprotobuf.a',
+	PROTOBUF_PROTOC = '/home/steve-o/protobuf/bin/protoc'
 )
 
 # Branch prediction
