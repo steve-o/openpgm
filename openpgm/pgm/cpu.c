@@ -33,6 +33,7 @@
 //#define CPU_DEBUG
 
 
+#if defined(__i386__) || defined(__x86_64__)
 #ifndef _MSC_VER
 static
 void
@@ -59,7 +60,6 @@ _xgetbv(uint32_t xcr) {
 #endif
 
 
-#if defined(__i386__) || defined(__x86_64__)
 PGM_GNUC_INTERNAL
 void
 pgm_cpuid (pgm_cpu_t* cpu)
