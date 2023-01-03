@@ -242,7 +242,7 @@ msf.imsf_numsrc = 0;]])],
 # sprintf, caveat http://savannah.gnu.org/patch/?6848 (ax_c_printf_thsep)
 AC_MSG_CHECKING([for printf thousands' grouping])
 AC_COMPILE_IFELSE(
-	[AC_LANG_PROGRAM(,[[printf ("%'d", 1000000);]])],
+	[AC_LANG_PROGRAM([[#include <stdio.h>]],[[printf ("%'d", 1000000);]])],
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DHAVE_SPRINTF_GROUPING"],
 	[AC_MSG_RESULT([no])])
