@@ -31,6 +31,10 @@
 #	include <config.h>
 #endif
 
+#ifdef HAVE_GRP_H
+#	include <grp.h>
+#endif
+
 #ifndef _BSD_SOURCE
 #	define _BSD_SOURCE	1	/* getprotobyname_r */
 #endif
