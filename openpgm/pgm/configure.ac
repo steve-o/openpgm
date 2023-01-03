@@ -71,7 +71,7 @@ AC_SEARCH_LIBS([clock_gettime], [rt])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h float.h inttypes.h libintl.h limits.h locale.h malloc.h memory.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h strings.h sys/ioctl.h sys/param.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h wchar.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h float.h grp.h inttypes.h libintl.h limits.h locale.h malloc.h memory.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h strings.h sys/ioctl.h sys/param.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h wchar.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
@@ -242,7 +242,7 @@ msf.imsf_numsrc = 0;]])],
 # sprintf, caveat http://savannah.gnu.org/patch/?6848 (ax_c_printf_thsep)
 AC_MSG_CHECKING([for printf thousands' grouping])
 AC_COMPILE_IFELSE(
-	[AC_LANG_PROGRAM(,[[printf ("%'d", 1000000);]])],
+	[AC_LANG_PROGRAM([[#include <stdio.h>]],[[printf ("%'d", 1000000);]])],
 	[AC_MSG_RESULT([yes])
 		CFLAGS="$CFLAGS -DHAVE_SPRINTF_GROUPING"],
 	[AC_MSG_RESULT([no])])
