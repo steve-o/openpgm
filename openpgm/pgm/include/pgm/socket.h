@@ -202,7 +202,7 @@ int pgm_wsapoll_info (pgm_sock_t*const restrict, WSAPOLLFD*const restrict, ULONG
 int pgm_epoll_ctl (pgm_sock_t*const, const int, const int, const int);
 #endif
 
-static
+static inline
 const char*
 pgm_family_string (
 	const int       family
